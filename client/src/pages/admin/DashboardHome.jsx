@@ -5,7 +5,7 @@ import {
   TrendingDown, Minus, Wallet, PiggyBank, Percent, Repeat,
   BarChart3, Lightbulb, Target, Activity, Scale, UserCheck,
   UserX, Server, Monitor, ArrowRight, Sparkles, Trophy, Hourglass,
-  Gem, RefreshCw, Calendar, Receipt,
+  Gem, RefreshCw, Calendar, Receipt, Download,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -17,6 +17,8 @@ import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
+import { calcDias, getRowVariant } from './planificador/rowHelpers'
+import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 
 // ─── Stat card (KPIs operativos) ─────────────────────────────────────────────
 // Si recibe `onClick`, se vuelve interactiva: funciona como acceso directo al
@@ -606,14 +608,19 @@ export default function DashboardHome() {
   const { showToast } = useUi()
   const [stats, setStats] = useState(null)
   const [bi, setBi] = useState(null)
+  const [planificador, setPlanificador] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [downloadingBackup, setDownloadingBackup] = useState(false)
   const [anioVentasLicencia, setAnioVentasLicencia] = useState(null)
   const [mesVentasLicencia, setMesVentasLicencia] = useState(null)
+  const [showVencidasPanel, setShowVencidasPanel] = useState(false)
+  const [showProximasPanel, setShowProximasPanel] = useState(false)
 
   const load = () => Promise.all([
     api.get('/admin/dashboard-stats').then((r) => setStats(r.data)),
     api.get('/admin/dashboard-bi').then((r) => setBi(r.data)),
+    api.get('/admin/planificador').then((r) => setPlanificador(r.data)),
   ])
 
   useEffect(() => {
@@ -645,10 +652,68 @@ export default function DashboardHome() {
     }
   }
 
+  // Descarga una copia .sqlite de la base de datos actual del servidor
+  // (la de producción, si se usa desde el panel desplegado en Railway).
+  const handleDownloadBackup = async () => {
+    setDownloadingBackup(true)
+    try {
+      const res = await api.get('/admin/backup/database', { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `chikisdtv-backup-${new Date().toISOString().slice(0, 10)}.sqlite`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (e) {
+      showToast(e.response?.data?.error || e.message, 'error')
+    } finally {
+      setDownloadingBackup(false)
+    }
+  }
+
   const pieData = useMemo(() => {
     if (!bi) return []
     return bi.tipoPago.map(t => ({ name: t.tipo, value: t.total, pct: t.pctTotal }))
   }, [bi])
+
+  // Pantallas del Planificador enriquecidas con su variante y días — misma
+  // clasificación (getRowVariant/calcDias) que usa PlanificadorPage.
+  const pantallasEnriquecidas = useMemo(() => {
+    if (!planificador) return []
+    const { pantallas, diasAlerta } = planificador
+    return pantallas.map(p => ({
+      ...p,
+      _variant: getRowVariant(p, diasAlerta),
+      _dias: calcDias(p.duracionReal || p.finalizacion) ?? p.diasVencimientoReal ?? p.diasVencimiento ?? null,
+    }))
+  }, [planificador])
+
+  const byDiasAsc = (a, b) => (a._dias ?? Infinity) - (b._dias ?? Infinity)
+
+  // Cuentas vencidas: misma data que la tarjeta "Vencidas" del Planificador (categoría 'vencido').
+  const cuentasVencidas = useMemo(
+    () => pantallasEnriquecidas.filter(p => p._variant === 'vencido').sort(byDiasAsc),
+    [pantallasEnriquecidas]
+  )
+
+  // Próximas a vencer: misma data que la tarjeta "Próx. a vencer" del Planificador (categoría 'alerta').
+  const proximasAVencer = useMemo(
+    () => pantallasEnriquecidas.filter(p => p._variant === 'alerta').sort(byDiasAsc),
+    [pantallasEnriquecidas]
+  )
+
+  const handleGenerateVentaPlanificador = (screen, catKey) => {
+    setShowVencidasPanel(false)
+    setShowProximasPanel(false)
+    navigate('/admin/payments', {
+      state: {
+        prefillVenta: screenToVentaPrefill(screen, catKey),
+        prefillSource: CATEGORY_CONFIG[catKey]?.title || 'Planificador',
+      },
+    })
+  }
 
   // Serie de variación mensual de ingresos (momentum) — derivada de porMes,
   // tomando solo meses con ventas registradas para no distorsionar con ceros.
@@ -740,17 +805,43 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-8">
+      {showVencidasPanel && (
+        <CategoryPanel
+          catKey="vencido"
+          screens={cuentasVencidas}
+          onClose={() => setShowVencidasPanel(false)}
+          onGenerate={handleGenerateVentaPlanificador}
+        />
+      )}
+
+      {showProximasPanel && (
+        <CategoryPanel
+          catKey="alerta"
+          screens={proximasAVencer}
+          onClose={() => setShowProximasPanel(false)}
+          onGenerate={handleGenerateVentaPlanificador}
+        />
+      )}
+
       <div className="mb-2 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-brand-accent">Dashboard</h1>
           <p className="text-gray-500">Panel general de ChikisdTV</p>
         </div>
-        <Button
-          onClick={handleSync} variant="secondary" disabled={syncing}
-          className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
-        >
-          <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando…' : 'Sincronizar Datos'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleDownloadBackup} variant="secondary" disabled={downloadingBackup}
+            className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
+          >
+            <Download size={15} /> {downloadingBackup ? 'Descargando…' : 'Respaldo BD'}
+          </Button>
+          <Button
+            onClick={handleSync} variant="secondary" disabled={syncing}
+            className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
+          >
+            <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando…' : 'Sincronizar Datos'}
+          </Button>
+        </div>
       </div>
 
       {/* ─── KPIs operativos: clientes, catálogo y capacidad ─────────────── */}
@@ -794,18 +885,18 @@ export default function DashboardHome() {
           onClick={() => navigate('/admin/payments')}
         />
         <StatCard
-          icon={AlertCircle} title="Pagos Vencidos" value={stats.vencidosPayments} color="bg-red-500"
-          subtitle={stats.vencidosPayments > 0
-            ? 'Cartera en mora directa — cruza con "Cuentas que deben" del Planificador para ubicar al cliente y generar el cobro'
-            : 'Sin pagos vencidos registrados — cartera sana por ahora'}
-          onClick={() => navigate('/admin/payments')}
+          icon={AlertCircle} title="Pagos Vencidos" value={cuentasVencidas.length} color="bg-red-500"
+          subtitle={cuentasVencidas.length > 0
+            ? 'Cuentas vencidas del Planificador — haz clic para ver cliente, fecha de vencimiento y días de mora'
+            : 'Sin cuentas vencidas en el Planificador — cartera sana por ahora'}
+          onClick={() => setShowVencidasPanel(true)}
         />
         <StatCard
-          icon={TrendingUp} title="Vencen en 7 días" value={stats.upcomingExpirations} color="bg-orange-500"
-          subtitle={stats.upcomingExpirations > 0
-            ? 'Oportunidad de renovación inmediata — ábrelas desde Planificador → "Próx. a vencer" y genera la venta pre-llenada'
-            : 'Sin renovaciones urgentes esta semana — buen momento para campañas de retención preventiva'}
-          onClick={() => navigate('/admin/planificador')}
+          icon={TrendingUp} title="Próximas a vencer" value={proximasAVencer.length} color="bg-orange-500"
+          subtitle={proximasAVencer.length > 0
+            ? `Cuentas del Planificador a ≤${planificador?.diasAlerta ?? 8} días de vencer — haz clic para ver cliente, fecha y días restantes`
+            : 'Sin cuentas próximas a vencer — buen momento para campañas de retención preventiva'}
+          onClick={() => setShowProximasPanel(true)}
         />
       </div>
 
