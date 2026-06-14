@@ -1,5 +1,5 @@
 import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck } from 'lucide-react'
-import { formatCurrency } from '../../../utils/excelUtils'
+import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
 import { STAT_TONES } from './StatCard'
 import { diasLabel, diasLabelClass, estadoBadgeVariant } from './rowHelpers'
@@ -7,18 +7,29 @@ import { diasLabel, diasLabelClass, estadoBadgeVariant } from './rowHelpers'
 // ─── Tarjetas inteligentes: configuración de cada categoría accionable ──────
 // Cada entrada describe cómo abrir su panel de detalle (título, tono visual,
 // columna contextual de negocio) y qué tipo de venta sugerir al generarla en Pagos.
+// Badge compartido por "alerta" y "vencido": fecha de vencimiento + días (vence en/venció hace)
+function fechaDiasBadge(p) {
+  const fecha = p.duracionReal || p.finalizacion
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      {fecha && <span className="text-xs text-gray-500">{formatDate(fecha)}</span>}
+      <span className={diasLabelClass(p._dias)}>{diasLabel(p._dias)}</span>
+    </div>
+  )
+}
+
 export const CATEGORY_CONFIG = {
   alerta: {
     title: 'Próximas a vencer', icon: Clock, tone: 'orange', tipoPago: 'Renovacion',
     extraLabel: 'Vencimiento',
-    badge: (p) => <span className={diasLabelClass(p._dias)}>{diasLabel(p._dias)}</span>,
+    badge: fechaDiasBadge,
     emptyMsg: 'No hay pantallas próximas a vencer en este momento. ¡Todo al día!',
     hint: 'Contacta a estos clientes para anticipar la renovación antes del vencimiento.',
   },
   vencido: {
     title: 'Cuentas vencidas', icon: XCircle, tone: 'red', tipoPago: 'Renovacion',
-    extraLabel: 'Estado',
-    badge: (p) => <span className={diasLabelClass(p._dias)}>{diasLabel(p._dias)}</span>,
+    extraLabel: 'Vencimiento',
+    badge: fechaDiasBadge,
     emptyMsg: 'No hay cuentas vencidas. ¡Excelente gestión de cartera!',
     hint: 'Prioriza estos clientes: cada día vencido es ingreso represado e incrementa el riesgo de fuga.',
   },

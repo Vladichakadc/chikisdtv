@@ -18,5 +18,6 @@ router.use(require('./planificador'));
 router.use(require('./cuentasPadre'));
 router.use(require('./bajas'));
 router.use(require('./costoPantalla'));
+router.use(require('./backup'));
 
 module.exports = router;
