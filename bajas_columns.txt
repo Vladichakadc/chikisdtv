@@ -1,0 +1,66 @@
+TOTAL COLUMNAS: 19
+  1. "Id_VM" (111/111 con datos) ejemplo: "BAJA150"
+  2. "Customer_id" (111/111 con datos) ejemplo: "074"
+  3. "Nombre" (111/111 con datos) ejemplo: "Gimena"
+  4. "Apellido" (111/111 con datos) ejemplo: "Tascon"
+  5. "SKU" (111/111 con datos) ejemplo: "003HD"
+  6. "TIPO DE FIRE" (111/111 con datos) ejemplo: "Fire TV HD"
+  7. "Devolucion" (111/111 con datos) ejemplo: "NO"
+  8. "Nickname" (111/111 con datos) ejemplo: "Gimena"
+  9. "Estado" (111/111 con datos) ejemplo: "Desactivado"
+  10. "Cortesia" (111/111 con datos) ejemplo: "NO"
+  11. "Pantallas" (111/111 con datos) ejemplo: "1"
+  12. "Fecha de Baja" (111/111 con datos) ejemplo: "46173"
+  13. "Fecha " (111/111 con datos) ejemplo: "46162.81458333333"
+  14. "Año" (111/111 con datos) ejemplo: "2026"
+  15. "Mes" (111/111 con datos) ejemplo: "Mayo"
+  16. "Item_Quantity" (111/111 con datos) ejemplo: "1"
+  17. "Tipo de Plan" (111/111 con datos) ejemplo: "Plan Semestral"
+  18. "Tipo de Pantalla" (111/111 con datos) ejemplo: "Individual"
+  19. "Cuenta Dedicada" (111/111 con datos) ejemplo: "NO"
+
+PRIMERA FILA:
+{
+  "Id_VM": "BAJA150",
+  "Customer_id": "074",
+  "Nombre": "Gimena",
+  "Apellido": "Tascon",
+  "SKU": "003HD",
+  "TIPO DE FIRE": "Fire TV HD",
+  "Devolucion": "NO",
+  "Nickname": "Gimena",
+  "Estado": "Desactivado",
+  "Cortesia": "NO",
+  "Pantallas": 1,
+  "Fecha de Baja": 46173,
+  "Fecha ": 46162.81458333333,
+  "Año": 2026,
+  "Mes": "Mayo",
+  "Item_Quantity": 1,
+  "Tipo de Plan": "Plan Semestral",
+  "Tipo de Pantalla": "Individual",
+  "Cuenta Dedicada": "NO"
+}
+
+SEGUNDA FILA:
+{
+  "Id_VM": "BAJA149",
+  "Customer_id": "102",
+  "Nombre": "Jorge ",
+  "Apellido": "Niño",
+  "SKU": "0014K",
+  "TIPO DE FIRE": "Fire TV 4K",
+  "Devolucion": "NO",
+  "Nickname": "Jorge Niño 2",
+  "Estado": "Desactivado",
+  "Cortesia": "NO",
+  "Pantallas": 1,
+  "Fecha de Baja": 46173,
+  "Fecha ": 46164,
+  "Año": 2026,
+  "Mes": "Mayo",
+  "Item_Quantity": 1,
+  "Tipo de Plan": "Plan Semestral",
+  "Tipo de Pantalla": "Individual",
+  "Cuenta Dedicada": "NO"
+}

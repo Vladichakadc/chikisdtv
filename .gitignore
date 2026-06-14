@@ -1,0 +1,37 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (contienen secretos, no se versionan)
+.env
+.env.local
+.env.*.local
+
+# Base de datos local (SQLite) y backups
+database.sqlite
+database.sqlite-shm
+database.sqlite-wal
+database.sqlite.bak_*
+backups/
+
+# Build de producción del frontend
+client/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Lock files de herramientas locales
+.claude/scheduled_tasks.lock
+
+# Documentos de negocio (no son parte del codigo, quedan solo en local)
+Comercio IPTV_3.pbix
+Planificador de proyectos Magistv_v1_202602105.xlsm
+Informe_ChikisdTV.pdf
+Respuestas Automatizadas FLUJOTV.docx
+Magistv.png
+Nuevo Imagen de mapa de bits.bmp
+Servicio de IPTV.txt

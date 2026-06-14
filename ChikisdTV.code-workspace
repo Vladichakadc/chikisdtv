@@ -1,0 +1,32 @@
+{
+  "folders": [
+    {
+      "name": "ChikisdTV",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "window.title": "ChikisdTV - ${activeEditorShort}${separator}${rootName}",
+    "workbench.colorCustomizations": {
+      "titleBar.activeBackground": "#f97316",
+      "titleBar.activeForeground": "#ffffff",
+      "titleBar.inactiveBackground": "#c2410c",
+      "titleBar.inactiveForeground": "#fed7aa",
+      "activityBar.background": "#f97316",
+      "activityBar.foreground": "#ffffff",
+      "statusBar.background": "#f97316",
+      "statusBar.foreground": "#ffffff"
+    },
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true,
+      "**/dist": true,
+      "**/Backups": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/*.sqlite": true
+    }
+  }
+}
