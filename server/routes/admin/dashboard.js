@@ -632,4 +632,78 @@ router.get('/dashboard-bi/cohorts', asyncHandler(async (_req, res) => {
   });
 }));
 
+// ============ INGRESO POR CLIENTE (detalle de ARPU) ============
+router.get('/dashboard-bi/ingresos-por-cliente', asyncHandler(async (_req, res) => {
+  const ventas = await Venta.findAll({
+    attributes: ['customerId', 'nombre', 'apellido', 'nickname', 'precioVenta', 'fecha'],
+    raw: true,
+  });
+
+  const porCliente = {};
+  for (const v of ventas) {
+    const cid = v.customerId || 'SIN_ID';
+    if (!porCliente[cid]) {
+      porCliente[cid] = { customerId: cid, nombre: '', apellido: '', nickname: '', totalIngresos: 0, numVentas: 0, ultimaCompra: null };
+    }
+    const e = porCliente[cid];
+    e.totalIngresos += Number(v.precioVenta) || 0;
+    e.numVentas += 1;
+    if (!e.ultimaCompra || (v.fecha && v.fecha > e.ultimaCompra)) {
+      e.ultimaCompra = v.fecha || e.ultimaCompra;
+      if (v.nombre) e.nombre = v.nombre;
+      if (v.apellido) e.apellido = v.apellido;
+      if (v.nickname) e.nickname = v.nickname;
+    }
+  }
+
+  const totalIngresos = Object.values(porCliente).reduce((s, e) => s + e.totalIngresos, 0);
+
+  const clientes = Object.values(porCliente)
+    .map(e => ({
+      customerId: e.customerId,
+      cliente: [e.nombre, e.apellido].filter(Boolean).join(' ').trim() || e.nickname || e.customerId,
+      nickname: e.nickname,
+      numVentas: e.numVentas,
+      totalIngresos: Math.round(e.totalIngresos),
+      ticketPromedio: e.numVentas > 0 ? Math.round(e.totalIngresos / e.numVentas) : 0,
+      ultimaCompra: e.ultimaCompra,
+      pctTotal: totalIngresos > 0 ? Number(((e.totalIngresos / totalIngresos) * 100).toFixed(2)) : 0,
+    }))
+    .sort((a, b) => b.totalIngresos - a.totalIngresos);
+
+  res.json({
+    totalIngresos: Math.round(totalIngresos),
+    numClientes: clientes.length,
+    arpu: clientes.length > 0 ? Math.round(totalIngresos / clientes.length) : 0,
+    clientes,
+  });
+}));
+
+// ============ DETALLE DE VENTAS DE UN CLIENTE (drill-down de ARPU) ============
+router.get('/dashboard-bi/ingresos-por-cliente/:customerId', asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+  const where = customerId === 'SIN_ID' ? { customerId: null } : { customerId };
+
+  const ventas = await Venta.findAll({
+    where,
+    attributes: ['idVM', 'fecha', 'tipoPago', 'tipoPlan', 'precioVenta', 'nickname', 'cuenta', 'cuentaId', 'medioPago'],
+    order: [['fecha', 'DESC']],
+    raw: true,
+  });
+
+  res.json({
+    customerId,
+    ventas: ventas.map(v => ({
+      idVM: v.idVM,
+      fecha: v.fecha,
+      tipoPago: v.tipoPago,
+      tipoPlan: v.tipoPlan,
+      precioVenta: Math.round(Number(v.precioVenta) || 0),
+      nickname: v.nickname,
+      cuenta: v.cuenta || v.cuentaId || '',
+      medioPago: v.medioPago,
+    })),
+  });
+}));
+
 module.exports = router;

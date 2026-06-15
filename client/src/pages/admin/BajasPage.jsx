@@ -86,10 +86,12 @@ export default function BajasPage() {
   const [sortCol, setSortCol] = useState('fechaBaja')
   const [sortDir, setSortDir] = useState('desc')
   const [nicknames, setNicknames] = useState([])
+  const [nicknameEditMode, setNicknameEditMode] = useState(false)
 
   const openNew = async () => {
     setEditing(null)
     setForm(EMPTY)
+    setNicknameEditMode(false)
     setShowForm(true)
     // Auto-generar ID
     try {
@@ -102,8 +104,8 @@ export default function BajasPage() {
       setNicknames(data)
     } catch (e) { console.error(e) }
   }
-  const openEdit = (b) => { setEditing(b); setForm({ ...b }); setShowForm(true) }
-  const closeForm = () => setShowForm(false)
+  const openEdit = (b) => { setEditing(b); setForm({ ...b }); setNicknameEditMode(false); setShowForm(true) }
+  const closeForm = () => { setShowForm(false); setNicknameEditMode(false) }
 
   const handleNicknameSelect = (nick) => {
     if (!nick) { setForm(f => ({ ...f, nickname: '' })); return }
@@ -353,21 +355,47 @@ export default function BajasPage() {
                   <input value={form.idBaja || 'Generando...'} readOnly disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 font-mono font-bold cursor-not-allowed" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nickname *</label>
-                  <select
-                    value={form.nickname || ''}
-                    onChange={(e) => handleNicknameSelect(e.target.value)}
-                    className="w-full px-3 py-2 border border-orange-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
-                    required
-                  >
-                    <option value="">-- Seleccionar nickname --</option>
-                    {nicknames.map(n => (
-                      <option key={n.nickname} value={n.nickname}>
-                        {n.nickname}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-400 mt-0.5">Al seleccionar se llenan los campos asociados</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Nickname *</label>
+                    {editing && (
+                      <button
+                        type="button"
+                        onClick={() => setNicknameEditMode(m => !m)}
+                        className="text-orange-600 hover:text-orange-700 text-xs font-semibold flex items-center gap-1"
+                        title={nicknameEditMode ? 'Volver a la lista de cuentas activas' : 'Editar nickname manualmente'}
+                      >
+                        <Pencil size={12} /> {nicknameEditMode ? 'Usar lista' : 'Editar nickname'}
+                      </button>
+                    )}
+                  </div>
+                  {nicknameEditMode ? (
+                    <input
+                      value={form.nickname || ''}
+                      onChange={(e) => setForm(f => ({ ...f, nickname: e.target.value }))}
+                      className="w-full px-3 py-2 border border-orange-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+                      required
+                    />
+                  ) : (
+                    <>
+                      <select
+                        value={form.nickname || ''}
+                        onChange={(e) => handleNicknameSelect(e.target.value)}
+                        className="w-full px-3 py-2 border border-orange-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+                        required
+                      >
+                        <option value="">-- Seleccionar nickname --</option>
+                        {form.nickname && !nicknames.some(n => n.nickname === form.nickname) && (
+                          <option value={form.nickname}>{form.nickname}</option>
+                        )}
+                        {nicknames.map(n => (
+                          <option key={n.nickname} value={n.nickname}>
+                            {n.nickname}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-400 mt-0.5">Al seleccionar se llenan los campos asociados</p>
+                    </>
+                  )}
                 </div>
                 <Input label="ID Cliente" value={form.customerId || ''} onChange={(e) => setForm({ ...form, customerId: e.target.value })} />
                 <Input label="Nombre *" value={form.nombre || ''} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />

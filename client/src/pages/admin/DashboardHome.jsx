@@ -19,6 +19,7 @@ import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
 import { calcDias, getRowVariant } from './planificador/rowHelpers'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
+import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
 
 // ─── Stat card (KPIs operativos) ─────────────────────────────────────────────
 // Si recibe `onClick`, se vuelve interactiva: funciona como acceso directo al
@@ -74,15 +75,27 @@ function GrowthBadge({ pct }) {
   )
 }
 
-function BiCard({ icon: Icon, label, value, growth, growthLabel, sub, variant = 'light', tag }) {
+function BiCard({ icon: Icon, label, value, growth, growthLabel, sub, variant = 'light', tag, onClick }) {
   const styles = {
     solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
     light:   'bg-white border-2 border-orange-200 text-orange-700',
     outline: 'bg-orange-50 border border-orange-300 text-orange-800',
   }
   const iconBg = { solid: 'bg-white/20', light: 'bg-orange-100', outline: 'bg-orange-200/60' }
+  const interactive = typeof onClick === 'function'
   return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+    <div
+      className={cn(
+        styles[variant], 'rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5',
+        interactive && 'cursor-pointer'
+      )}
+      {...(interactive ? {
+        role: 'button',
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
+      } : {})}
+    >
       <div className="flex items-center justify-between">
         <div>
           <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
@@ -94,6 +107,11 @@ function BiCard({ icon: Icon, label, value, growth, growthLabel, sub, variant = 
               <span className={`text-xs ${variant === 'solid' ? 'opacity-75' : 'text-gray-400'}`}>{growthLabel || sub}</span>
             )}
           </div>
+          {interactive && (
+            <p className={`flex items-center gap-1 text-xs font-semibold mt-2 ${variant === 'solid' ? 'text-white' : 'text-brand-primary'}`}>
+              Ver detalle por cliente <ArrowRight size={12} />
+            </p>
+          )}
         </div>
         <div className={`${iconBg[variant]} rounded-lg p-3`}>
           <Icon size={22} />
@@ -182,6 +200,19 @@ function MomentumValueLabel({ x, y, width, height, value }) {
       {...LABEL_STYLE}
     >
       {`${positivo ? '+' : ''}${value.toFixed(1)}%`}
+    </text>
+  )
+}
+
+// ─── Etiqueta de valor/porcentaje para las líneas de "Evolución anual": un
+// <text> propio (no el Label de recharts) porque LabelList sobre <Line> en
+// recharts v3 no recibe el parentViewBox y puede "escapar" del área del
+// gráfico — dibujando manualmente evitamos ese bug ───────────────────────────
+function LineValueLabel({ x, y, value, dy = -9, fill = '#1e293b', formatter = (v) => v }) {
+  if (value == null) return null
+  return (
+    <text x={x} y={y + dy} textAnchor="middle" style={{ ...LABEL_STYLE, fontSize: 10, fill }}>
+      {formatter(value)}
     </text>
   )
 }
@@ -302,7 +333,28 @@ function narrarIngresosCostosAnio(porAnio) {
   const pareceParcial = penultimo && ultimo.numVentas < penultimo.numVentas * 0.9
   return `Leyendo barra por barra, año a año: ${relatos.join('; ')}.${pareceParcial
     ? ` La barra de **${ultimo.anio}** se ve más baja porque el año está en curso (${ultimo.numVentas} ventas registradas frente a ${penultimo.numVentas} del ${penultimo.anio} ya cerrado) — no es una contracción real, es un corte parcial; para comparar de forma justa usa el comparativo "año corrido" (YTD) de arriba.`
-    : ` La línea verde (margen %) se mantiene en un rango alto y estable, lo que confirma que el crecimiento del negocio no ha sacrificado eficiencia de costos.`}`
+    : ` La línea morada (margen %) se mantiene en un rango alto y estable, lo que confirma que el crecimiento del negocio no ha sacrificado eficiencia de costos.`}`
+}
+
+// Lectura de la curva completa ingresos/costos/ganancia, desde el primer año
+// con datos hasta el año en curso — complementa la lectura "barra por barra"
+// de narrarIngresosCostosAnio con una vista de tendencia de largo plazo.
+function narrarEvolucionAnual(porAnio) {
+  if (!porAnio?.length) return null
+  const primero = porAnio[0]
+  const ultimo = porAnio[porAnio.length - 1]
+  if (primero === ultimo) return null
+  const variacion = (ini, fin) => (ini > 0 ? ((fin - ini) / ini) * 100 : null)
+  const crecIngresos = variacion(primero.ingresos, ultimo.ingresos)
+  const crecCostos = variacion(primero.costos, ultimo.costos)
+  const crecMargen = variacion(primero.margen, ultimo.margen)
+  const signo = (v) => (v >= 0 ? '+' : '')
+  const lecturaFinal = crecIngresos != null && crecCostos != null
+    ? (crecIngresos > crecCostos
+      ? ' La curva verde (ganancia) se separa cada vez más de la gris (costos): el negocio gana eficiencia a medida que crece — cada peso adicional de ingreso deja más ganancia que el anterior.'
+      : ' La curva gris (costos) crece más rápido que la naranja (ingresos): vale la pena vigilar el costo unitario, porque está erosionando la ganancia a medida que el negocio escala.')
+    : ''
+  return `Entre **${primero.anio}** y **${ultimo.anio}**: los ingresos pasaron de ${formatCurrency(primero.ingresos)} a ${formatCurrency(ultimo.ingresos)}${crecIngresos != null ? ` (${signo(crecIngresos)}${crecIngresos.toFixed(0)}%)` : ''}, los costos de ${formatCurrency(primero.costos)} a ${formatCurrency(ultimo.costos)}${crecCostos != null ? ` (${signo(crecCostos)}${crecCostos.toFixed(0)}%)` : ''}, y la ganancia (margen bruto en pesos) de ${formatCurrency(primero.margen)} a ${formatCurrency(ultimo.margen)}${crecMargen != null ? ` (${signo(crecMargen)}${crecMargen.toFixed(0)}%)` : ''}.${lecturaFinal}`
 }
 
 function narrarTendenciaMensual(porMes) {
@@ -617,6 +669,7 @@ export default function DashboardHome() {
   const [mesVentasLicencia, setMesVentasLicencia] = useState(null)
   const [showVencidasPanel, setShowVencidasPanel] = useState(false)
   const [showProximasPanel, setShowProximasPanel] = useState(false)
+  const [showArpuPanel, setShowArpuPanel] = useState(false)
 
   const load = () => Promise.all([
     api.get('/admin/dashboard-stats').then((r) => setStats(r.data)),
@@ -756,6 +809,16 @@ export default function DashboardHome() {
     return out.slice(-12)
   }, [bi])
 
+  // Crecimiento de la ganancia (margen en pesos) del último año cerrado vs.
+  // el anterior — mismo criterio que crecimientoIngresosUltimo/CostosUltimo.
+  const crecimientoMargenUltimo = useMemo(() => {
+    if (!bi?.porAnio?.length) return null
+    const ultimo = bi.porAnio[bi.porAnio.length - 1]
+    const penultimo = bi.porAnio[bi.porAnio.length - 2]
+    if (!penultimo || penultimo.margen <= 0) return null
+    return Number((((ultimo.margen - penultimo.margen) / penultimo.margen) * 100).toFixed(1))
+  }, [bi])
+
   // ─── Ventas de licencias — mes a mes, filtrable por año ────────────────────
   const aniosVentasLicencia = useMemo(() => {
     if (!bi) return []
@@ -848,6 +911,10 @@ export default function DashboardHome() {
         />
       )}
 
+      {showArpuPanel && (
+        <IngresoPorClientePanel onClose={() => setShowArpuPanel(false)} />
+      )}
+
       <div className="mb-2 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-brand-accent">Dashboard</h1>
@@ -911,14 +978,7 @@ export default function DashboardHome() {
       </div>
 
       {/* ─── KPIs operativos: ingresos y cartera ─────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={DollarSign} title="Ingresos Totales" value={formatCurrency(stats.totalIngresos)} color="bg-emerald-500"
-          subtitle={k
-            ? `Pagos confirmados — sostienen un margen bruto histórico de ${k.margenPctTotal.toFixed(1)}% (ver análisis BI abajo)`
-            : 'Histórico de pagos confirmados en el módulo de Pagos'}
-          onClick={() => navigate('/admin/payments')}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           icon={Clock} title="Pagos Pendientes" value={stats.pendingPayments} color="bg-amber-500"
           subtitle="A la espera de conciliación — revísalos en Pagos antes de que se vuelvan cartera vencida"
@@ -1005,15 +1065,83 @@ export default function DashboardHome() {
               growthLabel={`vs. ${k.anioAnterior} (año cerrado)`}
             />
             <BiCard
-              icon={Percent} variant="outline" label="Margen bruto"
-              value={`${k.margenPctTotal.toFixed(1)}%`}
-              sub={`${formatCurrency(k.margenTotal)} acumulado · ${k.margenPctUltimo?.toFixed(1)}% en ${k.anioActual}`}
+              icon={TrendingUp} variant="solid" label="Ganancia histórica"
+              value={formatCurrency(k.margenTotal)}
+              growth={crecimientoMargenUltimo}
+              growthLabel={`vs. ${k.anioAnterior} (año cerrado) · margen ${k.margenPctTotal.toFixed(1)}%`}
             />
             <BiCard
-              icon={Repeat} variant="light" label="Renovaciones"
-              value={`${k.tasaRenovacionPct.toFixed(1)}%`}
-              sub={`del ingreso total · churn ${k.churnPct.toFixed(1)}%`}
+              icon={Percent} variant="outline" label="Margen bruto"
+              value={`${k.margenPctTotal.toFixed(1)}%`}
+              sub={`${k.margenPctUltimo?.toFixed(1)}% en ${k.anioActual}`}
             />
+          </div>
+
+          {/* ─── Gráficos: evolución anual (línea) + comparativo por año (barras) ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="border-orange-100">
+              <CardHeader className="border-orange-50">
+                <CardTitle>Evolución anual: ingresos, costos y ganancia</CardTitle>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  Tendencia desde {bi.porAnio[0]?.anio} hasta {bi.porAnio[bi.porAnio.length - 1]?.anio} — la brecha entre la curva naranja (ingresos) y la gris (costos) es la curva verde (ganancia); el % morado sobre cada punto verde es el margen bruto de ese año
+                </p>
+              </CardHeader>
+              <CardBody>
+                <ResponsiveContainer width="100%" height={240}>
+                  <ComposedChart data={bi.porAnio} margin={{ top: 28, right: 20, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
+                    <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4 }}>
+                      <LabelList dataKey="ingresos" content={() => <text x={100} y={100} fontSize={20} fill="red">TEST</text>} />
+                      <LabelList dataKey="ingresos" zIndex={0} content={<LineValueLabel dy={-9} fill="#f97316" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} />} />
+                    </Line>
+                    <Line type="monotone" dataKey="costos" name="Costos" stroke="#94a3b8" strokeWidth={2.5} dot={{ r: 4 }}>
+                      <LabelList dataKey="costos" zIndex={0} content={<LineValueLabel dy={16} fill="#94a3b8" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} />} />
+                    </Line>
+                    <Line type="monotone" dataKey="margen" name="Ganancia" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4 }}>
+                      <LabelList dataKey="margen" zIndex={0} content={<LineValueLabel dy={-9} fill="#16a34a" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} />} />
+                      <LabelList dataKey="margenPct" zIndex={0} content={<LineValueLabel dy={-22} fill="#7c3aed" formatter={(v) => `${v.toFixed(0)}%`} />} />
+                    </Line>
+                  </ComposedChart>
+                </ResponsiveContainer>
+                <ChartInsight text={narrarEvolucionAnual(bi.porAnio)} />
+              </CardBody>
+            </Card>
+
+            <Card className="border-orange-100">
+              <CardHeader className="border-orange-50">
+                <CardTitle>Ingresos, costos y ganancia por año</CardTitle>
+                <p className="text-sm text-gray-400 mt-0.5">Comparativo histórico con margen bruto (%)</p>
+              </CardHeader>
+              <CardBody>
+                <ResponsiveContainer width="100%" height={340}>
+                  <ComposedChart data={bi.porAnio} margin={{ top: 28, right: 20, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
+                    <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[0, 100]} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar yAxisId="left" dataKey="ingresos" name="Ingresos" fill="#f97316" radius={[6, 6, 0, 0]} barSize={28}>
+                      <LabelList dataKey="ingresos" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10 }} />
+                    </Bar>
+                    <Bar yAxisId="left" dataKey="costos" name="Costos" fill="#94a3b8" radius={[6, 6, 0, 0]} barSize={28}>
+                      <LabelList dataKey="costos" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10 }} />
+                    </Bar>
+                    <Bar yAxisId="left" dataKey="margen" name="Ganancia" fill="#16a34a" radius={[6, 6, 0, 0]} barSize={28}>
+                      <LabelList dataKey="margen" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10 }} />
+                    </Bar>
+                    <Line yAxisId="right" type="monotone" dataKey="margenPct" name="Margen %" stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 4 }}>
+                      <LabelList dataKey="margenPct" position="top" formatter={(v) => `${v.toFixed(0)}%`} style={{ ...LABEL_STYLE, fontSize: 11 }} />
+                    </Line>
+                  </ComposedChart>
+                </ResponsiveContainer>
+                <ChartInsight text={narrarIngresosCostosAnio(bi.porAnio)} />
+              </CardBody>
+            </Card>
           </div>
 
           {bi.comparativoYTD && (
@@ -1080,6 +1208,7 @@ export default function DashboardHome() {
               value={formatCurrency(k.arpu)}
               sub={`promedio histórico sobre ${k.numClientesCompradores} clientes con compras registradas`}
               tag={tagArpu(k)}
+              onClick={() => setShowArpuPanel(true)}
             />
             <BiCard
               icon={Tv} variant="light" label="Ingreso por pantalla"
@@ -1094,6 +1223,11 @@ export default function DashboardHome() {
               tag={k.momentumMrrPct > 5  ? { tone: 'good',  text: 'Acelerando (MRR)' }
                 : k.momentumMrrPct > -5  ? { tone: 'info',  text: 'Ritmo estable' }
                 : { tone: 'warn', text: 'Desacelerando — vigilar' }}
+            />
+            <BiCard
+              icon={Repeat} variant="light" label="Renovaciones"
+              value={`${k.tasaRenovacionPct.toFixed(1)}%`}
+              sub={`del ingreso total · churn ${k.churnPct.toFixed(1)}%`}
             />
           </div>
 
@@ -1184,36 +1318,6 @@ export default function DashboardHome() {
                 </ComposedChart>
               </ResponsiveContainer>
               <ChartInsight text={narrarMomentum(momentumSerie, k)} />
-            </CardBody>
-          </Card>
-
-          {/* ─── Gráfico: ventas vs costos por año ─────────────────────────── */}
-          <Card className="border-orange-100">
-            <CardHeader className="border-orange-50">
-              <CardTitle>Ingresos vs. Costos por año</CardTitle>
-              <p className="text-sm text-gray-400 mt-0.5">Comparativo histórico con margen bruto (%)</p>
-            </CardHeader>
-            <CardBody>
-              <ResponsiveContainer width="100%" height={340}>
-                <ComposedChart data={bi.porAnio} margin={{ top: 28, right: 20, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                  <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[0, 100]} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar yAxisId="left" dataKey="ingresos" name="Ingresos" fill="#f97316" radius={[6, 6, 0, 0]} barSize={36}>
-                    <LabelList dataKey="ingresos" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10 }} />
-                  </Bar>
-                  <Bar yAxisId="left" dataKey="costos" name="Costos" fill="#94a3b8" radius={[6, 6, 0, 0]} barSize={36}>
-                    <LabelList dataKey="costos" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10 }} />
-                  </Bar>
-                  <Line yAxisId="right" type="monotone" dataKey="margenPct" name="Margen %" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4 }}>
-                    <LabelList dataKey="margenPct" position="top" formatter={(v) => `${v.toFixed(0)}%`} style={{ ...LABEL_STYLE, fontSize: 11 }} />
-                  </Line>
-                </ComposedChart>
-              </ResponsiveContainer>
-              <ChartInsight text={narrarIngresosCostosAnio(bi.porAnio)} />
             </CardBody>
           </Card>
 

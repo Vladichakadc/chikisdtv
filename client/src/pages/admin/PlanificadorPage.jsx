@@ -400,6 +400,44 @@ export default function PlanificadorPage() {
         </div>
       </div>
 
+      {/* Aviso: pantallas con ID de cuenta desalineado del prefijo de su ID de pantalla */}
+      {data?.inconsistencias?.length > 0 && (
+        <Card className="p-4 mb-4 border-amber-300 bg-amber-50">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                {data.inconsistencias.length} pantalla{data.inconsistencias.length === 1 ? '' : 's'} con ID de cuenta desalineado
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                El ID de cuenta no corresponde al grupo de la pantalla — probablemente un error de captura en el Excel de origen.
+                Corrígelo editando la pantalla y seleccionando el "Usuario IPTV" correcto.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {data.inconsistencias.map(inc => {
+                  const row = data.pantallas.find(p => p.idPantalla === inc.idPantalla)
+                  return (
+                    <li key={inc.idPantalla} className="flex items-center justify-between gap-2 text-xs text-amber-800">
+                      <span className="font-mono">
+                        {inc.idPantalla}: cuentaId actual <strong>{inc.cuentaId}</strong> · debería ser <strong>{inc.cuentaIdEsperado}</strong>
+                      </span>
+                      {row && (
+                        <button
+                          onClick={() => { snapshotBeforeChange(); setEditRow(row) }}
+                          className="shrink-0 text-amber-700 hover:text-amber-900 underline font-medium"
+                        >
+                          Editar
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard icon={Tv}           label="Cuentas totales"  value={stats.cuentas}       variant="solid"   sub={`${stats.total} pantallas`} />

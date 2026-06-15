@@ -3,7 +3,7 @@ import {
   Search, Plus, Pencil, Trash2, X,
   Server, ShieldCheck, Monitor, Clock,
   ChevronUp, ChevronDown, ChevronsUpDown,
-  Eye, EyeOff, RefreshCw, Upload,
+  Eye, EyeOff, RefreshCw, Upload, Download,
   FileSpreadsheet, CheckCircle2, AlertCircle, Undo2,
   Layers, TrendingUp, Percent, Lightbulb, Sparkles,
 } from 'lucide-react'
@@ -261,6 +261,7 @@ export default function CuentasPadrePage() {
   const [prevRows, setPrevRows]     = useState([])
   const [canUndo, setCanUndo]       = useState(false)
   const [filterVariante, setFilterVariante] = useState('ALL')
+  const [exporting, setExporting]   = useState(false)
 
 
   const handleSort = (key) => {
@@ -363,6 +364,27 @@ export default function CuentasPadrePage() {
     }
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const r = await api.get('/admin/cuentas-padre/export', { responseType: 'blob' })
+      const url = URL.createObjectURL(new Blob([r.data]))
+      const a = document.createElement('a')
+      const fecha = new Date().toISOString().split('T')[0]
+      a.href = url
+      a.download = `CuentasPadre_${fecha}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      showToast('Excel exportado correctamente', 'success')
+    } catch (e) {
+      showToast(e.response?.data?.error || e.message, 'error')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const handleRestoreOriginal = async () => {
     if (!confirm('¿Restaurar la tabla completa desde Tabla_Cuentaspadre.xlsx?\nEsto elimina cualquier cambio no guardado en el archivo original.')) return
     setUploading(true); setUploadResult(null)
@@ -424,12 +446,23 @@ export default function CuentasPadrePage() {
           <h1 className="text-3xl font-bold text-brand-accent">Cuentas Padre</h1>
           <p className="text-gray-500">Gestión de cuentas principales · {stats.total.toLocaleString()} registros</p>
         </div>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium transition-colors shadow"
-        >
-          <Plus size={16} /> Nueva Cuenta
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+          >
+            {exporting
+              ? <><RefreshCw size={16} className="animate-spin" /> Exportando…</>
+              : <><Download size={16} /> Exportar a Excel</>}
+          </button>
+          <button
+            onClick={openNew}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium transition-colors shadow"
+          >
+            <Plus size={16} /> Nueva Cuenta
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}

@@ -2,12 +2,62 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const { Op } = require('sequelize');
 const multer = require('multer');
 const { CuentaPadre } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+// ─── Helpers de exportación a Excel ────────────────────────────────────────
+// Replican CuentasPadrePage.jsx para que el archivo exportado tenga el mismo
+// encabezado, color de fila por estado y badge de "Estado" que se ve en pantalla
+
+const DIAS_ALERTA_CP = 30;
+
+function diasHastaExport(fecha) {
+  if (!fecha) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(fecha); if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+}
+
+function getVarianteExport(dias) {
+  if (dias === null) return 'sin_fecha';
+  if (dias <= 0) return 'vencida';
+  if (dias <= DIAS_ALERTA_CP) return 'alerta';
+  return 'valida';
+}
+
+const ROW_FILL_CP = {
+  valida:    'FFF0FDF4', // green-50
+  alerta:    'FFFFFBEB', // amber-50
+  vencida:   'FFFEF2F2', // red-50
+  sin_fecha: 'FFF9FAFB', // gray-50
+};
+
+function diasFontColorCP(dias) {
+  if (dias == null) return 'FF9CA3AF';        // gray-400
+  if (dias <= 0) return 'FFDC2626';           // red-600
+  if (dias <= DIAS_ALERTA_CP) return 'FFD97706'; // amber-600
+  return 'FF374151';                          // gray-700
+}
+
+function estadoBadgeCP(estado) {
+  const v = (estado || '').trim();
+  if (v === 'Válido') return ['FFDCFCE7', 'FF15803D'];                       // verde
+  if (v === 'Vencido' || v === 'Inactivo') return ['FFFEE2E2', 'FFB91C1C'];  // rojo
+  return ['FFF3F4F6', 'FF6B7280'];                                           // gris
+}
+
+// fechaInicio/fechaFin llegan como "YYYY-MM-DD"; se muestran como en la tabla (DD-MM-YYYY)
+function fmtDateDMYCP(d) {
+  if (!d) return '';
+  const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : String(d);
+}
 
 // ============ CUENTAS PADRE CRUD ============
 
@@ -42,6 +92,70 @@ router.get('/cuentas-padre', asyncHandler(async (_req, res) => {
   if (count === 0) await importCuentasPadre();
   const rows = await CuentaPadre.findAll({ order: [['cuentaId', 'ASC']] });
   res.json(rows);
+}));
+
+// GET /cuentas-padre/export — exporta todos los campos de la tabla a Excel,
+// con el mismo encabezado naranja, color de fila por estado y badge de
+// "Estado" que se ve en la página Cuentas Padre
+router.get('/cuentas-padre/export', asyncHandler(async (_req, res) => {
+  const rows = await CuentaPadre.findAll({ order: [['cuentaId', 'ASC']] });
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Cuentas Padre');
+
+  const HEADERS = ['ID Cuenta', 'Usuario', 'Contraseña', 'Crédito', 'Inicio', 'Fin', 'Días', 'SmartTV', 'Estado'];
+  const WIDTHS  = [12, 22, 18, 10, 12, 12, 10, 12, 12];
+  sheet.columns = WIDTHS.map(width => ({ width }));
+
+  const headerRow = sheet.getRow(1);
+  HEADERS.forEach((label, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = label;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEA580C' } }; // orange-600
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+  headerRow.height = 22;
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+  rows.forEach((r, idx) => {
+    const data    = r.toJSON();
+    const dias    = diasHastaExport(data.fechaFin);
+    const variant = getVarianteExport(dias);
+    const row     = sheet.getRow(idx + 2);
+
+    const values = [
+      data.cuentaId, data.nombreUsuario || '', data.contrasena || '', data.credito ?? '',
+      fmtDateDMYCP(data.fechaInicio), fmtDateDMYCP(data.fechaFin),
+      dias != null ? (dias <= 0 ? 'VENCIDA' : `${dias}d`) : '',
+      data.smartTv || '', data.estado || '',
+    ];
+
+    values.forEach((val, i) => {
+      const cell = row.getCell(i + 1);
+      cell.value = val;
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ROW_FILL_CP[variant] } };
+      cell.alignment = { vertical: 'middle', horizontal: (i === 1 || i === 2) ? 'left' : 'center' };
+    });
+
+    // Fin / Días — color de fuente según vencimiento (igual que la tabla)
+    row.getCell(6).font = { color: { argb: diasFontColorCP(dias) }, bold: dias != null && dias <= DIAS_ALERTA_CP };
+    row.getCell(7).font = { color: { argb: diasFontColorCP(dias) }, bold: true };
+
+    // Badge Estado
+    if (data.estado) {
+      const [bg, fg] = estadoBadgeCP(data.estado);
+      const cell = row.getCell(9);
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.font = { bold: true, color: { argb: fg } };
+    }
+  });
+
+  const fecha = new Date().toISOString().split('T')[0];
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="CuentasPadre_${fecha}.xlsx"`);
+  await workbook.xlsx.write(res);
+  res.end();
 }));
 
 router.post('/cuentas-padre/upload', upload.single('file'), asyncHandler(async (req, res) => {
