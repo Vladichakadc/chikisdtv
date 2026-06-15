@@ -146,7 +146,7 @@ export default function PlanificadorPage() {
 
     const cuentas       = new Set(pantallas.map(p => p.cuentaId)).size
     const variantes     = pantallas.map(p => getRowVariant(p, diasAlerta))
-    const activas       = variantes.filter(v => ['vigente','alerta','cortesia'].includes(v)).length
+    const activas       = pantallas.reduce((sum, p) => sum + (Number(p.pantallas) || 0), 0)
     const proximaVencer = variantes.filter(v => v === 'alerta').length
     const libres        = variantes.filter(v => v === 'libre').length
 
