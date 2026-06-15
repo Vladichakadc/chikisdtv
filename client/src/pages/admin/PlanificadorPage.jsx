@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Monitor, Clock, AlertTriangle, CheckCircle2,
   Search, Eye, EyeOff, RefreshCw, Tv,
@@ -28,6 +28,7 @@ import {
 
 export default function PlanificadorPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { showToast } = useUi()
   const [data, setData]                   = useState(null)
   const [loading, setLoading]             = useState(true)
@@ -139,6 +140,15 @@ export default function PlanificadorPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  // Auto-abrir panel Estatus Cliente si venimos del Dashboard con esa indicación
+  useEffect(() => {
+    if (location.state?.openEstatusPanel && !loading) {
+      setShowEstatusPanel(true)
+      // Limpiar el state para que no se reabra al recargar
+      window.history.replaceState({}, '')
+    }
+  }, [location.state, loading])
 
   const { rows, stats } = useMemo(() => {
     if (!data) return { rows: [], stats: {} }

@@ -755,6 +755,13 @@ export default function DashboardHome() {
     }))
   }, [planificador])
 
+  // Suma del campo "#" (pantallas por plan) — misma métrica que la tarjeta
+  // "Pantallas activas" del Planificador.
+  const pantallasActivasTotal = useMemo(() => {
+    if (!planificador?.pantallas) return 0
+    return planificador.pantallas.reduce((sum, p) => sum + (Number(p.pantallas) || 0), 0)
+  }, [planificador])
+
   const byDiasAsc = (a, b) => (a._dias ?? Infinity) - (b._dias ?? Infinity)
 
   // Cuentas vencidas: misma data que la tarjeta "Vencidas" del Planificador (categoría 'vencido').
@@ -951,11 +958,9 @@ export default function DashboardHome() {
           onClick={() => navigate('/admin/plans')}
         />
         <StatCard
-          icon={FileText} title="Suscripciones Activas" value={stats.activeSubscriptions} color="bg-green-500"
-          subtitle={stats.upcomingExpirations > 0
-            ? `${stats.upcomingExpirations} vencen en los próximos 7 días — el Planificador ya las prioriza en "Próx. a vencer"`
-            : 'Sin vencimientos en los próximos 7 días — cartera de renovaciones al día'}
-          onClick={() => navigate('/admin/subscriptions')}
+          icon={FileText} title="Pantallas activas" value={pantallasActivasTotal} color="bg-green-500"
+          subtitle="Suma de pantallas por plan del Planificador — clic para ver Estatus Cliente"
+          onClick={() => navigate('/admin/planificador', { state: { openEstatusPanel: true } })}
         />
         <StatCard
           icon={Tv} title="Dispositivos Activos" value={stats.totalDevices} color="bg-purple-500"
