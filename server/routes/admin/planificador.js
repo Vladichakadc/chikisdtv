@@ -32,6 +32,23 @@ function alertaFromDias(dias, stored) {
   return '';
 }
 
+// Detecta pantallas cuyo cuentaId no coincide con el prefijo de su idPantalla
+// (p. ej. "M037-3" con cuentaId "M038"). Es la causa raíz del "corrimiento" de
+// datos de cuenta entre pantallas vecinas tras un import/sync — suele originarse
+// en un error de captura en el Excel fuente.
+function findCuentaIdMismatches(pantallas) {
+  return pantallas
+    .filter(p => {
+      const prefix = (p.idPantalla || '').split('-')[0];
+      return prefix && p.cuentaId && prefix !== p.cuentaId;
+    })
+    .map(p => ({
+      idPantalla: p.idPantalla,
+      cuentaId: p.cuentaId,
+      cuentaIdEsperado: p.idPantalla.split('-')[0],
+    }));
+}
+
 function enrichPantalla(raw) {
   const diasVencimiento     = calcDiasDB(raw.finalizacion);
   const diasVencimientoReal = calcDiasDB(raw.duracionReal);
@@ -122,7 +139,7 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
   if (count === 0) await importFromExcel();
   const records = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-  res.json({ diasAlerta: DIAS_ALERTA, pantallas });
+  res.json({ diasAlerta: DIAS_ALERTA, pantallas, inconsistencias: findCuentaIdMismatches(pantallas) });
 }));
 
 // GET /planificador/export — exporta TODAS las columnas de la tabla del Planificador
@@ -326,7 +343,7 @@ router.post('/planificador/restore', asyncHandler(async (req, res) => {
 
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-  res.json({ message: 'Planificador restaurado al estado anterior', diasAlerta: DIAS_ALERTA, pantallas });
+  res.json({ message: 'Planificador restaurado al estado anterior', diasAlerta: DIAS_ALERTA, pantallas, inconsistencias: findCuentaIdMismatches(pantallas) });
 }));
 
 // POST /planificador/sync-cuentas-padre — sincroniza datos de cuenta desde Cuentas Padre
@@ -362,15 +379,20 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
 
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
+  const inconsistencias = findCuentaIdMismatches(pantallas);
 
   const skippedNote = skipped > 0 ? ` · ${skipped} sin pantallas asociadas (omitida${skipped === 1 ? '' : 's'})` : '';
+  const inconsistenciasNote = inconsistencias.length > 0
+    ? ` · ${inconsistencias.length} pantalla(s) con ID de cuenta desalineado`
+    : '';
 
   res.json({
-    message: `${updatedGroups} cuenta(s) sincronizada(s) · ${updatedScreens} pantalla(s) actualizada(s)${skippedNote}`,
+    message: `${updatedGroups} cuenta(s) sincronizada(s) · ${updatedScreens} pantalla(s) actualizada(s)${skippedNote}${inconsistenciasNote}`,
     updatedGroups,
     updatedScreens,
     diasAlerta: DIAS_ALERTA,
     pantallas,
+    inconsistencias,
   });
 }));
 
