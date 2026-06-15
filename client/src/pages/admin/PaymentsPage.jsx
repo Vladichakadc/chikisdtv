@@ -164,6 +164,10 @@ const SKU_TIPO_FIRE = {
   ONNHDO:  'Watch ONN HD Original',
 }
 
+// ─── Meses (orden cronológico) ─────────────────────────────────────────────
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
 // ─── Formulario vacío ────────────────────────────────────────────────────────
 
 const EMPTY = {
@@ -263,8 +267,7 @@ export default function PaymentsPage() {
   const openNew = async (extra = null, sourceLabel = null) => {
     setEditing(null)
     const now = new Date()
-    const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-    let next = { ...EMPTY, fecha: now.toISOString().split('T')[0], anio: String(now.getFullYear()), mes: months[now.getMonth()], ...extra }
+    let next = { ...EMPTY, fecha: now.toISOString().split('T')[0], anio: String(now.getFullYear()), mes: MESES[now.getMonth()], ...extra }
 
     if (extra?.nickname) {
       const found = nicknames.find(n => n.nickname === extra.nickname)
@@ -389,8 +392,7 @@ export default function PaymentsPage() {
 
       if (field === 'fecha' && val) {
         next.anio = val.slice(0, 4)
-        const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-        next.mes = months[parseInt(val.slice(5, 7), 10) - 1] || ''
+        next.mes = MESES[parseInt(val.slice(5, 7), 10) - 1] || ''
       }
       return next
     })
