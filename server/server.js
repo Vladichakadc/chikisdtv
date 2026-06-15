@@ -9,6 +9,7 @@ const { Client, Plan, CostoPantalla } = require('./models');
 
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const { autoFixCuentaIdMismatches } = require('./services/planificadorImportService');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -121,6 +122,9 @@ async function seedDevicesFromVentas() {
     console.log('[DB] Tablas sincronizadas');
     await seedAdminAndPlans();
     await seedDevicesFromVentas();
+    // Self-healing: corrige desalineamientos cuentaId/idPantalla en cada arranque,
+    // garantizando que producción quede sana sin necesidad de scripts manuales.
+    await autoFixCuentaIdMismatches();
 
     app.listen(PORT, () => {
       console.log(`[CHIKISDTV] Servidor corriendo en http://localhost:${PORT}`);

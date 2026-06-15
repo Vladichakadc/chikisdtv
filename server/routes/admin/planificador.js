@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const { Planificador, CuentaPadre } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
-const { importFromExcel } = require('../../services/planificadorImportService');
+const { importFromExcel, autoFixCuentaIdMismatches } = require('../../services/planificadorImportService');
 
 const DIAS_ALERTA = 8;
 
@@ -33,9 +34,8 @@ function alertaFromDias(dias, stored) {
 }
 
 // Detecta pantallas cuyo cuentaId no coincide con el prefijo de su idPantalla
-// (p. ej. "M037-3" con cuentaId "M038"). Es la causa raíz del "corrimiento" de
-// datos de cuenta entre pantallas vecinas tras un import/sync — suele originarse
-// en un error de captura en el Excel fuente.
+// DESPUÉS de que autoFixCuentaIdMismatches() ya corrió: lo que queda son filas
+// sin CuentaPadre coincidente — requieren revisión manual.
 function findCuentaIdMismatches(pantallas) {
   return pantallas
     .filter(p => {
@@ -131,24 +131,8 @@ function fmtDateDMY(d) {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : String(d);
 }
 
-// ============ PLANIFICADOR (DB + Excel import) ============
-
-// GET /planificador — lee desde DB, auto-importa desde Excel si está vacía
-router.get('/planificador', asyncHandler(async (_req, res) => {
-  const count = await Planificador.count();
-  if (count === 0) await importFromExcel();
-  const records = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
-  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-  res.json({ diasAlerta: DIAS_ALERTA, pantallas, inconsistencias: findCuentaIdMismatches(pantallas) });
-}));
-
-// GET /planificador/export — exporta TODAS las columnas de la tabla del Planificador
-// (CUENTA, CLIENTE y PLAN) a Excel, con las mismas bandas de grupo, colores de fila
-// por estado y badges que se ven en pantalla
-router.get('/planificador/export', asyncHandler(async (_req, res) => {
-  const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
-  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-
+// Construye el workbook ExcelJS del Planificador (usado por /export y /save-to-excel)
+function buildPlanificadorWorkbook(pantallas) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Planificador');
 
@@ -247,11 +231,48 @@ router.get('/planificador/export', asyncHandler(async (_req, res) => {
     }
   });
 
+  return workbook;
+}
+
+// ============ PLANIFICADOR (DB + Excel import) ============
+
+// GET /planificador — lee desde DB, auto-importa desde Excel si está vacía,
+// y aplica autocorrección de cuentaId en cada carga (self-healing).
+router.get('/planificador', asyncHandler(async (_req, res) => {
+  const count = await Planificador.count();
+  if (count === 0) await importFromExcel(); // importFromExcel ya llama autofix internamente
+  else await autoFixCuentaIdMismatches();   // self-healing en cada carga sobre BD existente
+  const records = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
+  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
+  res.json({ diasAlerta: DIAS_ALERTA, pantallas, inconsistencias: findCuentaIdMismatches(pantallas) });
+}));
+
+// GET /planificador/export — descarga el Planificador completo como .xlsx
+router.get('/planificador/export', asyncHandler(async (_req, res) => {
+  const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
+  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
+  const workbook  = buildPlanificadorWorkbook(pantallas);
   const fecha = new Date().toISOString().split('T')[0];
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="Planificador_${fecha}.xlsx"`);
   await workbook.xlsx.write(res);
   res.end();
+}));
+
+// POST /planificador/save-to-excel — guarda el estado actual de la BD como
+// "Planificador_actualizado.xlsx" en la raíz del proyecto (NO toca el .xlsm original).
+// Wired al botón "Guardar" del frontend: mantiene el Excel sincronizado con la BD
+// para que futuros reimports no reintroduzcan datos obsoletos.
+router.post('/planificador/save-to-excel', asyncHandler(async (_req, res) => {
+  const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
+  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
+  const workbook  = buildPlanificadorWorkbook(pantallas);
+  const outPath = path.join(__dirname, '..', '..', '..', 'Planificador_actualizado.xlsx');
+  await workbook.xlsx.writeFile(outPath);
+  res.json({
+    message: `Planificador guardado: ${pantallas.length} pantallas exportadas a Planificador_actualizado.xlsx`,
+    archivo: 'Planificador_actualizado.xlsx',
+  });
 }));
 
 // PUT /planificador/:idPantalla — actualiza un registro
@@ -341,6 +362,9 @@ router.post('/planificador/restore', asyncHandler(async (req, res) => {
     });
   }
 
+  // Autocorregir tras restaurar (el snapshot podría contener datos previos al fix)
+  await autoFixCuentaIdMismatches();
+
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
   res.json({ message: 'Planificador restaurado al estado anterior', diasAlerta: DIAS_ALERTA, pantallas, inconsistencias: findCuentaIdMismatches(pantallas) });
@@ -397,6 +421,7 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
 }));
 
 // POST /planificador/import — fuerza re-importación desde Excel (sobrescribe DB)
+// importFromExcel() aplica autofix internamente tras el import.
 router.post('/planificador/import', asyncHandler(async (_req, res) => {
   const count = await importFromExcel();
   res.json({ message: `${count} pantallas importadas desde Excel` });

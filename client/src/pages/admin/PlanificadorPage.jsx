@@ -113,10 +113,10 @@ export default function PlanificadorPage() {
   const handleGuardar = async () => {
     setSaving(true)
     try {
-      const r = await api.get('/admin/planificador')
-      setData(r.data)
-      const hora = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      showToast(`Datos guardados en la base de datos: ${r.data.pantallas.length} pantallas confirmadas (${hora}).`, 'success')
+      const save = await api.post('/admin/planificador/save-to-excel')
+      const refresh = await api.get('/admin/planificador')
+      setData(refresh.data)
+      showToast(save.data.message, 'success')
     } catch (e) {
       showToast(e.response?.data?.error || e.message, 'error')
     } finally {
