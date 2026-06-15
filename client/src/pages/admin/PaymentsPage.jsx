@@ -194,6 +194,10 @@ export default function PaymentsPage() {
   const [selectedYears, setSelectedYears] = useState(null)
   const [yearMenuOpen, setYearMenuOpen] = useState(false)
   const yearMenuRef = useRef(null)
+  // `null` = todos los meses (sin filtro). Array = subconjunto explícito seleccionado.
+  const [selectedMonths, setSelectedMonths] = useState(null)
+  const [monthMenuOpen, setMonthMenuOpen] = useState(false)
+  const monthMenuRef = useRef(null)
   const [sortCol, setSortCol]   = useState('fecha')
   const [sortDir, setSortDir]   = useState('desc')
   const [showForm, setShowForm] = useState(false)
@@ -253,6 +257,18 @@ export default function PaymentsPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [yearMenuOpen])
+
+  // Cierra el menú de meses al hacer clic fuera de él
+  useEffect(() => {
+    if (!monthMenuOpen) return
+    const handler = (e) => {
+      if (monthMenuRef.current && !monthMenuRef.current.contains(e.target)) {
+        setMonthMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [monthMenuOpen])
 
   const handleSort = (key) => {
     if (key === 'acciones') return
@@ -480,11 +496,46 @@ export default function PaymentsPage() {
         ? selectedYears[0]
         : `${selectedYears.length} años`
 
+  // Opciones de Mes: valores distintos ya registrados en la tabla de pagos, en orden cronológico
+  const monthOptions = useMemo(() => {
+    const set = new Set(rows.map(r => (r.mes || '').trim()).filter(Boolean))
+    return MESES.filter(m => set.has(m))
+  }, [rows])
+
+  const isMonthSelected = (month) => selectedMonths === null || selectedMonths.includes(month)
+  const allMonthsSelected = selectedMonths === null || selectedMonths.length === monthOptions.length
+
+  const toggleMonth = (month) => {
+    setSelectedMonths(prev => {
+      const effective = prev === null ? monthOptions : prev
+      const next = effective.includes(month) ? effective.filter(m => m !== month) : [...effective, month]
+      return next.length === monthOptions.length ? null : next
+    })
+  }
+
+  const toggleAllMonths = () => {
+    setSelectedMonths(prev => {
+      const allSelected = prev === null || prev.length === monthOptions.length
+      return allSelected ? [] : null
+    })
+  }
+
+  const monthFilterLabel = selectedMonths === null
+    ? 'Todos los meses'
+    : selectedMonths.length === 0
+      ? 'Ningún mes'
+      : selectedMonths.length === 1
+        ? selectedMonths[0]
+        : `${selectedMonths.length} meses`
+
   // Resultado de búsqueda (sin ordenar todavía) — sirve de base tanto para la tabla como para las tarjetas
   const searched = useMemo(() => {
     let result = rows
     if (selectedYears !== null) {
       result = result.filter(r => selectedYears.includes(String(r.anio || '')))
+    }
+    if (selectedMonths !== null) {
+      result = result.filter(r => selectedMonths.includes(String(r.mes || '')))
     }
     if (search) {
       const s = search.toLowerCase()
@@ -499,7 +550,7 @@ export default function PaymentsPage() {
       )
     }
     return result
-  }, [rows, search, selectedYears])
+  }, [rows, search, selectedYears, selectedMonths])
 
   // Las tarjetas inteligentes reflejan el resultado filtrado por la búsqueda y el año
   const stats = useMemo(() => {
@@ -545,7 +596,7 @@ export default function PaymentsPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={ShoppingCart} label="Total Registros"  value={stats.total.toLocaleString()}          variant="solid"   sub={(search || selectedYears !== null) ? 'Resultados filtrados' : 'Histórico completo'} />
+        <StatCard icon={ShoppingCart} label="Total Registros"  value={stats.total.toLocaleString()}          variant="solid"   sub={(search || selectedYears !== null || selectedMonths !== null) ? 'Resultados filtrados' : 'Histórico completo'} />
         <StatCard icon={DollarSign}   label="Ingresos Totales" value={fmtCOP(stats.ingresos)}                variant="light"   sub="Licencias vendidas" />
         <StatCard icon={RotateCcw}    label="Renovaciones"     value={stats.renovaciones.toLocaleString()}   variant="outline" sub="Clientes recurrentes" />
         <StatCard icon={Zap}          label="Activaciones"     value={stats.activaciones.toLocaleString()}   variant="light"   sub="Nuevas pantallas" />
@@ -600,6 +651,49 @@ export default function PaymentsPage() {
                   </label>
                 ))}
                 {yearOptions.length === 0 && (
+                  <p className="px-2.5 py-1.5 text-xs text-gray-400">Sin datos</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Filtro por Mes (selección múltiple) */}
+        <div className="relative" ref={monthMenuRef}>
+          <button
+            type="button"
+            onClick={() => setMonthMenuOpen(o => !o)}
+            className="flex items-center gap-2 px-4 py-2.5 border border-orange-200 rounded-xl bg-white shadow-sm hover:bg-orange-50 text-sm font-medium text-gray-700 transition-colors"
+          >
+            <Calendar size={16} className="text-orange-500" />
+            <span>Mes: <strong className="text-brand-accent">{monthFilterLabel}</strong></span>
+            <ChevronDown size={14} className={cn('text-gray-400 transition-transform', monthMenuOpen && 'rotate-180')} />
+          </button>
+
+          {monthMenuOpen && (
+            <div className="absolute z-20 mt-2 w-48 rounded-xl border border-orange-100 bg-white shadow-lg p-1.5">
+              <label className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-orange-50 cursor-pointer text-sm font-semibold text-brand-accent border-b border-gray-100 mb-1">
+                <input
+                  type="checkbox"
+                  checked={allMonthsSelected}
+                  onChange={toggleAllMonths}
+                  className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                />
+                Seleccionar todos
+              </label>
+              <div className="max-h-56 overflow-auto">
+                {monthOptions.map(month => (
+                  <label key={month} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-orange-50 cursor-pointer text-sm text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={isMonthSelected(month)}
+                      onChange={() => toggleMonth(month)}
+                      className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                    />
+                    {month}
+                  </label>
+                ))}
+                {monthOptions.length === 0 && (
                   <p className="px-2.5 py-1.5 text-xs text-gray-400">Sin datos</p>
                 )}
               </div>
@@ -872,7 +966,7 @@ export default function PaymentsPage() {
                     <select value={form.mes} onChange={f('mes')}
                       className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
                       <option value="">—</option>
-                      {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map(m => (
+                      {MESES.map(m => (
                         <option key={m}>{m}</option>
                       ))}
                     </select>
