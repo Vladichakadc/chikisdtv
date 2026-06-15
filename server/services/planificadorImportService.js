@@ -1,6 +1,6 @@
 const path = require('path');
 const XLSX = require('xlsx');
-const { Planificador } = require('../models');
+const { Planificador, CuentaPadre } = require('../models');
 
 function excelToDate(n) {
   if (n === '' || n == null) return null;
@@ -8,9 +8,55 @@ function excelToDate(n) {
   return d.toISOString().split('T')[0];
 }
 
+// Corrige automáticamente filas donde prefix(idPantalla) !== cuentaId.
+// Para cada fila afectada busca la CuentaPadre cuyo cuentaId == prefix(idPantalla)
+// y actualiza cuentaId + bloque CUENTA (cuenta/password/credito/inicio/finalizacion).
+// Si no existe CuentaPadre para el prefix esperado, la fila queda intacta y se
+// incluye en `unfixable` (requiere revisión manual).
+// Devuelve { fixed, unfixable } y loguea correcciones al arranque/import.
+async function autoFixCuentaIdMismatches() {
+  const rows = await Planificador.findAll({ raw: true });
+  const mismatched = rows.filter(r => {
+    const prefix = (r.idPantalla || '').split('-')[0];
+    return prefix && r.cuentaId && prefix !== r.cuentaId;
+  });
+  if (mismatched.length === 0) return { fixed: 0, unfixable: [] };
+
+  const cuentas = await CuentaPadre.findAll();
+  const cuentaMap = {};
+  cuentas.forEach(c => { cuentaMap[c.cuentaId] = c; });
+
+  let fixed = 0;
+  const unfixable = [];
+
+  for (const row of mismatched) {
+    const prefix = row.idPantalla.split('-')[0];
+    const cp = cuentaMap[prefix];
+    if (!cp) { unfixable.push({ idPantalla: row.idPantalla, cuentaIdActual: row.cuentaId, cuentaIdEsperado: prefix }); continue; }
+
+    await Planificador.update(
+      {
+        cuentaId:     cp.cuentaId,
+        cuenta:       cp.nombreUsuario || null,
+        password:     cp.contrasena    || null,
+        credito:      cp.credito       ?? null,
+        inicio:       cp.fechaInicio   || null,
+        finalizacion: cp.fechaFin      || null,
+      },
+      { where: { idPantalla: row.idPantalla } }
+    );
+    console.log(`[AUTOFIX] ${row.idPantalla}: cuentaId ${row.cuentaId} → ${prefix}`);
+    fixed++;
+  }
+
+  if (fixed > 0) console.log(`[AUTOFIX] ${fixed} pantalla(s) autocorregida(s). ${unfixable.length} sin CuentaPadre (requieren revisión).`);
+  return { fixed, unfixable };
+}
+
 // Importa/sincroniza el Planificador desde el archivo .xlsm de origen.
 // Compartido entre el router del Planificador y el de Bajas (que lo usa para
 // auto-poblar nicknames cuando la tabla está vacía).
+// Aplica autofix de cuentaId inmediatamente después del import.
 async function importFromExcel() {
   const filePath = path.join(__dirname, '..', '..', 'Planificador de proyectos Magistv_v1_202602105.xlsm');
   const wb = XLSX.readFile(filePath, { raw: true });
@@ -53,7 +99,12 @@ async function importFromExcel() {
       ],
     });
   }
+
+  // Autocorrección inmediata: si el Excel tiene el bug de cuentaId corrido,
+  // lo sanamos en la BD antes de que cualquier cliente lea los datos.
+  await autoFixCuentaIdMismatches();
+
   return records.length;
 }
 
-module.exports = { importFromExcel, excelToDate };
+module.exports = { importFromExcel, autoFixCuentaIdMismatches, excelToDate };
