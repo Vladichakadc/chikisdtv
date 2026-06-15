@@ -1094,17 +1094,22 @@ export default function DashboardHome() {
                     <YAxis tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
                     <Tooltip content={<ChartTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4 }}>
-                      <LabelList dataKey="ingresos" content={() => <text x={100} y={100} fontSize={20} fill="red">TEST</text>} />
-                      <LabelList dataKey="ingresos" zIndex={0} content={<LineValueLabel dy={-9} fill="#f97316" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} />} />
-                    </Line>
-                    <Line type="monotone" dataKey="costos" name="Costos" stroke="#94a3b8" strokeWidth={2.5} dot={{ r: 4 }}>
-                      <LabelList dataKey="costos" zIndex={0} content={<LineValueLabel dy={16} fill="#94a3b8" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} />} />
-                    </Line>
-                    <Line type="monotone" dataKey="margen" name="Ganancia" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4 }}>
-                      <LabelList dataKey="margen" zIndex={0} content={<LineValueLabel dy={-9} fill="#16a34a" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} />} />
-                      <LabelList dataKey="margenPct" zIndex={0} content={<LineValueLabel dy={-22} fill="#7c3aed" formatter={(v) => `${v.toFixed(0)}%`} />} />
-                    </Line>
+                    <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="costos" name="Costos" stroke="#94a3b8" strokeWidth={2.5} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="margen" name="Ganancia" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4 }} />
+                    {/* Barras invisibles: solo sirven de soporte para las etiquetas de
+                        valor y % de cada línea (LabelList sobre <Line> no se renderiza
+                        en esta versión de recharts) */}
+                    <Bar dataKey="ingresos" fill="transparent" legendType="none" barSize={2} isAnimationActive={false}>
+                      <LabelList dataKey="ingresos" position="top" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#f97316' }} />
+                    </Bar>
+                    <Bar dataKey="costos" fill="transparent" legendType="none" barSize={2} isAnimationActive={false}>
+                      <LabelList dataKey="costos" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#94a3b8' }} />
+                    </Bar>
+                    <Bar dataKey="margen" fill="transparent" legendType="none" barSize={2} isAnimationActive={false}>
+                      <LabelList dataKey="margen" position="top" offset={4} formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#16a34a' }} />
+                      <LabelList dataKey="margenPct" position="top" offset={17} formatter={(v) => `${v.toFixed(0)}%`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#7c3aed' }} />
+                    </Bar>
                   </ComposedChart>
                 </ResponsiveContainer>
                 <ChartInsight text={narrarEvolucionAnual(bi.porAnio)} />
