@@ -168,6 +168,10 @@ const SKU_TIPO_FIRE = {
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
+// Normaliza para comparar meses sin distinguir mayúsculas/minúsculas (hay registros
+// históricos con el mes en minúscula, p. ej. "julio" en vez de "Julio")
+const normMes = (s) => (s || '').toString().trim().toLowerCase()
+
 // ─── Formulario vacío ────────────────────────────────────────────────────────
 
 const EMPTY = {
@@ -498,8 +502,8 @@ export default function PaymentsPage() {
 
   // Opciones de Mes: valores distintos ya registrados en la tabla de pagos, en orden cronológico
   const monthOptions = useMemo(() => {
-    const set = new Set(rows.map(r => (r.mes || '').trim()).filter(Boolean))
-    return MESES.filter(m => set.has(m))
+    const set = new Set(rows.map(r => normMes(r.mes)).filter(Boolean))
+    return MESES.filter(m => set.has(normMes(m)))
   }, [rows])
 
   const isMonthSelected = (month) => selectedMonths === null || selectedMonths.includes(month)
@@ -535,7 +539,8 @@ export default function PaymentsPage() {
       result = result.filter(r => selectedYears.includes(String(r.anio || '')))
     }
     if (selectedMonths !== null) {
-      result = result.filter(r => selectedMonths.includes(String(r.mes || '')))
+      const wanted = new Set(selectedMonths.map(normMes))
+      result = result.filter(r => wanted.has(normMes(r.mes)))
     }
     if (search) {
       const s = search.toLowerCase()
