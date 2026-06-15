@@ -675,8 +675,9 @@ export default function DashboardHome() {
   }
 
   // Solo-desarrollo: reemplaza la base de datos local por un archivo .sqlite
-  // subido (ej. un respaldo descargado de producción) y reinicia el backend
-  // para que la cargue. El backend rechaza esto si NODE_ENV es 'production'.
+  // subido (ej. un respaldo descargado de producción). El backend reabre la
+  // conexión contra el archivo nuevo sin reiniciarse, así que basta recargar
+  // la página para ver los datos actualizados. Rechazado si NODE_ENV es 'production'.
   const handleRestoreLocalBackup = async (e) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -690,7 +691,7 @@ export default function DashboardHome() {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       showToast(r.data.message, 'success')
-      setTimeout(() => window.location.reload(), 2000)
+      setTimeout(() => window.location.reload(), 800)
     } catch (e2) {
       showToast(e2.response?.data?.error || e2.message, 'error')
       setRestoringBackup(false)
