@@ -204,19 +204,6 @@ function MomentumValueLabel({ x, y, width, height, value }) {
   )
 }
 
-// ─── Etiqueta de valor/porcentaje para las líneas de "Evolución anual": un
-// <text> propio (no el Label de recharts) porque LabelList sobre <Line> en
-// recharts v3 no recibe el parentViewBox y puede "escapar" del área del
-// gráfico — dibujando manualmente evitamos ese bug ───────────────────────────
-function LineValueLabel({ x, y, value, dy = -9, fill = '#1e293b', formatter = (v) => v }) {
-  if (value == null) return null
-  return (
-    <text x={x} y={y + dy} textAnchor="middle" style={{ ...LABEL_STYLE, fontSize: 10, fill }}>
-      {formatter(value)}
-    </text>
-  )
-}
-
 // ─── Recuadro de lectura por gráfica (storytelling al pie de cada chart) ─────
 // Texto corto, generado dinámicamente desde los datos, que explica "qué dice
 // esta gráfica" en lenguaje simple pero técnico — el puente entre el dato y
