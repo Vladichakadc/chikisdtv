@@ -5,7 +5,7 @@ import {
   TrendingDown, Minus, Wallet, PiggyBank, Percent, Repeat,
   BarChart3, Lightbulb, Target, Activity, Scale, UserCheck,
   UserX, Server, Monitor, ArrowRight, Sparkles, Trophy, Hourglass,
-  Gem, RefreshCw, Calendar, Receipt, Download,
+  Gem, RefreshCw, Calendar, Receipt, Download, Upload,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -612,6 +612,7 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [downloadingBackup, setDownloadingBackup] = useState(false)
+  const [restoringBackup, setRestoringBackup] = useState(false)
   const [anioVentasLicencia, setAnioVentasLicencia] = useState(null)
   const [mesVentasLicencia, setMesVentasLicencia] = useState(null)
   const [showVencidasPanel, setShowVencidasPanel] = useState(false)
@@ -670,6 +671,29 @@ export default function DashboardHome() {
       showToast(e.response?.data?.error || e.message, 'error')
     } finally {
       setDownloadingBackup(false)
+    }
+  }
+
+  // Solo-desarrollo: reemplaza la base de datos local por un archivo .sqlite
+  // subido (ej. un respaldo descargado de producción) y reinicia el backend
+  // para que la cargue. El backend rechaza esto si NODE_ENV es 'production'.
+  const handleRestoreLocalBackup = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setRestoringBackup(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const r = await api.post('/admin/backup/restore', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      showToast(r.data.message, 'success')
+      setTimeout(() => window.location.reload(), 2000)
+    } catch (e2) {
+      showToast(e2.response?.data?.error || e2.message, 'error')
+      setRestoringBackup(false)
     }
   }
 
@@ -829,6 +853,21 @@ export default function DashboardHome() {
           <p className="text-gray-500">Panel general de ChikisdTV</p>
         </div>
         <div className="flex items-center gap-2">
+          {import.meta.env.DEV && (
+            <>
+              <input
+                type="file" accept=".sqlite" id="restore-db-input" className="hidden"
+                onChange={handleRestoreLocalBackup}
+              />
+              <Button
+                onClick={() => document.getElementById('restore-db-input').click()}
+                variant="secondary" disabled={restoringBackup}
+                className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
+              >
+                <Upload size={15} /> {restoringBackup ? 'Cargando…' : 'Cargar BD local'}
+              </Button>
+            </>
+          )}
           <Button
             onClick={handleDownloadBackup} variant="secondary" disabled={downloadingBackup}
             className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
