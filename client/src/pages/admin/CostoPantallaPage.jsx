@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { todayStr } from '../../utils/dateUtils'
 import {
   Search, Plus, Pencil, Trash2, X, Upload,
   DollarSign, Monitor, TrendingUp, BarChart3,
@@ -171,7 +172,7 @@ export default function CostoPantallaPage() {
 
   const openNew = async () => {
     setEditing(null)
-    setForm({ ...EMPTY, fecha: new Date().toISOString().split('T')[0] })
+    setForm({ ...EMPTY, fecha: todayStr() })
     setShowForm(true)
     
     try {

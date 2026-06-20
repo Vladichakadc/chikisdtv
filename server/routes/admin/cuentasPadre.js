@@ -158,6 +158,17 @@ router.get('/cuentas-padre/export', asyncHandler(async (_req, res) => {
   res.end();
 }));
 
+const DIFF_FIELDS = ['nombreUsuario', 'contrasena', 'credito', 'fechaInicio', 'fechaFin', 'smartTv', 'estado'];
+const NUM_DIFF_FIELDS = new Set(['credito']);
+
+function fieldChanged(nv, ov, isNum) {
+  const a = nv ?? null;
+  const b = ov ?? null;
+  if (a === null && b === null) return false;
+  if (a === null || b === null) return true;
+  return isNum ? Number(a) !== Number(b) : String(a).trim() !== String(b).trim();
+}
+
 router.post('/cuentas-padre/upload', upload.single('file'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' });
 
@@ -193,8 +204,10 @@ router.post('/cuentas-padre/upload', upload.single('file'), asyncHandler(async (
     return i > -1 && row[i] != null && row[i] !== '' ? row[i] : null;
   };
 
-  // Cargar todos los registros existentes para búsqueda por usuario
-  const existing = await CuentaPadre.findAll({ attributes: ['cuentaId', 'nombreUsuario'] });
+  // Cargar todos los registros existentes con todos sus campos para comparación
+  const existing = await CuentaPadre.findAll();
+  const existingMap = {};
+  existing.forEach(r => { existingMap[r.cuentaId] = r.toJSON(); });
 
   // Mapa nombreUsuario → cuentaId (para resolver filas sin ID)
   const byUsername = {};
@@ -251,6 +264,27 @@ router.post('/cuentas-padre/upload', upload.single('file'), asyncHandler(async (
     });
   }
 
+  // Calcular diff antes del upsert (estado "antes" vs "después" por registro)
+  const diff = records.map(rec => {
+    const old = existingMap[rec.cuentaId];
+    if (!old) return { cuentaId: rec.cuentaId, nombreUsuario: rec.nombreUsuario, status: 'nueva', cambios: [] };
+    const cambios = [];
+    for (const campo of DIFF_FIELDS) {
+      if (fieldChanged(rec[campo], old[campo], NUM_DIFF_FIELDS.has(campo))) {
+        cambios.push({ campo, antes: old[campo] ?? null, despues: rec[campo] ?? null });
+      }
+    }
+    return {
+      cuentaId: rec.cuentaId,
+      nombreUsuario: rec.nombreUsuario,
+      status: cambios.length > 0 ? 'actualizada' : 'sin_cambio',
+      cambios,
+    };
+  });
+
+  const updatedCount   = diff.filter(d => d.status === 'actualizada').length;
+  const unchangedCount = diff.filter(d => d.status === 'sin_cambio').length;
+
   if (records.length > 0) {
     await CuentaPadre.bulkCreate(records, {
       updateOnDuplicate: ['nombreUsuario', 'contrasena', 'credito', 'fechaInicio', 'fechaFin', 'smartTv', 'estado'],
@@ -260,10 +294,11 @@ router.post('/cuentas-padre/upload', upload.single('file'), asyncHandler(async (
   const all = await CuentaPadre.findAll({ order: [['cuentaId', 'ASC']] });
 
   const parts = [`${records.length} cuenta(s) procesada(s)`];
-  if (matchedCount > 0) parts.push(`${matchedCount} asociada(s) por usuario`);
-  if (newCount > 0)     parts.push(`${newCount} nueva(s) con ID asignado`);
+  if (newCount > 0)       parts.push(`${newCount} nueva(s)`);
+  if (updatedCount > 0)   parts.push(`${updatedCount} actualizada(s)`);
+  if (unchangedCount > 0) parts.push(`${unchangedCount} sin cambio`);
 
-  res.json({ message: parts.join(', '), newCount, matchedCount, rows: all });
+  res.json({ message: parts.join(' · '), newCount, matchedCount, updatedCount, unchangedCount, diff, rows: all });
 }));
 
 router.post('/cuentas-padre/restore', asyncHandler(async (req, res) => {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
 const { Client, Plan, Subscription, Payment, Device, Baja, Venta, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
+const { todayStr, daysFromNow } = require('../../utils/dateUtils');
 const asyncHandler = require('../../middleware/asyncHandler');
 
 // ============ DASHBOARD STATS ============
@@ -17,11 +18,10 @@ router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   const vencidosPayments = await Payment.count({ where: { estado: 'Vencido' } });
 
   const today = new Date();
-  const in7Days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
   const upcomingExpirations = await Subscription.count({
     where: {
       estado: 'Activo',
-      fechaVencimiento: { [Op.between]: [today.toISOString().split('T')[0], in7Days.toISOString().split('T')[0]] }
+      fechaVencimiento: { [Op.between]: [todayStr(), daysFromNow(7)] }
     }
   });
 

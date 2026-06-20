@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { todayStr } from '../../utils/dateUtils'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
@@ -36,7 +37,7 @@ export default function SubscriptionsPage() {
 
   useEffect(() => { load() }, [])
 
-  const openNew = () => { setEditing(null); setForm({ ...EMPTY, fechaInicio: new Date().toISOString().split('T')[0] }); setShowForm(true) }
+  const openNew = () => { setEditing(null); setForm({ ...EMPTY, fechaInicio: todayStr() }); setShowForm(true) }
   const openEdit = (s) => {
     setEditing(s)
     setForm({ ...s, clientId: s.clientId, planId: s.planId })
