@@ -370,7 +370,18 @@ router.post('/planificador/restore', asyncHandler(async (req, res) => {
   res.json({ message: 'Planificador restaurado al estado anterior', diasAlerta: DIAS_ALERTA, pantallas, inconsistencias: findCuentaIdMismatches(pantallas) });
 }));
 
+const SYNC_FIELDS = ['cuenta', 'password', 'credito', 'inicio', 'finalizacion'];
+
+function syncFieldChanged(nv, ov, isNum) {
+  const a = nv ?? null;
+  const b = ov ?? null;
+  if (a === null && b === null) return false;
+  if (a === null || b === null) return true;
+  return isNum ? Number(a) !== Number(b) : String(a).trim() !== String(b).trim();
+}
+
 // POST /planificador/sync-cuentas-padre — sincroniza datos de cuenta desde Cuentas Padre
+// y devuelve un diff por cuenta con los campos que cambiaron.
 router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) => {
   const cuentas = await CuentaPadre.findAll();
   if (cuentas.length === 0)
@@ -379,41 +390,80 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
   const cuentaMap = {};
   cuentas.forEach(c => { cuentaMap[String(c.cuentaId).trim()] = c; });
 
+  // Snapshot previo: una fila representativa por cuentaId (todas las pantallas de
+  // la misma cuenta comparten los mismos campos de cuenta/password/credito/inicio/fin)
+  const allBefore = await Planificador.findAll({
+    attributes: ['cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion'],
+    raw: true,
+  });
+  const beforeMap = {};
+  allBefore.forEach(r => { if (!beforeMap[r.cuentaId]) beforeMap[r.cuentaId] = r; });
+
   let updatedScreens = 0;
   let updatedGroups  = 0;
   let skipped        = 0;
+  const diff = [];
 
   for (const [cuentaId, cp] of Object.entries(cuentaMap)) {
-    const [affectedCount] = await Planificador.update(
-      {
-        cuenta:       cp.nombreUsuario || null,
-        password:     cp.contrasena    || null,
-        credito:      cp.credito       ?? null,
-        inicio:       cp.fechaInicio   || null,
-        finalizacion: cp.fechaFin      || null,
-      },
-      { where: { cuentaId } }
-    );
+    const newVals = {
+      cuenta:       cp.nombreUsuario || null,
+      password:     cp.contrasena    || null,
+      credito:      cp.credito       ?? null,
+      inicio:       cp.fechaInicio   || null,
+      finalizacion: cp.fechaFin      || null,
+    };
 
-    if (affectedCount === 0) { skipped++; continue; }
+    const [affectedCount] = await Planificador.update(newVals, { where: { cuentaId } });
+
+    if (affectedCount === 0) {
+      skipped++;
+      diff.push({ cuentaId, cuenta: cp.nombreUsuario || null, status: 'sin_pantallas', pantallasAfectadas: 0, cambios: [] });
+      continue;
+    }
 
     updatedScreens += affectedCount;
     updatedGroups++;
+
+    const before = beforeMap[cuentaId];
+    const cambios = [];
+    for (const campo of SYNC_FIELDS) {
+      const oldVal = before ? (before[campo] ?? null) : null;
+      const newVal = newVals[campo] ?? null;
+      if (syncFieldChanged(newVal, oldVal, campo === 'credito')) {
+        cambios.push({ campo, antes: oldVal, despues: newVal });
+      }
+    }
+
+    diff.push({
+      cuentaId,
+      cuenta: cp.nombreUsuario || null,
+      status: cambios.length > 0 ? 'actualizada' : 'sin_cambio',
+      pantallasAfectadas: affectedCount,
+      cambios,
+    });
   }
 
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
   const inconsistencias = findCuentaIdMismatches(pantallas);
 
-  const skippedNote = skipped > 0 ? ` · ${skipped} sin pantallas asociadas (omitida${skipped === 1 ? '' : 's'})` : '';
-  const inconsistenciasNote = inconsistencias.length > 0
-    ? ` · ${inconsistencias.length} pantalla(s) con ID de cuenta desalineado`
-    : '';
+  const conCambios  = diff.filter(d => d.status === 'actualizada').length;
+  const sinCambioN  = diff.filter(d => d.status === 'sin_cambio').length;
+
+  const parts = [`${updatedGroups} cuenta(s) · ${updatedScreens} pantalla(s) actualizadas`];
+  if (conCambios > 0)  parts.push(`${conCambios} con cambios`);
+  if (sinCambioN > 0)  parts.push(`${sinCambioN} sin cambio`);
+  if (skipped > 0)     parts.push(`${skipped} sin pantallas`);
+  if (inconsistencias.length > 0) parts.push(`${inconsistencias.length} ID desalineado`);
 
   res.json({
-    message: `${updatedGroups} cuenta(s) sincronizada(s) · ${updatedScreens} pantalla(s) actualizada(s)${skippedNote}${inconsistenciasNote}`,
+    message: parts.join(' · '),
     updatedGroups,
     updatedScreens,
+    conCambios,
+    sinCambio: sinCambioN,
+    sinPantallas: skipped,
+    diff,
     diasAlerta: DIAS_ALERTA,
     pantallas,
     inconsistencias,

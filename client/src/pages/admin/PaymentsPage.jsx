@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
+import { todayStr } from '../../utils/dateUtils'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search, Plus, Pencil, Trash2, X,
@@ -287,7 +288,7 @@ export default function PaymentsPage() {
   const openNew = async (extra = null, sourceLabel = null) => {
     setEditing(null)
     const now = new Date()
-    let next = { ...EMPTY, fecha: now.toISOString().split('T')[0], anio: String(now.getFullYear()), mes: MESES[now.getMonth()], ...extra }
+    let next = { ...EMPTY, fecha: todayStr(), anio: String(now.getFullYear()), mes: MESES[now.getMonth()], ...extra }
 
     if (extra?.nickname) {
       const found = nicknames.find(n => n.nickname === extra.nickname)

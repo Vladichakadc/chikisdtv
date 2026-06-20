@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { todayStr } from '../../utils/dateUtils'
 import {
   Search, Plus, Pencil, Trash2, X,
   DollarSign, ShoppingCart, Tv, RotateCcw,
@@ -191,7 +192,7 @@ export default function VentaDispositivosPage() {
     setEditing(null)
     const now = new Date()
     const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-    let next = { ...EMPTY, fecha: now.toISOString().split('T')[0], anio: String(now.getFullYear()), mes: months[now.getMonth()] }
+    let next = { ...EMPTY, fecha: todayStr(), anio: String(now.getFullYear()), mes: months[now.getMonth()] }
 
     setForm(next)
     setShowForm(true)

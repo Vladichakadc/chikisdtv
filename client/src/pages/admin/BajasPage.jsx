@@ -8,6 +8,7 @@ import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { Input, Select, Textarea } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { formatDate } from '../../utils/excelUtils'
+import { todayStr } from '../../utils/dateUtils'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -96,7 +97,7 @@ export default function BajasPage() {
     // Auto-generar ID
     try {
       const { data } = await api.get('/admin/bajas/next-id')
-      setForm(f => ({ ...f, idBaja: data.nextId, fechaBaja: new Date().toISOString().split('T')[0] }))
+      setForm(f => ({ ...f, idBaja: data.nextId, fechaBaja: todayStr() }))
     } catch (e) { console.error(e) }
     // Cargar nicknames
     try {

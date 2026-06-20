@@ -1,3 +1,5 @@
+// Zona horaria Colombia — debe preceder a cualquier operación de fecha
+process.env.TZ = 'America/Bogota';
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');

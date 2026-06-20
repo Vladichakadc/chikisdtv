@@ -1,6 +1,6 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, Package, FileText, CreditCard, Tv, LogOut, Menu, CalendarClock, UserX, KeyRound, Monitor, GitMerge } from 'lucide-react'
-import { useState } from 'react'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { LayoutDashboard, Users, Package, FileText, CreditCard, Tv, LogOut, Menu, CalendarClock, UserX, KeyRound, Monitor, GitMerge, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { cn } from '../utils/cn'
 
 const navItems = [
@@ -21,7 +21,14 @@ const navItems = [
 
 export default function DashboardLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [open, setOpen] = useState(true)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Cierra el drawer móvil al cambiar de ruta
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -29,22 +36,64 @@ export default function DashboardLayout() {
     navigate('/login')
   }
 
+  const showLabels = open || mobileOpen
+
   return (
     <div className="h-screen bg-ui-background flex overflow-hidden">
-      <aside className={cn('bg-brand-accent text-white flex flex-col flex-shrink-0 transition-all duration-200', open ? 'w-64' : 'w-16')}>
-        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-          {open && (
+
+      {/* Overlay oscuro detrás del drawer en mobile */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'bg-brand-accent text-white flex flex-col transition-all duration-300 z-50',
+          // Mobile: drawer fijo fuera de pantalla por defecto
+          'fixed inset-y-0 left-0 w-72',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+          // Desktop: sidebar estático en flujo normal, sin translate
+          'md:relative md:translate-x-0 md:inset-y-auto md:left-auto md:flex-shrink-0',
+          open ? 'md:w-64' : 'md:w-16',
+        )}
+      >
+        {/* Cabecera del sidebar */}
+        <div
+          className={cn(
+            'p-4 border-b border-slate-700 flex items-center flex-shrink-0',
+            showLabels ? 'justify-between' : 'justify-center'
+          )}
+        >
+          {showLabels && (
             <div>
               <div className="text-xl font-bold text-brand-primary">ChikisdTV</div>
               <div className="text-xs text-slate-400">Panel Administrador</div>
             </div>
           )}
-          <button onClick={() => setOpen(!open)} className="p-2 hover:bg-slate-700 rounded">
+          {/* Botón colapsar — solo desktop */}
+          <button
+            onClick={() => setOpen(!open)}
+            className="p-2 hover:bg-slate-700 rounded hidden md:block"
+            aria-label="Colapsar menú"
+          >
             <Menu size={18} />
+          </button>
+          {/* Botón cerrar drawer — solo mobile */}
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="p-2 hover:bg-slate-700 rounded md:hidden"
+            aria-label="Cerrar menú"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <nav className="flex-1 py-4 space-y-1">
+        {/* Navegación */}
+        <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon
             return (
@@ -61,27 +110,44 @@ export default function DashboardLayout() {
                   )
                 }
               >
-                <Icon size={18} />
-                {open && <span className="font-medium">{item.label}</span>}
+                <Icon size={18} className="flex-shrink-0" />
+                {showLabels && <span className="font-medium">{item.label}</span>}
               </NavLink>
             )
           })}
         </nav>
 
+        {/* Cerrar sesión */}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-red-600 hover:text-white border-t border-slate-700 transition-colors"
+          className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-red-600 hover:text-white border-t border-slate-700 transition-colors flex-shrink-0"
         >
-          <LogOut size={18} />
-          {open && <span className="font-medium">Cerrar sesión</span>}
+          <LogOut size={18} className="flex-shrink-0" />
+          {showLabels && <span className="font-medium">Cerrar sesión</span>}
         </button>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-6">
-          <Outlet />
-        </div>
-      </main>
+      {/* Área de contenido principal */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
+        {/* Header sticky — solo visible en mobile */}
+        <header className="md:hidden flex items-center gap-3 px-4 h-14 bg-brand-accent text-white border-b border-slate-700 flex-shrink-0">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+            aria-label="Abrir menú"
+          >
+            <Menu size={20} />
+          </button>
+          <span className="text-base font-bold text-brand-primary">ChikisdTV</span>
+        </header>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-3 md:p-6">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
