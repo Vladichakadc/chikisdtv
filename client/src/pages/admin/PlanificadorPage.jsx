@@ -37,12 +37,23 @@ const SYNC_CAMPO_LABELS = {
 
 // ─── Modal informe comparativo de sincronización con Cuentas Padre ────────────
 
+function VencimientoChip({ diasAlFin }) {
+  if (diasAlFin == null) return <span className="text-gray-300 text-xs">—</span>
+  if (diasAlFin <= 0)
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold whitespace-nowrap"><AlertTriangle size={10} /> Vencida</span>
+  if (diasAlFin <= 7)
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold whitespace-nowrap"><Clock size={10} /> {diasAlFin}d</span>
+  return <span className="text-gray-500 text-xs whitespace-nowrap">{diasAlFin}d</span>
+}
+
 function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
   const [soloConCambios, setSoloConCambios] = useState(false)
 
   const actualizadas  = diff.filter(d => d.status === 'actualizada')
   const sinCambio     = diff.filter(d => d.status === 'sin_cambio')
   const sinPantallas  = diff.filter(d => d.status === 'sin_pantallas')
+  const vencidas      = diff.filter(d => d.diasAlFin != null && d.diasAlFin <= 0)
+  const porVencer     = diff.filter(d => d.diasAlFin != null && d.diasAlFin > 0 && d.diasAlFin <= 7)
 
   const visible = soloConCambios
     ? actualizadas
@@ -67,6 +78,18 @@ function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
 
         {/* Chips resumen */}
         <div className="flex items-center flex-wrap gap-2.5 px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          {vencidas.length > 0 && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-sm font-semibold">
+              <AlertTriangle size={13} />
+              {vencidas.length} vencida{vencidas.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {porVencer.length > 0 && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 text-sm font-semibold">
+              <Clock size={13} />
+              {porVencer.length} por vencer
+            </span>
+          )}
           {actualizadas.length > 0 && (
             <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-100 text-orange-700 text-sm font-semibold">
               <Pencil size={13} />
@@ -105,14 +128,16 @@ function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
                 <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold border-b border-gray-200">ID Cuenta</th>
                 <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold border-b border-gray-200">Usuario IPTV</th>
                 <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold text-center border-b border-gray-200">Pantallas</th>
-                <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold text-center border-b border-gray-200">Estado</th>
+                <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold text-center border-b border-gray-200">Estado cuenta</th>
+                <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold text-center border-b border-gray-200">Vencimiento</th>
+                <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold text-center border-b border-gray-200">Sincronización</th>
                 <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold border-b border-gray-200">Cambios detectados</th>
               </tr>
             </thead>
             <tbody>
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                     <CheckCircle2 size={28} className="mx-auto mb-2 text-gray-300" />
                     Todos los datos ya estaban sincronizados.
                   </td>
@@ -135,9 +160,21 @@ function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
                     {item.pantallasAfectadas > 0 ? item.pantallasAfectadas : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                    {item.estado
+                      ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${item.estado === 'Válido' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.estado}</span>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <VencimientoChip diasAlFin={item.diasAlFin} />
+                  </td>
+                  <td className="px-4 py-2.5 text-center whitespace-nowrap">
                     {item.status === 'actualizada' ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold">
                         <Pencil size={10} /> Actualizada
+                      </span>
+                    ) : item.status === 'sin_pantallas' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">
+                        <Monitor size={10} /> Sin pantallas
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 text-xs font-semibold">

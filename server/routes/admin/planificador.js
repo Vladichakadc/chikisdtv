@@ -415,9 +415,12 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
 
     const [affectedCount] = await Planificador.update(newVals, { where: { cuentaId } });
 
+    const estadoCuenta = cp.estado || null;
+    const diasAlFin    = calcDiasDB(cp.fechaFin);
+
     if (affectedCount === 0) {
       skipped++;
-      diff.push({ cuentaId, cuenta: cp.nombreUsuario || null, status: 'sin_pantallas', pantallasAfectadas: 0, cambios: [] });
+      diff.push({ cuentaId, cuenta: cp.nombreUsuario || null, estado: estadoCuenta, diasAlFin, status: 'sin_pantallas', pantallasAfectadas: 0, cambios: [] });
       continue;
     }
 
@@ -437,6 +440,8 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
     diff.push({
       cuentaId,
       cuenta: cp.nombreUsuario || null,
+      estado: estadoCuenta,
+      diasAlFin,
       status: cambios.length > 0 ? 'actualizada' : 'sin_cambio',
       pantallasAfectadas: affectedCount,
       cambios,
