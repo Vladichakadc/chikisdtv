@@ -59,12 +59,18 @@ router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   // ─── Cruce con Planificador: capacidad disponible para nuevas ventas ──────
   // Replica la clasificación "libre" de PlanificadorPage (nickname que indica
   // "libre" o pantalla totalmente sin nombre/apellido/nickname asignado).
-  const pantallasRows = await Planificador.findAll({ attributes: ['nombre', 'apellido', 'nickname'], raw: true });
+  // totalPantallas = SUM(pantallas) — no COUNT(*): una fila puede representar
+  // más de una pantalla cuando un cliente tiene varias configuradas bajo el
+  // mismo slot (columna # del Planificador).
+  const pantallasRows = await Planificador.findAll({ attributes: ['nombre', 'apellido', 'nickname', 'pantallas'], raw: true });
   let pantallasLibres = 0;
+  let totalPantallas = 0;
   for (const s of pantallasRows) {
+    const np = Number(s.pantallas) || 0;
+    totalPantallas += np;
     const nombre = (String(s.nombre ?? '') + String(s.apellido ?? '')).trim();
     const nickname = (s.nickname || '').trim();
-    if (nickname.toLowerCase().includes('libre') || (!nombre && !nickname)) pantallasLibres++;
+    if (nickname.toLowerCase().includes('libre') || (!nombre && !nickname)) pantallasLibres += np;
   }
 
   res.json({
@@ -86,7 +92,7 @@ router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
     cuentasPadreTotal,
     creditoCuentasPadreTotal: Math.round(creditoCuentasPadreTotal || 0),
     inversionRecargasAnio,
-    totalPantallas: pantallasRows.length,
+    totalPantallas,
     pantallasLibres,
   });
 }));
@@ -304,8 +310,10 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     });
   }
 
-  const alertaRows = await Planificador.findAll({ attributes: ['alertaReal', 'debe', 'customerId', 'cuentaId', 'nombre', 'apellido', 'nickname'], raw: true });
-  const totalPantallas = alertaRows.length;
+  // pantallas = SUM(columna #): una fila puede representar más de una pantalla
+  // cuando un cliente tiene varias configuradas. Usar COUNT(*) subestima el total.
+  const alertaRows = await Planificador.findAll({ attributes: ['alertaReal', 'debe', 'customerId', 'cuentaId', 'nombre', 'apellido', 'nickname', 'pantallas'], raw: true });
+  const totalPantallas = alertaRows.reduce((s, r) => s + (Number(r.pantallas) || 0), 0);
   const ingresoPorPantalla = totalPantallas > 0 ? Math.round(totalIngresos / totalPantallas) : 0;
   const costoPorPantalla = totalPantallas > 0 ? Math.round(totalCostos / totalPantallas) : 0;
 
@@ -371,11 +379,12 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     const cid = p.cuentaId;
     if (!cid) continue;
     if (!ocupadosPorCuenta[cid]) ocupadosPorCuenta[cid] = { total: 0, ocupadas: 0 };
-    ocupadosPorCuenta[cid].total++;
+    const np = Number(p.pantallas) || 1;
+    ocupadosPorCuenta[cid].total += np;
     const nombre = (String(p.nombre ?? '') + String(p.apellido ?? '')).trim();
     const nickname = (p.nickname || '').trim();
     const esLibre = nickname.toLowerCase().includes('libre') || (!nombre && !nickname);
-    if (!esLibre) ocupadosPorCuenta[cid].ocupadas++;
+    if (!esLibre) ocupadosPorCuenta[cid].ocupadas += np;
   }
   const ocupacionDetalle = cpRows
     .filter(cp => Number(cp.credito) > 0)
