@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Users, Package, FileText, CreditCard, Tv, LogOut, Menu, CalendarClock, UserX, KeyRound, Monitor, GitMerge, X, Landmark } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { cn } from '../utils/cn'
 
 const navItems = [
@@ -104,7 +104,7 @@ export default function DashboardLayout() {
                 end={item.end}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-3 px-4 py-2.5 transition-colors',
+                    'flex items-center gap-3 px-4 py-3 md:py-2.5 min-h-[44px] md:min-h-0 transition-colors touch-manipulation active:bg-slate-600',
                     isActive
                       ? 'bg-brand-primary text-white border-l-4 border-white'
                       : 'text-slate-300 hover:bg-slate-700 border-l-4 border-transparent'
@@ -121,7 +121,7 @@ export default function DashboardLayout() {
         {/* Cerrar sesión */}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-red-600 hover:text-white border-t border-slate-700 transition-colors flex-shrink-0"
+          className="flex items-center gap-3 px-4 py-3 min-h-[48px] pb-[max(0.75rem,env(safe-area-inset-bottom))] text-slate-300 hover:bg-red-600 hover:text-white border-t border-slate-700 transition-colors flex-shrink-0 touch-manipulation"
         >
           <LogOut size={18} className="flex-shrink-0" />
           {showLabels && <span className="font-medium">Cerrar sesión</span>}
@@ -135,17 +135,26 @@ export default function DashboardLayout() {
         <header className="md:hidden flex items-center gap-3 px-4 h-14 bg-brand-accent text-white border-b border-slate-700 flex-shrink-0">
           <button
             onClick={() => setMobileOpen(true)}
-            className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+            className="p-2.5 -ml-1.5 hover:bg-slate-700 active:bg-slate-600 rounded-lg transition-colors touch-manipulation"
             aria-label="Abrir menú"
           >
-            <Menu size={20} />
+            <Menu size={22} />
           </button>
           <span className="text-base font-bold text-brand-primary">ChikisdTV</span>
         </header>
 
         <main className="flex-1 overflow-y-auto">
           <div className="p-3 md:p-6">
-            <Outlet />
+            {/* Suspense local: al navegar entre páginas el shell (sidebar/header)
+                permanece visible y solo el contenido muestra el loader */}
+            <Suspense fallback={
+              <div className="flex flex-col items-center justify-center py-24 gap-3">
+                <div className="w-9 h-9 rounded-full border-[3px] border-orange-200 border-t-brand-primary animate-spin" />
+                <p className="text-sm text-gray-400">Cargando…</p>
+              </div>
+            }>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

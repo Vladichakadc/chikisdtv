@@ -6,8 +6,37 @@ html, body, #root {
   height: 100%;
 }
 
+html {
+  /* Evita que iOS/Android agranden el texto por su cuenta al rotar */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: #f8fafc;
   color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Sin rebote elástico del documento en móvil (los paneles internos sí hacen scroll) */
+  overscroll-behavior-y: none;
+}
+
+/* Toques limpios en móvil: sin el flash gris/azul del navegador al tocar */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Scroll con inercia en los contenedores desplazables (iOS) */
+.overflow-y-auto, .overflow-auto, .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Animación del bottom-sheet (modales en móvil) */
+@keyframes sheet-up {
+  from { transform: translateY(24px); opacity: 0.6; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.animate-sheet-up {
+  animation: sheet-up 0.22s ease-out;
 }
