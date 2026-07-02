@@ -6,19 +6,27 @@ import {
 } from 'recharts'
 import api from '../../config/api'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatCurrency } from '../../utils/excelUtils'
 
 // ─── Helpers de UI ────────────────────────────────────────────────────────────
 
-function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
+function StatCard({ icon: Icon, label, value, sub, color = 'indigo', onClick }) {
   const colors = {
     indigo: 'from-indigo-500 to-indigo-600 text-white shadow-indigo-200',
     emerald: 'from-emerald-500 to-emerald-600 text-white shadow-emerald-200',
     orange: 'from-orange-500 to-orange-600 text-white shadow-orange-200',
     violet: 'from-violet-500 to-violet-600 text-white shadow-violet-200',
   }
+  const interactive = typeof onClick === 'function'
   return (
-    <div className={`bg-gradient-to-br ${colors[color]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+    <div
+      className={`bg-gradient-to-br ${colors[color]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 ${interactive ? 'cursor-pointer' : ''}`}
+      {...(interactive ? {
+        role: 'button', tabIndex: 0, onClick,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
+      } : {})}
+    >
       <div className="flex items-center gap-3">
         <div className="bg-white/20 rounded-lg p-2">
           <Icon size={18} className="text-white" />
@@ -29,6 +37,7 @@ function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
       </div>
       <p className="text-3xl font-bold mt-2">{value}</p>
       {sub && <p className="text-xs mt-2 leading-relaxed text-white/70">{sub}</p>}
+      {interactive && <p className="text-xs font-semibold mt-1.5 text-white/90">¿Cómo se calcula?</p>}
     </div>
   )
 }
@@ -41,6 +50,7 @@ export default function AnalisisDispositivosPage() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [explain, setExplain] = useState(null)
 
   useEffect(() => {
     api.get('/admin/payments/ventas-equipos')
@@ -109,11 +119,31 @@ export default function AnalisisDispositivosPage() {
 
       {!loading && !error && (
         <>
+          <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
           {/* KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard icon={Tv} label="Total Dispositivos Vendidos" value={stats.total} color="indigo" sub={`${stats.activos} actualmente activos`} />
-            <StatCard icon={DollarSign} label="Ingresos Totales (Histórico)" value={formatCurrency(stats.totalIngresos)} color="emerald" sub="Suma de ventas de equipos" />
-            <StatCard icon={TrendingUp} label="Dispositivo más popular" value={tipoDispositivos[0]?.name || '—'} color="orange" sub={`${tipoDispositivos[0]?.value || 0} unidades vendidas`} />
+            <StatCard icon={Tv} label="Total Dispositivos Vendidos" value={stats.total} color="indigo" sub={`${stats.activos} actualmente activos`}
+              onClick={() => setExplain({
+                title: 'Total Dispositivos Vendidos', value: stats.total, icon: Tv,
+                queEs: 'Cuántos equipos físicos se han vendido en toda la historia, y cuántos siguen activos con clientes.',
+                comoSeCalcula: 'Conteo de los registros de ventas de equipos. "Activos" cuenta los que tienen **Estado = Activo**. Coincide con "Total Equipos" del módulo Venta Dispositivos.',
+                origen: 'Tabla de ventas de equipos (módulo **Venta Dispositivos**).',
+              })} />
+            <StatCard icon={DollarSign} label="Ingresos Totales (Histórico)" value={formatCurrency(stats.totalIngresos)} color="emerald" sub="Suma de ventas de equipos"
+              onClick={() => setExplain({
+                title: 'Ingresos Totales (Histórico)', value: formatCurrency(stats.totalIngresos), icon: DollarSign,
+                queEs: 'Todo el dinero recaudado por venta de hardware — la línea de ingreso complementaria a las licencias.',
+                comoSeCalcula: 'Se **suma el precio de venta** de todos los equipos. Es la misma cifra de "Ingresos Equipos" en Venta Dispositivos y de la línea de equipos en Análisis Financiero — todo sale de la misma tabla.',
+                origen: 'Campo precio de venta de las ventas de equipos.',
+              })} />
+            <StatCard icon={TrendingUp} label="Dispositivo más popular" value={tipoDispositivos[0]?.name || '—'} color="orange" sub={`${tipoDispositivos[0]?.value || 0} unidades vendidas`}
+              onClick={() => setExplain({
+                title: 'Dispositivo más popular', value: tipoDispositivos[0]?.name || '—', icon: TrendingUp,
+                queEs: 'El tipo de equipo que más se ha vendido — la referencia que conviene mantener en inventario.',
+                comoSeCalcula: 'Se agrupan las ventas por **tipo de dispositivo** y se toma el de mayor conteo. El desglose completo está en la dona de abajo.',
+                origen: 'Campo tipo de dispositivo de las ventas de equipos.',
+              })} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

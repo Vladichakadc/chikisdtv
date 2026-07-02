@@ -16,36 +16,11 @@ import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { useUi } from '../../context/UiContext'
 import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatDate } from '../../utils/excelUtils'
+import { ModuleStatCard as StatCard } from './dashboard/biShared'
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ icon: Icon, label, value, sub, variant }) {
-  const styles = {
-    solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
-    light:   'bg-white border-2 border-orange-200 text-orange-700',
-    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
-  }
-  const iconBg = {
-    solid:   'bg-white/20',
-    light:   'bg-orange-100',
-    outline: 'bg-orange-200/60',
-  }
-  return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
-          <p className="text-3xl font-bold mt-1">{value}</p>
-          {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-orange-500'}`}>{sub}</p>}
-        </div>
-        <div className={`${iconBg[variant]} rounded-lg p-3`}>
-          <Icon size={24} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// ─── KPI Card — compartida (con modal explicativo al clic) ───────────────────
 
 // ─── Componentes de análisis de capacidad ────────────────────────────────────
 
@@ -58,17 +33,27 @@ function SmartTagCP({ tone = 'info', children }) {
   )
 }
 
-function BiCardCP({ icon: Icon, label, value, sub, variant = 'light', tag }) {
+function BiCardCP({ icon: Icon, label, value, sub, variant = 'light', tag, onClick }) {
   const styles = { solid: 'bg-gradient-to-br from-sky-500 to-sky-700 text-white', light: 'bg-white border-2 border-sky-200 text-sky-700', outline: 'bg-sky-50 border border-sky-300 text-sky-800' }
   const iconBg  = { solid: 'bg-white/20', light: 'bg-sky-100', outline: 'bg-sky-200/60' }
+  const interactive = typeof onClick === 'function'
   return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+    <div
+      className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 ${interactive ? 'cursor-pointer' : ''}`}
+      {...(interactive ? {
+        role: 'button', tabIndex: 0, onClick,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
+      } : {})}
+    >
       <div className="flex items-center justify-between">
         <div>
           <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
           <p className="text-2xl font-bold mt-1">{value}</p>
           {tag && <div className="mt-1.5"><SmartTagCP tone={tag.tone}>{tag.text}</SmartTagCP></div>}
           {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-gray-400'}`}>{sub}</p>}
+          {interactive && (
+            <p className={`text-xs font-semibold mt-1.5 ${variant === 'solid' ? 'text-white/90' : 'text-sky-600'}`}>¿Cómo se calcula?</p>
+          )}
         </div>
         <div className={`${iconBg[variant]} rounded-lg p-3`}><Icon size={22} /></div>
       </div>
@@ -101,9 +86,9 @@ function narrarCapacidadCP(oc) {
   const cuentasBaja   = (detalle || []).filter(c => c.pctOcupacion < 50).length
   const pctLibre = 100 - pctOcupacionGlobal
   const margen = pctOcupacionGlobal < 92
-    ? `Quedan **${totalLibres} cupos libres** (${pctLibre}% de la capacidad instalada) disponibles para activar sin comprar créditos adicionales.`
-    : `La capacidad está casi agotada — considera recargar antes de la próxima campaña de activaciones.`
-  return `La red de **${(detalle || []).length} cuentas padre** suma **${totalCapacidad} pantallas de capacidad total**, de las cuales **${totalOcupadas} están activas** (${pctOcupacionGlobal}% de ocupación). ${margen}${cuentasLlenas > 0 ? ` **${cuentasLlenas} cuenta${cuentasLlenas > 1 ? 's están' : ' está'} al tope** — necesitan recarga para seguir creciendo.` : ''}${cuentasBaja > 0 ? ` **${cuentasBaja} cuenta${cuentasBaja > 1 ? 's tienen' : ' tiene'} menos del 50% de ocupación** — margen que se pierde mes a mes sin gestión activa.` : ''}`
+    ? `Quedan **${totalLibres} pantalla${totalLibres === 1 ? '' : 's'} libre${totalLibres === 1 ? '' : 's'}** (${pctLibre}% de las registradas) disponibles para asignar a un cliente sin ampliar la infraestructura.`
+    : `Prácticamente todas las pantallas registradas ya tienen cliente — para seguir creciendo hay que abrir pantallas nuevas en el Planificador (y recargar las cuentas que lo requieran).`
+  return `La red de **${(detalle || []).length} cuentas padre con pantallas** suma **${totalCapacidad} pantallas registradas en el Planificador** (la fuente real de capacidad), de las cuales **${totalOcupadas} están asignadas** (${pctOcupacionGlobal}% de ocupación). ${margen}${cuentasLlenas > 0 ? ` **${cuentasLlenas} cuenta${cuentasLlenas > 1 ? 's están' : ' está'} al tope** — sin pantallas libres.` : ''}${cuentasBaja > 0 ? ` **${cuentasBaja} cuenta${cuentasBaja > 1 ? 's tienen' : ' tiene'} menos del 50% de ocupación** — pantallas abiertas que no generan ingreso.` : ''}`
 }
 
 // ─── Icono de orden ───────────────────────────────────────────────────────────
@@ -414,6 +399,7 @@ export default function CuentasPadrePage() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [form, setForm]         = useState(EMPTY)
+  const [explain, setExplain]   = useState(null)
   const [showPwd, setShowPwd]     = useState(true)
   const [uploadFile, setUploadFile] = useState(null)
   const [uploading, setUploading]   = useState(false)
@@ -646,13 +632,45 @@ export default function CuentasPadrePage() {
         </div>
       </div>
 
+      <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard icon={Server}      label="Total Cuentas"     value={stats.total.toLocaleString()}    variant="solid"   sub="Histórico completo" />
-        <StatCard icon={ShieldCheck} label="Cuentas Válidas"   value={stats.validas.toLocaleString()}  variant="light"   sub="Estado activo" />
-        <StatCard icon={Monitor}     label="Crédito Total"     value={stats.credito.toLocaleString()}  variant="outline" sub="Pantallas disponibles" />
-        <StatCard icon={Clock}       label={`Próx. a vencer`}  value={stats.proximas.toLocaleString()} variant="light"   sub={`≤ ${DIAS_ALERTA} días`} />
-        <StatCard icon={AlertCircle} label="Vencidas"          value={stats.vencidas.toLocaleString()} variant="outline" sub="Requieren acción" />
+        <StatCard icon={Server}      label="Total Cuentas"     value={stats.total.toLocaleString()}    variant="solid"   sub="Histórico completo"
+          onClick={() => setExplain({
+            title: 'Total Cuentas', value: stats.total.toLocaleString(), icon: Server,
+            queEs: 'Cuántas cuentas padre (cuentas maestras del proveedor IPTV) están registradas. Cada una agrupa varias pantallas de clientes.',
+            comoSeCalcula: 'Conteo simple de los registros de este módulo. Coincide con la tarjeta "Cuentas Padre" que existía en el Dashboard.',
+            origen: 'Tabla de cuentas padre de este módulo.',
+          })} />
+        <StatCard icon={ShieldCheck} label="Cuentas Válidas"   value={stats.validas.toLocaleString()}  variant="light"   sub="Estado activo"
+          onClick={() => setExplain({
+            title: 'Cuentas Válidas', value: stats.validas.toLocaleString(), icon: ShieldCheck,
+            queEs: 'Cuentas cuyo estado registrado es "Válido" — las que están operativas con el proveedor.',
+            comoSeCalcula: 'Se cuentan los registros con **Estado = Válido**.',
+            origen: 'Campo Estado de cada cuenta. Este mismo estado aparece en el informe de Sincronización del Planificador.',
+          })} />
+        <StatCard icon={Monitor}     label="Crédito Total"     value={stats.credito.toLocaleString()}  variant="outline" sub="Saldo registrado de las cuentas"
+          onClick={() => setExplain({
+            title: 'Crédito Total', value: stats.credito.toLocaleString(), icon: Monitor,
+            queEs: 'La suma del campo Crédito registrado en las cuentas padre — el saldo administrativo que se lleva con el proveedor.',
+            comoSeCalcula: 'Se **suma el campo Crédito** de cada cuenta. **Importante:** este número no representa cupos de pantalla — la capacidad real de pantallas la define el **Planificador** (ver el panel "Capacidad instalada" más abajo).',
+            origen: 'Campo Crédito de cada cuenta de este módulo.',
+          })} />
+        <StatCard icon={Clock}       label={`Próx. a vencer`}  value={stats.proximas.toLocaleString()} variant="light"   sub={`≤ ${DIAS_ALERTA} días`}
+          onClick={() => setExplain({
+            title: 'Próximas a vencer', value: stats.proximas.toLocaleString(), icon: Clock,
+            queEs: `Cuentas padre que vencen dentro de los próximos ${DIAS_ALERTA} días — hay que recargarlas antes para no dejar sin servicio a todas sus pantallas de golpe.`,
+            comoSeCalcula: `Se calculan los días entre hoy y la **Fecha Fin** de cada cuenta; si faltan ${DIAS_ALERTA} días o menos (y no ha vencido), entra aquí.`,
+            origen: 'Campo Fecha Fin de cada cuenta de este módulo.',
+          })} />
+        <StatCard icon={AlertCircle} label="Vencidas"          value={stats.vencidas.toLocaleString()} variant="outline" sub="Requieren acción"
+          onClick={() => setExplain({
+            title: 'Vencidas', value: stats.vencidas.toLocaleString(), icon: AlertCircle,
+            queEs: 'Cuentas padre cuya fecha de fin ya pasó. Una cuenta padre vencida afecta a **todas** las pantallas de clientes que dependen de ella — es la alerta más crítica del módulo.',
+            comoSeCalcula: 'Se comparan las **Fechas Fin** contra hoy: si ya pasaron, la cuenta está vencida.',
+            origen: 'Campo Fecha Fin de cada cuenta de este módulo.',
+          })} />
       </div>
 
       <div className="flex gap-4 items-start">
@@ -996,13 +1014,25 @@ export default function CuentasPadrePage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
             <BiCardCP icon={Layers} variant="solid" label="Capacidad instalada"
               value={`${ocupacion.totalCapacidad} pantallas`}
-              sub="cupos comprados en todas las cuentas padre"
+              sub="pantallas registradas en el Planificador"
               tag={{ tone: 'info', text: 'Infraestructura disponible' }}
+              onClick={() => setExplain({
+                title: 'Capacidad instalada', value: `${ocupacion.totalCapacidad} pantallas`, icon: Layers,
+                queEs: 'El total de pantallas que existen en la operación — el techo de cuántos clientes puede atender el negocio con lo que ya tiene montado.',
+                comoSeCalcula: 'Se **suma la columna # (pantallas)** de todas las filas del Planificador, agrupadas por cuenta padre. El Planificador es la fuente real de capacidad — el campo Crédito de las cuentas no representa cupos de pantalla. Es la misma cifra del panel de Ocupación del Dashboard.',
+                origen: 'Tabla del **Planificador**, agrupada por cuenta padre.',
+              })}
             />
             <BiCardCP icon={Monitor} variant="light" label="Pantallas activas"
               value={ocupacion.totalOcupadas}
               sub={`generando ingreso hoy · ${ocupacion.pctOcupacionGlobal}% de la capacidad`}
               tag={tagOcupacionCP(ocupacion.pctOcupacionGlobal)}
+              onClick={() => setExplain({
+                title: 'Pantallas activas', value: ocupacion.totalOcupadas, icon: Monitor,
+                queEs: 'Cuántas de las pantallas registradas están asignadas a un cliente real y generando ingreso.',
+                comoSeCalcula: 'Se cuentan las pantallas del **Planificador** que tienen cliente asignado (nombre o nickname que no diga "libre"), agrupadas por cuenta padre.',
+                origen: 'Tabla del Planificador (asignaciones por cuenta).',
+              })}
             />
             <BiCardCP icon={TrendingUp} variant="outline" label="Pantallas libres"
               value={ocupacion.totalLibres}
@@ -1010,11 +1040,23 @@ export default function CuentasPadrePage() {
               tag={ocupacion.totalLibres > 0
                 ? { tone: 'good', text: `${ocupacion.totalLibres} ventas posibles hoy sin costo adicional` }
                 : { tone: 'warn', text: 'Capacidad agotada — recargar pronto' }}
+              onClick={() => setExplain({
+                title: 'Pantallas libres', value: ocupacion.totalLibres, icon: TrendingUp,
+                queEs: 'Pantallas ya montadas en el Planificador que están sin cliente — cada una es una venta posible con **costo marginal cero**, porque la infraestructura ya existe.',
+                comoSeCalcula: '**Capacidad instalada − Pantallas activas** (ambas del Planificador). Asignarlas primero, antes de abrir pantallas nuevas, es la decisión financiera más eficiente.',
+                origen: 'Tabla del Planificador.',
+              })}
             />
             <BiCardCP icon={Percent} variant={ocupacion.pctOcupacionGlobal >= 92 ? 'outline' : 'solid'} label="Tasa de ocupación"
               value={`${ocupacion.pctOcupacionGlobal}%`}
               sub={`${ocupacion.detalle.filter(c => c.pctOcupacion >= 100).length} cuentas llenas · ${ocupacion.detalle.filter(c => c.pctOcupacion < 50).length} con baja ocupación`}
               tag={tagOcupacionCP(ocupacion.pctOcupacionGlobal)}
+              onClick={() => setExplain({
+                title: 'Tasa de ocupación', value: `${ocupacion.pctOcupacionGlobal}%`, icon: Percent,
+                queEs: 'Qué porcentaje de las pantallas registradas está realmente vendido. Como la ocupación de un hotel: muy baja desperdicia infraestructura; al 100% no hay dónde poner un cliente nuevo.',
+                comoSeCalcula: '**(Pantallas activas ÷ Capacidad instalada) × 100**, ambas medidas sobre el Planificador. La misma fórmula que usan el Dashboard y la tarjeta "Ocupación" del propio Planificador — todo coincide.',
+                origen: 'Tabla del Planificador, agrupada por cuenta padre.',
+              })}
             />
           </div>
 

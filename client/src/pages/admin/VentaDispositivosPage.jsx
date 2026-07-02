@@ -426,7 +426,7 @@ export default function VentaDispositivosPage() {
           onClick={() => setExplain({
             title: 'Ingresos Equipos', value: fmtCOP(stats.ingresos), icon: DollarSign,
             queEs: 'La plata recaudada por venta de hardware. Es una línea de ingreso separada de las licencias.',
-            comoSeCalcula: 'Se **suma el precio de venta** de cada equipo visible. Sin filtros, coincide con los "Ingresos Totales" de Análisis Dispositivos y con la línea de equipos de Análisis Financiero. Ojo: el **costo de compra** de los equipos casi nunca está registrado, así que el margen real de esta línea no es medible todavía.',
+            comoSeCalcula: 'Se **suma el precio de venta** de cada equipo visible. Sin filtros, coincide con los "Ingresos Totales" de Análisis Dispositivos y con la línea de equipos de Análisis Financiero. El **costo de compra** registrado de los equipos se descuenta en el EBITDA de Análisis Financiero.',
             origen: 'Campo precio de venta de cada registro de este módulo.',
           })} />
         <StatCard icon={Tv}           label="FireTV Vendidos"  value={stats.firetv.toLocaleString()}    variant="outline" sub="Equipos Amazon"

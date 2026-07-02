@@ -5,7 +5,8 @@ import {
   Plus, Pencil, Trash2, X, Upload
 } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from 'recharts'
-import { ChartInsight, narrarGeografia, LABEL_STYLE, PIE_COLORS } from './dashboard/biShared'
+import { ModuleStatCard as StatCard, ChartInsight, narrarGeografia, LABEL_STYLE, PIE_COLORS } from './dashboard/biShared'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { useUi } from '../../context/UiContext'
@@ -38,28 +39,7 @@ const PAISES = [
   { nombre: 'Estados Unidos', codigo: '+1' },
 ]
 
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
-
-function StatCard({ icon: Icon, label, value, sub, variant }) {
-  const styles = {
-    solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
-    light:   'bg-white border-2 border-orange-200 text-orange-700',
-    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
-  }
-  const iconBg = { solid: 'bg-white/20', light: 'bg-orange-100', outline: 'bg-orange-200/60' }
-  return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
-          <p className="text-3xl font-bold mt-1">{value}</p>
-          {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-orange-500'}`}>{sub}</p>}
-        </div>
-        <div className={`${iconBg[variant]} rounded-lg p-3`}><Icon size={24} /></div>
-      </div>
-    </div>
-  )
-}
+// ─── KPI Card — compartida (con modal explicativo al clic) ───────────────────
 
 // ─── Sort icon ────────────────────────────────────────────────────────────────
 
@@ -132,6 +112,7 @@ export default function ClientsPage() {
   const [editing, setEditing]   = useState(null)
   const [form, setForm]         = useState(EMPTY)
   const [paisesClientes, setPaisesClientes] = useState([])
+  const [explain, setExplain] = useState(null)
 
   // Distribución geográfica (agregado del dashboard-bi, movido desde el Dashboard)
   useEffect(() => {
@@ -253,12 +234,38 @@ export default function ClientsPage() {
         </div>
       </div>
 
+      <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={Users}     label="Total Clientes"   value={stats.total.toLocaleString()}        variant="solid"   sub="Histórico completo" />
-        <StatCard icon={UserCheck} label="Clientes Finales" value={stats.finales.toLocaleString()}      variant="light"   sub="Usuarios directos" />
-        <StatCard icon={Repeat}    label="Revendedores"     value={stats.revendedores.toLocaleString()}  variant="outline" sub="Canal de reventa" />
-        <StatCard icon={Globe}     label="Países"           value={stats.paises.toLocaleString()}        variant="light"   sub="Cobertura global" />
+        <StatCard icon={Users}     label="Total Clientes"   value={stats.total.toLocaleString()}        variant="solid"   sub="Histórico completo"
+          onClick={() => setExplain({
+            title: 'Total Clientes', value: stats.total.toLocaleString(), icon: Users,
+            queEs: 'Cuántos clientes hay registrados en la tabla de clientes, incluyendo activos e inactivos — el universo histórico completo.',
+            comoSeCalcula: 'Conteo simple de las filas de la tabla de clientes. **Ojo:** la tarjeta "Clientes Activos" del Dashboard usa otra fuente (los usuarios de acceso con estado Activo), por eso los números pueden diferir — miden cosas distintas.',
+            origen: 'Tabla de clientes de este módulo (importada del Excel original).',
+          })} />
+        <StatCard icon={UserCheck} label="Clientes Finales" value={stats.finales.toLocaleString()}      variant="light"   sub="Usuarios directos"
+          onClick={() => setExplain({
+            title: 'Clientes Finales', value: stats.finales.toLocaleString(), icon: UserCheck,
+            queEs: 'Clientes que consumen el servicio directamente (no lo revenden). Son la base de mayor margen por pantalla.',
+            comoSeCalcula: 'Se cuentan los registros con **Tipo Cliente = Final**.',
+            origen: 'Campo Tipo Cliente de esta tabla.',
+          })} />
+        <StatCard icon={Repeat}    label="Revendedores"     value={stats.revendedores.toLocaleString()}  variant="outline" sub="Canal de reventa"
+          onClick={() => setExplain({
+            title: 'Revendedores', value: stats.revendedores.toLocaleString(), icon: Repeat,
+            queEs: 'Clientes que compran para revender a terceros. Mueven volumen, pero suelen negociar precios menores — vale la pena monitorear su ticket promedio.',
+            comoSeCalcula: 'Se cuentan los registros con **Tipo Cliente = Revendedor**.',
+            origen: 'Campo Tipo Cliente de esta tabla.',
+          })} />
+        <StatCard icon={Globe}     label="Países"           value={stats.paises.toLocaleString()}        variant="light"   sub="Cobertura global"
+          onClick={() => setExplain({
+            title: 'Países', value: stats.paises.toLocaleString(), icon: Globe,
+            queEs: 'En cuántos países distintos hay clientes registrados — la huella geográfica del negocio.',
+            comoSeCalcula: 'Se cuentan los **valores únicos** del campo País (ignorando vacíos). La distribución detallada está en la gráfica de abajo.',
+            origen: 'Campo País de esta tabla.',
+          })} />
       </div>
 
       {/* Distribución geográfica (movido desde el Dashboard) */}
