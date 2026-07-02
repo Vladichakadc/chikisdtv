@@ -15,6 +15,7 @@ import { useUi } from '../../context/UiContext'
 import { Badge } from '../../components/ui/Badge'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 
 import { StatCard } from './planificador/StatCard'
@@ -261,6 +262,7 @@ export default function PlanificadorPage() {
   const [prevPantallas, setPrevPantallas] = useState(null)
   const [undoing, setUndoing]             = useState(false)
   const [activePanel, setActivePanel]     = useState(null)
+  const [explain, setExplain]             = useState(null)
   const [showEstatusPanel, setShowEstatusPanel] = useState(false)
   const [showCuentaData, setShowCuentaData]     = useState(false)
   const [estatusExpanded, setEstatusExpanded]   = useState(false)
@@ -697,10 +699,24 @@ export default function PlanificadorPage() {
         </Card>
       )}
 
+      <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <StatCard icon={Tv}           label="Cuentas totales"  value={stats.cuentas}       variant="solid"   sub={`${stats.total} pantallas`} />
-        <StatCard icon={CheckCircle2} label="Pantallas activas" value={stats.activas}       variant="light" />
+        <StatCard icon={Tv}           label="Cuentas totales"  value={stats.cuentas}       variant="solid"   sub={`${stats.total} pantallas`}
+          onClick={() => setExplain({
+            title: 'Cuentas totales', value: stats.cuentas, icon: Tv,
+            queEs: 'Cuántas cuentas padre distintas tienen pantallas registradas en el Planificador, y cuántas pantallas suman entre todas.',
+            comoSeCalcula: 'Se cuentan los **IDs de cuenta únicos** entre las filas del Planificador. Las pantallas son la suma de la columna # — un registro puede valer por 2 o más pantallas.',
+            origen: 'Tabla del Planificador. El inventario completo de cuentas (incluidas las que no tienen pantallas) vive en **Cuentas Padre**.',
+          })} />
+        <StatCard icon={CheckCircle2} label="Pantallas activas" value={stats.activas}       variant="light"
+          onClick={() => setExplain({
+            title: 'Pantallas activas', value: stats.activas, icon: CheckCircle2,
+            queEs: 'Pantallas asignadas a un cliente y con el servicio vigente (no vencidas).',
+            comoSeCalcula: 'Se suman las pantallas de las filas que tienen cliente asignado y cuya fecha de vencimiento no ha pasado.',
+            origen: 'Campos de cliente y fechas de cada fila del Planificador.',
+          })} />
         <StatCard icon={Clock}        label="Próx. a vencer"   value={stats.proximaVencer} variant="outline" sub={`≤ ${stats.diasAlerta} días`}
           onClick={() => setActivePanel('alerta')} />
         <StatCard icon={Monitor}      label="Sin asignar"       value={stats.libres}        variant="light"   sub="Pantallas libres"
@@ -717,7 +733,13 @@ export default function PlanificadorPage() {
           onClick={() => setActivePanel('cortesia')} />
         <StatCard icon={DollarSign} label="Crédito en cartera"  value={formatCurrency(stats.creditoTotal)} variant="light" tone="emerald" sub="Saldo acumulado de cuentas"
           onClick={() => setActivePanel('credito')} />
-        <StatCard icon={Percent}    label="Ocupación"           value={`${stats.ocupacion}%`}         variant="light"   tone="orange"  sub={`${stats.asignadas} de ${stats.total} pantallas asignadas`} />
+        <StatCard icon={Percent}    label="Ocupación"           value={`${stats.ocupacion}%`}         variant="light"   tone="orange"  sub={`${stats.asignadas} de ${stats.total} pantallas asignadas`}
+          onClick={() => setExplain({
+            title: 'Ocupación', value: `${stats.ocupacion}%`, icon: Percent,
+            queEs: 'Qué porcentaje de las pantallas registradas en el Planificador están asignadas a un cliente.',
+            comoSeCalcula: `**(${stats.asignadas} asignadas ÷ ${stats.total} pantallas) × 100**. El Planificador es la fuente oficial de capacidad: el panel de Ocupación del Dashboard y el de Cuentas Padre usan esta misma base, así todo coincide.`,
+            origen: 'Filas del Planificador (asignadas = con nombre o nickname distinto de "libre").',
+          })} />
       </div>
 
       {/* Filters */}

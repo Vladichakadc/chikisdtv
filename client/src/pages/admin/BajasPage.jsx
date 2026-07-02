@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from 'react'
 import { useUi } from '../../context/UiContext'
 import { Plus, Pencil, Trash2, X, Search, UserX, Tv, ArrowDownCircle, BarChart3, Calendar, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from 'recharts'
-import { ChartInsight, narrarBajasPorAnio, LABEL_STYLE } from './dashboard/biShared'
+import { ModuleStatCard as StatCard, ChartInsight, narrarBajasPorAnio, LABEL_STYLE } from './dashboard/biShared'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { Button } from '../../components/ui/Button'
@@ -22,33 +23,7 @@ const EMPTY = {
   tipoPlan: '', tipoPantalla: '', cuentaDedicada: '', motivo: '', observaciones: ''
 }
 
-// Tarjeta KPI — colores corporativos naranja/blanco
-function StatCard({ icon: Icon, label, value, sub, variant }) {
-  const styles = {
-    solid: 'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
-    light: 'bg-white border-2 border-orange-200 text-orange-700',
-    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
-  }
-  const iconBg = {
-    solid: 'bg-white/20',
-    light: 'bg-orange-100',
-    outline: 'bg-orange-200/60',
-  }
-  return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
-          <p className="text-3xl font-bold mt-1">{value}</p>
-          {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-orange-500'}`}>{sub}</p>}
-        </div>
-        <div className={`${iconBg[variant]} rounded-lg p-3`}>
-          <Icon size={24} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// Tarjeta KPI — compartida (naranja corporativo, con modal explicativo al clic)
 
 // Columnas de la tabla
 const TABLE_COLUMNS = [
@@ -91,6 +66,7 @@ export default function BajasPage() {
   const [sortDir, setSortDir] = useState('desc')
   const [nicknames, setNicknames] = useState([])
   const [nicknameEditMode, setNicknameEditMode] = useState(false)
+  const [explain, setExplain] = useState(null)
 
   // Comparativo año a año (agregado del dashboard-bi, movido desde el Dashboard)
   useEffect(() => {
@@ -271,13 +247,45 @@ export default function BajasPage() {
         <Button onClick={openNew}><Plus size={18} /> Nueva Baja</Button>
       </div>
 
+      <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
       {/* KPI Cards — naranja corporativo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard icon={UserX} label="Total Bajas" value={stats.total} variant="solid" sub="Histórico completo" />
-        <StatCard icon={Calendar} label="Bajas 2026" value={stats.anioActual} variant="light" sub="Año en curso" />
-        <StatCard icon={ArrowDownCircle} label="Devueltos" value={stats.devueltos} variant="outline" sub={`${stats.total ? Math.round(stats.devueltos/stats.total*100) : 0}% del total`} />
-        <StatCard icon={Tv} label="Cortesías" value={stats.cortesias} variant="light" sub="Servicio gratuito" />
-        <StatCard icon={BarChart3} label="Mes pico" value={stats.mesMasAlto ? stats.mesMasAlto[0] : '—'} variant="solid" sub={stats.mesMasAlto ? `${stats.mesMasAlto[1]} bajas` : ''} />
+        <StatCard icon={UserX} label="Total Bajas" value={stats.total} variant="solid" sub="Histórico completo"
+          onClick={() => setExplain({
+            title: 'Total Bajas', value: stats.total, icon: UserX,
+            queEs: 'Cuántas cancelaciones de servicio se han registrado en toda la historia del negocio — la otra cara del crecimiento.',
+            comoSeCalcula: 'Conteo simple de los registros de este módulo. Es la misma cifra que el Dashboard usaba como "bajas históricas".',
+            origen: 'Tabla de bajas de este módulo (importada del Excel original y alimentada con cada baja nueva).',
+          })} />
+        <StatCard icon={Calendar} label="Bajas 2026" value={stats.anioActual} variant="light" sub="Año en curso"
+          onClick={() => setExplain({
+            title: 'Bajas 2026', value: stats.anioActual, icon: Calendar,
+            queEs: 'Cancelaciones registradas en lo corrido del año actual — el pulso reciente del churn.',
+            comoSeCalcula: 'Se cuentan los registros cuyo campo **Año** es el año en curso. Compárala contra el mismo punto del año pasado (no contra el año completo) para saber si el churn mejora o empeora.',
+            origen: 'Campo Año de cada registro de este módulo.',
+          })} />
+        <StatCard icon={ArrowDownCircle} label="Devueltos" value={stats.devueltos} variant="outline" sub={`${stats.total ? Math.round(stats.devueltos/stats.total*100) : 0}% del total`}
+          onClick={() => setExplain({
+            title: 'Devueltos', value: stats.devueltos, icon: ArrowDownCircle,
+            queEs: 'De las bajas registradas, cuántas devolvieron el equipo físico. Recuperar el equipo permite revenderlo y recuperar parte del costo.',
+            comoSeCalcula: 'Se cuentan los registros con el campo **Devolución = SÍ**.',
+            origen: 'Campo Devolución de cada baja de este módulo.',
+          })} />
+        <StatCard icon={Tv} label="Cortesías" value={stats.cortesias} variant="light" sub="Servicio gratuito"
+          onClick={() => setExplain({
+            title: 'Cortesías', value: stats.cortesias, icon: Tv,
+            queEs: 'Bajas de clientes que tenían el servicio de cortesía (gratis) — su cancelación no afecta el ingreso, pero libera capacidad.',
+            comoSeCalcula: 'Se cuentan los registros con el campo **Cortesía = SÍ**.',
+            origen: 'Campo Cortesía de cada baja de este módulo.',
+          })} />
+        <StatCard icon={BarChart3} label="Mes pico" value={stats.mesMasAlto ? stats.mesMasAlto[0] : '—'} variant="solid" sub={stats.mesMasAlto ? `${stats.mesMasAlto[1]} bajas` : ''}
+          onClick={() => setExplain({
+            title: 'Mes pico', value: stats.mesMasAlto ? `${stats.mesMasAlto[0]} (${stats.mesMasAlto[1]} bajas)` : '—', icon: BarChart3,
+            queEs: 'El mes del calendario con más cancelaciones acumuladas en el histórico — señala la estacionalidad del churn.',
+            comoSeCalcula: 'Se agrupan todas las bajas por su campo **Mes** (sumando todos los años) y se toma el mes con mayor conteo. Útil para anticipar campañas de retención antes de ese mes.',
+            origen: 'Campo Mes de cada baja de este módulo.',
+          })} />
       </div>
 
       {/* Comparativo año a año (movido desde el Dashboard) */}

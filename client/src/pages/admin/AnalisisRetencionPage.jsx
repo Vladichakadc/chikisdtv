@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 import api from '../../config/api'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatCurrency } from '../../utils/excelUtils'
 
 // ─── Helpers de UI ────────────────────────────────────────────────────────────
@@ -27,7 +28,7 @@ function SmartTag({ tone = 'info', icon: Icon = Sparkles, children }) {
   )
 }
 
-function BiCard({ icon: Icon, label, value, sub, variant = 'light', tag }) {
+function BiCard({ icon: Icon, label, value, sub, variant = 'light', tag, onClick }) {
   const styles = {
     solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-orange-200',
     light:   'bg-white border-2 border-orange-200 text-orange-700',
@@ -36,8 +37,15 @@ function BiCard({ icon: Icon, label, value, sub, variant = 'light', tag }) {
   const iconBg = {
     solid: 'bg-white/20', light: 'bg-orange-100', outline: 'bg-orange-200/60',
   }
+  const interactive = typeof onClick === 'function'
   return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+    <div
+      className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 ${interactive ? 'cursor-pointer' : ''}`}
+      {...(interactive ? {
+        role: 'button', tabIndex: 0, onClick,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
+      } : {})}
+    >
       <div className="flex items-center gap-3">
         <div className={`${iconBg[variant]} rounded-lg p-2`}>
           <Icon size={18} className={variant === 'solid' ? 'text-white' : 'text-orange-500'} />
@@ -52,6 +60,9 @@ function BiCard({ icon: Icon, label, value, sub, variant = 'light', tag }) {
         <p className={`text-xs mt-2 leading-relaxed ${variant === 'solid' ? 'text-white/70' : 'text-gray-400'}`}>
           {sub}
         </p>
+      )}
+      {interactive && (
+        <p className={`text-xs font-semibold mt-1.5 ${variant === 'solid' ? 'text-white/90' : 'text-brand-primary'}`}>¿Cómo se calcula?</p>
       )}
     </div>
   )
@@ -261,6 +272,7 @@ export default function AnalisisRetencionPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [explain, setExplain] = useState(null)
 
   useEffect(() => {
     api.get('/admin/dashboard-bi/cohorts')
@@ -298,6 +310,8 @@ export default function AnalisisRetencionPage() {
 
       {data && (
         <>
+          <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
           {/* KPIs de retención */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <BiCard
@@ -307,6 +321,12 @@ export default function AnalisisRetencionPage() {
               value={data.resumen.mes1 != null ? `${data.resumen.mes1}%` : '—'}
               sub="% que genera una 2ª transacción al mes siguiente de activación"
               tag={tagMes1(data.resumen.mes1)}
+              onClick={() => setExplain({
+                title: 'Retención · Mes 1', value: data.resumen.mes1 != null ? `${data.resumen.mes1}%` : '—', icon: Users,
+                queEs: 'De cada 100 clientes que se activaron, cuántos volvieron a comprar (o renovar) al mes siguiente — la primera prueba de fuego de la relación.',
+                comoSeCalcula: 'Cada cliente se agrupa en la **cohorte** del mes de su primera activación. Se revisa si tuvo alguna transacción en el mes calendario siguiente y se promedia sobre todas las cohortes.',
+                origen: 'Fechas y tipos de pago de las ventas (módulo Pagos), excluyendo cortesías. **Ojo:** los clientes con plan anual no registran actividad mensual aunque estén activos, así que este % subestima la retención real.',
+              })}
             />
             <BiCard
               icon={Repeat}
@@ -315,6 +335,12 @@ export default function AnalisisRetencionPage() {
               value={data.resumen.mes3 != null ? `${data.resumen.mes3}%` : '—'}
               sub="actividad a los 3 meses de haber entrado"
               tag={tagMes3(data.resumen.mes3)}
+              onClick={() => setExplain({
+                title: 'Retención · Mes 3', value: data.resumen.mes3 != null ? `${data.resumen.mes3}%` : '—', icon: Repeat,
+                queEs: 'Cuántos clientes siguen comprando 3 meses después de haber entrado — el punto donde se separan los clientes de paso de los recurrentes.',
+                comoSeCalcula: 'Mismo método de cohortes: % de clientes de cada cohorte con al menos una transacción en su tercer mes de vida, promediado.',
+                origen: 'Ventas del módulo Pagos, agrupadas por cohorte de primera activación.',
+              })}
             />
             <BiCard
               icon={TrendingUp}
@@ -323,6 +349,12 @@ export default function AnalisisRetencionPage() {
               value={data.resumen.mes6 != null ? `${data.resumen.mes6}%` : '—'}
               sub="actividad a los 6 meses — señal de fidelidad"
               tag={tagMes6(data.resumen.mes6)}
+              onClick={() => setExplain({
+                title: 'Retención · Mes 6', value: data.resumen.mes6 != null ? `${data.resumen.mes6}%` : '—', icon: TrendingUp,
+                queEs: 'Cuántos clientes siguen activos medio año después de entrar — los que llegan aquí suelen quedarse.',
+                comoSeCalcula: 'Mismo método de cohortes, medido en el sexto mes de vida de cada cliente.',
+                origen: 'Ventas del módulo Pagos, agrupadas por cohorte.',
+              })}
             />
             <BiCard
               icon={Trophy}
@@ -331,6 +363,12 @@ export default function AnalisisRetencionPage() {
               value={data.resumen.mes12 != null ? `${data.resumen.mes12}%` : '—'}
               sub="actividad al año — clientes de largo plazo"
               tag={tagMes12(data.resumen.mes12)}
+              onClick={() => setExplain({
+                title: 'Retención · Mes 12', value: data.resumen.mes12 != null ? `${data.resumen.mes12}%` : '—', icon: Trophy,
+                queEs: 'Cuántos clientes cumplen un año comprando — el núcleo fiel que sostiene el ingreso recurrente y el LTV alto.',
+                comoSeCalcula: 'Mismo método de cohortes, medido en el mes 12 de vida. Solo cuentan las cohortes con al menos un año de antigüedad.',
+                origen: 'Ventas del módulo Pagos, agrupadas por cohorte. El detalle mes a mes está en el mapa de calor de abajo.',
+              })}
             />
           </div>
 

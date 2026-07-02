@@ -369,11 +369,11 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     .map(([alerta, cantidad]) => ({ alerta, cantidad }));
 
   // ─── Ocupación de Cuentas Padre ────────────────────────────────────────────
-  // El costo de una cuenta padre (créditos comprados) es un bloque fijo; cada
-  // pantalla sin asignar dentro de ese bloque es costo pagado sin ingreso —
-  // conocer la ocupación real permite saber cuánto ingreso incremental queda
-  // disponible sin comprar un solo crédito adicional.
-  const cpRows = await CuentaPadre.findAll({ attributes: ['cuentaId', 'credito', 'estado'], raw: true });
+  // La capacidad real de pantallas la define el PLANIFICADOR (suma de la
+  // columna # por cuenta) — el campo `credito` de CuentaPadre NO representa
+  // cupos de pantalla y no se usa aquí. Ocupada = pantalla con cliente
+  // asignado; libre = registrada pero sin asignar (venta posible sin comprar
+  // capacidad adicional).
   const ocupadosPorCuenta = {};
   for (const p of alertaRows) {
     const cid = p.cuentaId;
@@ -386,21 +386,15 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     const esLibre = nickname.toLowerCase().includes('libre') || (!nombre && !nickname);
     if (!esLibre) ocupadosPorCuenta[cid].ocupadas += np;
   }
-  const ocupacionDetalle = cpRows
-    .filter(cp => Number(cp.credito) > 0)
-    .map(cp => {
-      const datos = ocupadosPorCuenta[cp.cuentaId] || { total: 0, ocupadas: 0 };
-      const capacidad = Number(cp.credito);
-      const ocupadas = Math.min(datos.ocupadas, capacidad);
-      return {
-        cuentaId: cp.cuentaId,
-        capacidad,
-        ocupadas,
-        libres: Math.max(0, capacidad - ocupadas),
-        pctOcupacion: Math.min(100, Math.round((ocupadas / capacidad) * 100)),
-      };
-    })
-    .sort((a, b) => b.pctOcupacion - a.pctOcupacion);
+  const ocupacionDetalle = Object.entries(ocupadosPorCuenta)
+    .map(([cuentaId, d]) => ({
+      cuentaId,
+      capacidad: d.total,
+      ocupadas: d.ocupadas,
+      libres: Math.max(0, d.total - d.ocupadas),
+      pctOcupacion: d.total > 0 ? Math.min(100, Math.round((d.ocupadas / d.total) * 100)) : 0,
+    }))
+    .sort((a, b) => a.pctOcupacion - b.pctOcupacion || b.libres - a.libres);
   const totalCapacidadCP = ocupacionDetalle.reduce((s, c) => s + c.capacidad, 0);
   const totalOcupadasCP  = ocupacionDetalle.reduce((s, c) => s + c.ocupadas,  0);
   const totalLibresCP    = Math.max(0, totalCapacidadCP - totalOcupadasCP);
