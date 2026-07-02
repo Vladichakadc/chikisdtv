@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { X, UserCheck, Search, FileSpreadsheet, Loader2, ChevronDown, ChevronRight, Receipt } from 'lucide-react'
-import ExcelJS from 'exceljs'
 import api from '../../../config/api'
 import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
@@ -28,6 +27,9 @@ const BRAND = {
 // Genera el .xlsx con el listado de ingreso por cliente usando los colores
 // corporativos de la app, y dispara su descarga en el navegador.
 async function exportIngresoPorClienteExcel(clientes, resumen) {
+  // exceljs pesa ~940KB — se carga bajo demanda solo cuando el usuario exporta,
+  // para no penalizar la carga inicial de la app (crítico en móviles).
+  const { default: ExcelJS } = await import('exceljs')
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'ChikisdTV'
   workbook.created = new Date()

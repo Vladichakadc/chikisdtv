@@ -41,16 +41,23 @@ export function KpiExplainModal({ info, onClose }) {
   const { title, value, icon: Icon, queEs, comoSeCalcula, origen, action } = info
 
   return (
+    // En móvil se comporta como bottom-sheet (desliza desde abajo, ancho completo);
+    // en pantallas medianas+ vuelve a ser el modal centrado clásico.
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col"
+        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[88vh] sm:max-h-[90vh] flex flex-col animate-sheet-up"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Asa de arrastre — affordance de bottom-sheet, solo móvil */}
+        <div className="sm:hidden flex justify-center pt-2 -mb-1 bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl">
+          <div className="w-10 h-1 rounded-full bg-white/40" />
+        </div>
+
         {/* Header */}
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl px-5 py-4 flex items-start justify-between gap-3 flex-shrink-0">
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 sm:rounded-t-2xl px-5 py-4 flex items-start justify-between gap-3 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             {Icon && (
               <div className="bg-white/20 rounded-lg p-2.5 flex-shrink-0">
@@ -86,11 +93,11 @@ export function KpiExplainModal({ info, onClose }) {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-3.5 border-t border-gray-100 flex items-center justify-end gap-2 flex-shrink-0">
-          <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+        {/* Footer — botones a ancho completo en móvil, compactos en desktop */}
+        <div className="px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t border-gray-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 flex-shrink-0">
+          <Button variant="secondary" onClick={onClose} className="w-full sm:w-auto">Cerrar</Button>
           {action && (
-            <Button onClick={() => { onClose(); action.onClick() }}>
+            <Button onClick={() => { onClose(); action.onClick() }} className="w-full sm:w-auto">
               {action.label} <ArrowRight size={14} />
             </Button>
           )}

@@ -502,12 +502,12 @@ export default function DashboardHome() {
         <IngresoPorClientePanel onClose={() => setShowArpuPanel(false)} />
       )}
 
-      <div className="mb-2 flex items-center justify-between gap-4">
+      <div className="mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-brand-accent">Dashboard</h1>
-          <p className="text-gray-500">Pulso diario de ChikisdTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-brand-primary font-semibold hover:underline">Análisis Financiero</button></p>
+          <h1 className="text-2xl md:text-3xl font-bold text-brand-accent">Dashboard</h1>
+          <p className="text-sm md:text-base text-gray-500">Pulso diario de ChikisdTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-brand-primary font-semibold hover:underline">Análisis Financiero</button></p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {import.meta.env.DEV && (
             <>
               <input
