@@ -5,7 +5,7 @@ import {
   TrendingDown, Minus, Wallet, PiggyBank, Percent, Repeat,
   BarChart3, Lightbulb, Target, Activity, Scale, UserCheck,
   UserX, Server, Monitor, ArrowRight, Sparkles, Trophy, Hourglass,
-  Gem, RefreshCw, Calendar, Receipt, Download, Upload,
+  Gem, RefreshCw, Calendar, Receipt, Download, Upload, ShieldAlert,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -1863,6 +1863,157 @@ export default function DashboardHome() {
                 <ChartInsight text={narrarSaludPlanificador(bi.planificadorAlertas, bi.pantallasConDeuda, k.totalPantallas)} />
               </CardBody>
             </Card>
+          </div>
+
+          {/* ─── Operaciones · Panel de control ────────────────────────────── */}
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl p-2.5 shadow-md">
+                <Activity size={22} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-brand-accent">Operaciones · Panel de control</h2>
+                <p className="text-sm text-gray-500">Ocupación de capacidad instalada y clientes que requieren atención inmediata</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* Ocupación de Cuentas Padre */}
+              {bi.ocupacion && (
+                <Card className="border-slate-200">
+                  <CardHeader className="border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Ocupación de Cuentas Padre</CardTitle>
+                      <span className={cn(
+                        'text-2xl font-bold tabular-nums',
+                        bi.ocupacion.pctOcupacionGlobal >= 90 ? 'text-red-600' :
+                        bi.ocupacion.pctOcupacionGlobal >= 75 ? 'text-amber-600' : 'text-green-600'
+                      )}>{bi.ocupacion.pctOcupacionGlobal}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full mt-2 overflow-hidden">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all',
+                          bi.ocupacion.pctOcupacionGlobal >= 90 ? 'bg-red-500' :
+                          bi.ocupacion.pctOcupacionGlobal >= 75 ? 'bg-amber-400' : 'bg-green-500'
+                        )}
+                        style={{ width: `${bi.ocupacion.pctOcupacionGlobal}%` }}
+                      />
+                    </div>
+                    <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                      <span><span className="font-semibold text-brand-accent">{bi.ocupacion.totalOcupadas}</span> ocupadas</span>
+                      <span><span className="font-semibold text-green-600">{bi.ocupacion.totalLibres}</span> libres</span>
+                      <span><span className="font-semibold text-gray-400">{bi.ocupacion.totalCapacidad}</span> capacidad total</span>
+                    </div>
+                  </CardHeader>
+                  <CardBody className="p-0">
+                    <div className="overflow-auto max-h-64">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="sticky top-0 bg-slate-50 text-gray-500">
+                            <th className="px-4 py-2 text-left font-semibold">Cuenta</th>
+                            <th className="px-4 py-2 text-center font-semibold">Cap.</th>
+                            <th className="px-4 py-2 text-center font-semibold">Ocup.</th>
+                            <th className="px-4 py-2 text-left font-semibold w-28">Uso</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bi.ocupacion.detalle.map((c, i) => (
+                            <tr key={c.cuentaId} className={cn('border-t border-gray-50', i % 2 === 1 && 'bg-gray-50/50')}>
+                              <td className="px-4 py-2 font-mono text-brand-accent font-medium">{c.cuentaId}</td>
+                              <td className="px-4 py-2 text-center text-gray-500">{c.capacidad}</td>
+                              <td className="px-4 py-2 text-center font-semibold text-brand-accent">{c.ocupadas}</td>
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                      className={cn('h-full rounded-full',
+                                        c.pctOcupacion >= 100 ? 'bg-red-500' :
+                                        c.pctOcupacion >= 80  ? 'bg-amber-400' : 'bg-brand-primary'
+                                      )}
+                                      style={{ width: `${Math.min(c.pctOcupacion, 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className={cn('text-xs tabular-nums',
+                                    c.pctOcupacion >= 100 ? 'text-red-600' :
+                                    c.pctOcupacion >= 80  ? 'text-amber-600' : 'text-gray-500'
+                                  )}>{c.pctOcupacion}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {bi.ocupacion.totalLibres > 0 && (
+                      <div className="px-4 py-2.5 border-t border-gray-100 bg-green-50 text-xs text-green-700 font-medium flex items-center gap-1.5">
+                        <TrendingUp size={12} />
+                        {bi.ocupacion.totalLibres} pantalla{bi.ocupacion.totalLibres !== 1 ? 's' : ''} disponible{bi.ocupacion.totalLibres !== 1 ? 's' : ''} para vender sin costo adicional
+                      </div>
+                    )}
+                  </CardBody>
+                </Card>
+              )}
+
+              {/* Clientes en riesgo de churn */}
+              {bi.clientesEnRiesgo?.length > 0 && (
+                <Card className="border-red-100">
+                  <CardHeader className="border-red-50">
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Clientes en riesgo de churn</CardTitle>
+                      <div className="flex gap-1.5">
+                        {bi.clientesEnRiesgo.filter(c => c.alerta === 'VENCIDO').length > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
+                            {bi.clientesEnRiesgo.filter(c => c.alerta === 'VENCIDO').length} vencidos
+                          </span>
+                        )}
+                        {bi.clientesEnRiesgo.filter(c => c.alerta === 'PROXIMO A VENCER').length > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                            {bi.clientesEnRiesgo.filter(c => c.alerta === 'PROXIMO A VENCER').length} por vencer
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">Ordenados por LTV histórico — prioriza los de mayor valor</p>
+                  </CardHeader>
+                  <CardBody className="p-0">
+                    <div className="overflow-auto max-h-72">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="sticky top-0 bg-red-50 text-gray-500">
+                            <th className="px-4 py-2 text-left font-semibold">Cliente</th>
+                            <th className="px-4 py-2 text-left font-semibold">Nickname</th>
+                            <th className="px-4 py-2 text-right font-semibold">LTV</th>
+                            <th className="px-4 py-2 text-center font-semibold">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bi.clientesEnRiesgo.map((c, i) => (
+                            <tr key={c.customerId || i} className={cn('border-t border-gray-50', i % 2 === 1 && 'bg-gray-50/50')}>
+                              <td className="px-4 py-2 font-medium text-brand-accent">{c.nombre}</td>
+                              <td className="px-4 py-2 font-mono text-gray-500">{c.nickname || '—'}</td>
+                              <td className="px-4 py-2 text-right font-semibold text-brand-accent tabular-nums">
+                                {c.ltvHistorico > 0 ? formatCurrency(c.ltvHistorico) : <span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                {c.alerta === 'VENCIDO'
+                                  ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold whitespace-nowrap"><AlertCircle size={9} /> Vencido</span>
+                                  : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold whitespace-nowrap"><Clock size={9} /> Por vencer</span>
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="px-4 py-2.5 border-t border-gray-100 bg-red-50/50 text-xs text-red-600 font-medium flex items-center gap-1.5">
+                      <ShieldAlert size={12} />
+                      Valor total en riesgo: <span className="font-bold ml-1">{formatCurrency(bi.ltv?.valorEnRiesgo || 0)}</span>
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
+            </div>
           </div>
 
           {/* ─── Análisis económico-financiero ─────────────────────────────── */}

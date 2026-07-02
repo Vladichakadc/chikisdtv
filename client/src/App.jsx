@@ -15,6 +15,7 @@ import BajasPage from './pages/admin/BajasPage'
 import CostoPantallaPage from './pages/admin/CostoPantallaPage'
 import CuentasPadrePage from './pages/admin/CuentasPadrePage'
 import AnalisisRetencionPage from './pages/admin/AnalisisRetencionPage'
+import AnalisisFinancieroPage from './pages/admin/AnalisisFinancieroPage'
 import AnalisisDispositivosPage from './pages/admin/AnalisisDispositivosPage'
 import VentaDispositivosPage from './pages/admin/VentaDispositivosPage'
 
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="costo-pantalla" element={<CostoPantallaPage />} />
         <Route path="cuentas-padre" element={<CuentasPadrePage />} />
         <Route path="retencion" element={<AnalisisRetencionPage />} />
+        <Route path="analisis-financiero" element={<AnalisisFinancieroPage />} />
         <Route path="analisis-dispositivos" element={<AnalisisDispositivosPage />} />
       </Route>
 
