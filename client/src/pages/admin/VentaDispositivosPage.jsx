@@ -10,11 +10,12 @@ import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
 import { Card, CardBody } from '../../components/ui/Card'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 
 // ─── KPI Card ────────────────────────────────────────────────────────────────
 
-function StatCard({ icon: Icon, label, value, sub, variant }) {
+function StatCard({ icon: Icon, label, value, sub, variant, onClick }) {
   const styles = {
     solid:   'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white',
     light:   'bg-white border-2 border-indigo-200 text-indigo-700',
@@ -25,13 +26,23 @@ function StatCard({ icon: Icon, label, value, sub, variant }) {
     light:   'bg-indigo-100',
     outline: 'bg-indigo-200/60',
   }
+  const interactive = typeof onClick === 'function'
   return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
+    <div
+      className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 ${interactive ? 'cursor-pointer' : ''}`}
+      {...(interactive ? {
+        role: 'button', tabIndex: 0, onClick,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
+      } : {})}
+    >
       <div className="flex items-center justify-between">
         <div>
           <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
           <p className="text-3xl font-bold mt-1">{value}</p>
           {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-indigo-500'}`}>{sub}</p>}
+          {interactive && (
+            <p className={`text-xs font-semibold mt-1.5 ${variant === 'solid' ? 'text-white/90' : 'text-indigo-600'}`}>¿Cómo se calcula?</p>
+          )}
         </div>
         <div className={`${iconBg[variant]} rounded-lg p-3`}>
           <Icon size={24} />
@@ -155,6 +166,7 @@ export default function VentaDispositivosPage() {
   const [search, setSearch]     = useState('')
   const [sortCol, setSortCol]   = useState('fecha')
   const [sortDir, setSortDir]   = useState('desc')
+  const [explain, setExplain]   = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [form, setForm]         = useState(EMPTY)
@@ -398,12 +410,39 @@ export default function VentaDispositivosPage() {
         </button>
       </div>
 
+      <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={ShoppingCart} label="Total Equipos"    value={stats.total.toLocaleString()}     variant="solid"   sub={search ? 'Resultados filtrados' : 'Ventas totales'} />
-        <StatCard icon={DollarSign}   label="Ingresos Equipos" value={fmtCOP(stats.ingresos)}           variant="light"   sub="Monto recaudado" />
-        <StatCard icon={Tv}           label="FireTV Vendidos"  value={stats.firetv.toLocaleString()}    variant="outline" sub="Equipos Amazon" />
-        <StatCard icon={Tv}           label="ONN Vendidos"     value={stats.onn.toLocaleString()}       variant="outline" sub="Equipos ONN" />
+        <StatCard icon={ShoppingCart} label="Total Equipos"    value={stats.total.toLocaleString()}     variant="solid"   sub={search ? 'Resultados filtrados' : 'Ventas totales'}
+          onClick={() => setExplain({
+            title: 'Total Equipos', value: stats.total.toLocaleString(), icon: ShoppingCart,
+            queEs: 'Cuántos dispositivos físicos (Fire TV, ONN…) se han vendido. Si hay una búsqueda activa, refleja solo lo filtrado.',
+            comoSeCalcula: 'Conteo de los registros de venta de equipos visibles en la tabla.',
+            origen: 'Tabla de ventas de equipos de este módulo. Las gráficas de tendencia viven en **Análisis Dispositivos**.',
+            action: { label: 'Ver Análisis Dispositivos', onClick: () => navigate('/admin/analisis-dispositivos') },
+          })} />
+        <StatCard icon={DollarSign}   label="Ingresos Equipos" value={fmtCOP(stats.ingresos)}           variant="light"   sub="Monto recaudado"
+          onClick={() => setExplain({
+            title: 'Ingresos Equipos', value: fmtCOP(stats.ingresos), icon: DollarSign,
+            queEs: 'La plata recaudada por venta de hardware. Es una línea de ingreso separada de las licencias.',
+            comoSeCalcula: 'Se **suma el precio de venta** de cada equipo visible. Sin filtros, coincide con los "Ingresos Totales" de Análisis Dispositivos y con la línea de equipos de Análisis Financiero. Ojo: el **costo de compra** de los equipos casi nunca está registrado, así que el margen real de esta línea no es medible todavía.',
+            origen: 'Campo precio de venta de cada registro de este módulo.',
+          })} />
+        <StatCard icon={Tv}           label="FireTV Vendidos"  value={stats.firetv.toLocaleString()}    variant="outline" sub="Equipos Amazon"
+          onClick={() => setExplain({
+            title: 'FireTV Vendidos', value: stats.firetv.toLocaleString(), icon: Tv,
+            queEs: 'Cuántos de los equipos vendidos son Fire TV de Amazon (el dispositivo estrella del negocio).',
+            comoSeCalcula: 'Se cuentan los registros visibles cuyo campo **tipo de dispositivo contiene "fire"**.',
+            origen: 'Campo tipo de dispositivo de cada venta de este módulo.',
+          })} />
+        <StatCard icon={Tv}           label="ONN Vendidos"     value={stats.onn.toLocaleString()}       variant="outline" sub="Equipos ONN"
+          onClick={() => setExplain({
+            title: 'ONN Vendidos', value: stats.onn.toLocaleString(), icon: Tv,
+            queEs: 'Cuántos de los equipos vendidos son ONN (la alternativa económica de Walmart).',
+            comoSeCalcula: 'Se cuentan los registros visibles cuyo campo **tipo de dispositivo contiene "onn"**.',
+            origen: 'Campo tipo de dispositivo de cada venta de este módulo.',
+          })} />
       </div>
 
       {/* Búsqueda */}

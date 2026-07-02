@@ -131,6 +131,48 @@ export function BiCard({ icon: Icon, label, value, growth, growthLabel, sub, var
   )
 }
 
+// Tarjeta KPI de módulo (naranja corporativo) — el mismo diseño que usaban las
+// páginas de módulo, ahora con soporte de clic para el modal "¿Cómo se calcula?".
+export function ModuleStatCard({ icon: Icon, label, value, sub, variant, onClick }) {
+  const styles = {
+    solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
+    light:   'bg-white border-2 border-orange-200 text-orange-700',
+    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
+  }
+  const iconBg = {
+    solid:   'bg-white/20',
+    light:   'bg-orange-100',
+    outline: 'bg-orange-200/60',
+  }
+  const interactive = typeof onClick === 'function'
+  return (
+    <div
+      className={cn(
+        styles[variant], 'rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5',
+        interactive && 'cursor-pointer'
+      )}
+      {...(interactive ? {
+        role: 'button', tabIndex: 0, onClick,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
+      } : {})}
+    >
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
+          <p className="text-3xl font-bold mt-1 truncate">{value}</p>
+          {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-orange-500'}`}>{sub}</p>}
+          {interactive && (
+            <p className={`text-xs font-semibold mt-1.5 ${variant === 'solid' ? 'text-white/90' : 'text-brand-primary'}`}>¿Cómo se calcula?</p>
+          )}
+        </div>
+        <div className={`${iconBg[variant]} rounded-lg p-3 flex-shrink-0`}>
+          <Icon size={24} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
