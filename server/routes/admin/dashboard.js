@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { Client, Plan, Subscription, Payment, Device, Baja, Venta, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
+const { Client, Plan, Subscription, Payment, Device, Baja, Venta, VentaEquipo, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
 const { todayStr, daysFromNow } = require('../../utils/dateUtils');
 const asyncHandler = require('../../middleware/asyncHandler');
 
@@ -489,6 +489,52 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   }
   const momentumVentasPct = conteoCrecMensual > 0 ? Number((sumaCrecMensual / conteoCrecMensual).toFixed(1)) : 0;
 
+  // ─── Comparativo YTD (año corrido: Ene–mesActual vs mismo período año anterior) ──
+  const todayLocal   = new Date();
+  const anioHoy      = todayLocal.getFullYear();
+  const mesHoy       = todayLocal.getMonth() + 1; // 1-based (Bogotá, por TZ env)
+  const anioYTDAnt   = anioHoy - 1;
+  const ingYTD       = ventas.filter(v => Number(v.anio) === anioHoy    && mesNum(v.mes) <= mesHoy).reduce((s, v) => s + (Number(v.precioVenta) || 0), 0);
+  const cosYTD       = costos.filter(c => Number(c.anio) === anioHoy    && mesNum(c.mes) <= mesHoy).reduce((s, c) => s + Number(c.costoCOP || 0) + Number(c.impuesto4x100COP || 0), 0);
+  const ingYTDAnt    = ventas.filter(v => Number(v.anio) === anioYTDAnt && mesNum(v.mes) <= mesHoy).reduce((s, v) => s + (Number(v.precioVenta) || 0), 0);
+  const cosYTDAnt    = costos.filter(c => Number(c.anio) === anioYTDAnt && mesNum(c.mes) <= mesHoy).reduce((s, c) => s + Number(c.costoCOP || 0) + Number(c.impuesto4x100COP || 0), 0);
+  const comparativoYTD = (ingYTD > 0 || ingYTDAnt > 0) ? {
+    etiqueta:           `Ene–${MES_LABEL[mesHoy]}`,
+    anioActual:          anioHoy,
+    anioAnterior:        anioYTDAnt,
+    ingresosActual:      Math.round(ingYTD),
+    costosActual:        Math.round(cosYTD),
+    ingresosAnterior:    Math.round(ingYTDAnt),
+    costosAnterior:      Math.round(cosYTDAnt),
+    crecimientoIngresosPct: ingYTDAnt > 0 ? Number((((ingYTD - ingYTDAnt) / ingYTDAnt) * 100).toFixed(1)) : null,
+    crecimientoCostosPct:   cosYTDAnt > 0 ? Number((((cosYTD - cosYTDAnt) / cosYTDAnt) * 100).toFixed(1)) : null,
+  } : null;
+
+  // ─── Clientes en riesgo de churn: VENCIDO / PROXIMO A VENCER + LTV ───────
+  const ltvByCid = {};
+  for (const c of ltvRows) ltvByCid[c.cid] = c.ingresos;
+  const riesgoAcc = {};
+  for (const a of alertaRows) {
+    if (!a.customerId) continue;
+    if (a.alertaReal !== 'VENCIDO' && a.alertaReal !== 'PROXIMO A VENCER') continue;
+    const nick = (a.nickname || '').toLowerCase();
+    if (nick.includes('libre') || (!a.nombre && !a.apellido && !a.nickname)) continue;
+    if (!riesgoAcc[a.customerId]) {
+      riesgoAcc[a.customerId] = {
+        customerId:   a.customerId,
+        nombre:       `${a.nombre || ''} ${a.apellido || ''}`.trim() || a.nickname || 'Sin nombre',
+        nickname:     a.nickname || '',
+        alerta:       a.alertaReal,
+        ltvHistorico: Math.round(ltvByCid[a.customerId] || 0),
+      };
+    }
+    // Si tiene pantalla VENCIDA, escalar la alerta independientemente del orden
+    if (a.alertaReal === 'VENCIDO') riesgoAcc[a.customerId].alerta = 'VENCIDO';
+  }
+  const clientesEnRiesgo = Object.values(riesgoAcc)
+    .sort((a, b) => b.ltvHistorico - a.ltvHistorico)
+    .slice(0, 20);
+
   const payload = {
     porAnio,
     porMes: porMesConMrr,
@@ -506,6 +552,8 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
       pctOcupacionGlobal,
       detalle: ocupacionDetalle.slice(0, 30),
     },
+    comparativoYTD,
+    clientesEnRiesgo,
     ltv: {
       ltvPromedio,
       vidaPromedioMeses: vidaMeses,
@@ -553,6 +601,158 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
 
   dashboardBiCache = { data: payload, expiresAt: Date.now() + DASHBOARD_BI_CACHE_TTL_MS };
   res.json(payload);
+}));
+
+// ============ ANÁLISIS FINANCIERO (EBITDA / OPEX / CAPEX / TIR) ============
+// Lectura financiera del negocio con la información realmente registrada:
+//  · Ingresos  = ventas de licencias + ventas de equipos
+//  · OPEX      = recargas de créditos + impuesto 4x1000 (gasto operativo recurrente)
+//  · COGS HW   = costo de adquisición de los equipos vendidos (campo `costo`)
+//  · EBITDA    = Ingresos − OPEX − COGS HW  (proxy: no hay nómina/gastos admin registrados,
+//                por lo que este EBITDA coincide con la utilidad bruta operativa)
+//  · CAPEX     ≈ 0 registrado — negocio asset-light; se expone para transparencia
+//  · TIR       = tasa interna de retorno de los flujos netos mensuales (bisección);
+//                solo es calculable si la serie tiene al menos un flujo negativo
+router.get('/dashboard-bi/finanzas', asyncHandler(async (_req, res) => {
+  const [ventas, equipos, costos] = await Promise.all([
+    Venta.findAll({ attributes: ['anio', 'mes', 'precioVenta'], raw: true }),
+    VentaEquipo.findAll({ attributes: ['anio', 'mes', 'precioVenta', 'costo'], raw: true }),
+    CostoPantalla.findAll({ attributes: ['anio', 'mes', 'costoCOP', 'impuesto4x100COP', 'trm', 'costoPantallaCOP'], raw: true }),
+  ]);
+
+  const MES_LABEL = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const monthKey = (anio, mes) => `${anio}-${String(mesNum(mes)).padStart(2, '0')}`;
+
+  const meses = {};
+  const ensure = (k) => {
+    if (!meses[k]) meses[k] = { ingLicencias: 0, ingEquipos: 0, opex: 0, cogsEquipos: 0, trmSum: 0, trmN: 0 };
+    return meses[k];
+  };
+
+  for (const v of ventas) {
+    const k = monthKey(v.anio, v.mes);
+    if (k.endsWith('-00')) continue;
+    ensure(k).ingLicencias += Number(v.precioVenta) || 0;
+  }
+  for (const e of equipos) {
+    const k = monthKey(e.anio, e.mes);
+    if (k.endsWith('-00')) continue;
+    const r = ensure(k);
+    r.ingEquipos  += Number(e.precioVenta) || 0;
+    r.cogsEquipos += Number(e.costo) || 0;
+  }
+  for (const c of costos) {
+    const k = monthKey(c.anio, c.mes);
+    if (k.endsWith('-00')) continue;
+    const r = ensure(k);
+    r.opex += (Number(c.costoCOP) || 0) + (Number(c.impuesto4x100COP) || 0);
+    if (Number(c.trm) > 0) { r.trmSum += Number(c.trm); r.trmN += 1; }
+  }
+
+  let acumulado = 0;
+  const serieMensual = Object.keys(meses).sort().map(k => {
+    const m = meses[k];
+    const [anio, mm] = k.split('-');
+    const ingresos = Math.round(m.ingLicencias + m.ingEquipos);
+    const opexM    = Math.round(m.opex);
+    const cogsM    = Math.round(m.cogsEquipos);
+    const ebitda   = ingresos - opexM - cogsM;
+    acumulado += ebitda;
+    return {
+      key: k,
+      label: `${MES_LABEL[Number(mm)]} ${anio.slice(2)}`,
+      anio,
+      ingresos,
+      ingLicencias: Math.round(m.ingLicencias),
+      ingEquipos:   Math.round(m.ingEquipos),
+      opex: opexM,
+      cogsEquipos: cogsM,
+      ebitda,
+      margenEbitdaPct: ingresos > 0 ? Number(((ebitda / ingresos) * 100).toFixed(1)) : null,
+      flujoAcumulado: acumulado,
+      trmPromedio: m.trmN > 0 ? Math.round(m.trmSum / m.trmN) : null,
+    };
+  });
+
+  // ─── Agregación anual ──────────────────────────────────────────────────────
+  const porAnioMap = {};
+  for (const m of serieMensual) {
+    if (!porAnioMap[m.anio]) porAnioMap[m.anio] = { anio: m.anio, ingresos: 0, opex: 0, cogsEquipos: 0, ebitda: 0 };
+    const a = porAnioMap[m.anio];
+    a.ingresos += m.ingresos; a.opex += m.opex; a.cogsEquipos += m.cogsEquipos; a.ebitda += m.ebitda;
+  }
+  let prevEbitda = null;
+  const serieAnual = Object.values(porAnioMap).sort((a, b) => a.anio.localeCompare(b.anio)).map(a => {
+    const margenEbitdaPct = a.ingresos > 0 ? Number(((a.ebitda / a.ingresos) * 100).toFixed(1)) : null;
+    const opexRatioPct    = a.ingresos > 0 ? Number(((a.opex / a.ingresos) * 100).toFixed(1)) : null;
+    const crecimientoEbitdaPct = prevEbitda != null && prevEbitda !== 0
+      ? Number((((a.ebitda - prevEbitda) / Math.abs(prevEbitda)) * 100).toFixed(1)) : null;
+    prevEbitda = a.ebitda;
+    return { ...a, margenEbitdaPct, opexRatioPct, crecimientoEbitdaPct };
+  });
+
+  // ─── TIR de los flujos netos mensuales (bisección sobre VPN) ──────────────
+  const flujos = serieMensual.map(m => m.ebitda);
+  const hayNegativo = flujos.some(f => f < 0);
+  const hayPositivo = flujos.some(f => f > 0);
+  let tirMensualPct = null, tirAnualPct = null;
+  if (hayNegativo && hayPositivo) {
+    const vpn = (r) => flujos.reduce((s, f, t) => s + f / Math.pow(1 + r, t), 0);
+    let lo = -0.99, hi = 10;
+    if (vpn(lo) * vpn(hi) < 0) {
+      for (let i = 0; i < 200; i++) {
+        const mid = (lo + hi) / 2;
+        if (vpn(lo) * vpn(mid) <= 0) hi = mid; else lo = mid;
+      }
+      const r = (lo + hi) / 2;
+      tirMensualPct = Number((r * 100).toFixed(2));
+      tirAnualPct   = Number(((Math.pow(1 + r, 12) - 1) * 100).toFixed(1));
+    }
+  }
+
+  // Payback: primer mes en el que el flujo acumulado se vuelve (y se queda) positivo
+  let paybackMes = null;
+  for (let i = 0; i < serieMensual.length; i++) {
+    if (serieMensual[i].flujoAcumulado > 0) { paybackMes = { index: i + 1, label: serieMensual[i].label }; break; }
+  }
+
+  // ─── KPIs de cabecera ──────────────────────────────────────────────────────
+  const totIngresos = serieMensual.reduce((s, m) => s + m.ingresos, 0);
+  const totOpex     = serieMensual.reduce((s, m) => s + m.opex, 0);
+  const totCogs     = serieMensual.reduce((s, m) => s + m.cogsEquipos, 0);
+  const totEbitda   = totIngresos - totOpex - totCogs;
+  const mesesConDatos = serieMensual.filter(m => m.ingresos > 0 || m.opex > 0);
+  const roiSobreOpex  = totOpex > 0 ? Number((totEbitda / totOpex).toFixed(2)) : null;
+
+  // Últimos 12 meses (LTM) para lectura de corto plazo
+  const ltm = serieMensual.slice(-12);
+  const ltmIngresos = ltm.reduce((s, m) => s + m.ingresos, 0);
+  const ltmOpex     = ltm.reduce((s, m) => s + m.opex, 0);
+  const ltmEbitda   = ltm.reduce((s, m) => s + m.ebitda, 0);
+
+  res.json({
+    serieMensual,
+    serieAnual,
+    kpis: {
+      ebitdaHistorico: totEbitda,
+      margenEbitdaPct: totIngresos > 0 ? Number(((totEbitda / totIngresos) * 100).toFixed(1)) : null,
+      opexHistorico: totOpex,
+      opexRatioPct: totIngresos > 0 ? Number(((totOpex / totIngresos) * 100).toFixed(1)) : null,
+      cogsEquiposHistorico: totCogs,
+      capexRegistrado: 0,
+      tirMensualPct,
+      tirAnualPct,
+      paybackMes,
+      roiSobreOpex,
+      ebitdaPromedioMensual: mesesConDatos.length > 0 ? Math.round(totEbitda / mesesConDatos.length) : 0,
+      ltm: {
+        ingresos: ltmIngresos,
+        opex: ltmOpex,
+        ebitda: ltmEbitda,
+        margenEbitdaPct: ltmIngresos > 0 ? Number(((ltmEbitda / ltmIngresos) * 100).toFixed(1)) : null,
+      },
+    },
+  });
 }));
 
 // ============ COHORT RETENTION ANALYSIS ============

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, Package, FileText, CreditCard, Tv, LogOut, Menu, CalendarClock, UserX, KeyRound, Monitor, GitMerge, X } from 'lucide-react'
+import { LayoutDashboard, Users, Package, FileText, CreditCard, Tv, LogOut, Menu, CalendarClock, UserX, KeyRound, Monitor, GitMerge, X, Landmark } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '../utils/cn'
 
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/admin/bajas', label: 'Bajas', icon: UserX },
   { to: '/admin/cuentas-padre', label: 'Cuentas Padre', icon: KeyRound },
   { to: '/admin/retencion', label: 'Análisis Retención', icon: GitMerge },
+  { to: '/admin/analisis-financiero', label: 'Análisis Financiero', icon: Landmark },
   { to: '/admin/analisis-dispositivos', label: 'Análisis Dispositivos', icon: Tv },
 ]
 
