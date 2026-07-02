@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useUi } from '../../context/UiContext'
 import { Plus, Pencil, Trash2, X, Search, UserX, Tv, ArrowDownCircle, BarChart3, Calendar, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from 'recharts'
+import { ChartInsight, narrarBajasPorAnio, LABEL_STYLE } from './dashboard/biShared'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { Button } from '../../components/ui/Button'
@@ -80,6 +82,7 @@ function SortIcon({ sortKey, sortCol, sortDir }) {
 export default function BajasPage() {
   const { showToast } = useUi()
   const { data: bajas, loading, reload: load } = useApiResource('/admin/bajas')
+  const [bajasPorAnio, setBajasPorAnio] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
@@ -88,6 +91,13 @@ export default function BajasPage() {
   const [sortDir, setSortDir] = useState('desc')
   const [nicknames, setNicknames] = useState([])
   const [nicknameEditMode, setNicknameEditMode] = useState(false)
+
+  // Comparativo año a año (agregado del dashboard-bi, movido desde el Dashboard)
+  useEffect(() => {
+    api.get('/admin/dashboard-bi')
+      .then(r => setBajasPorAnio(r.data.bajasPorAnioDetalle || []))
+      .catch(() => {})
+  }, [])
 
   const openNew = async () => {
     setEditing(null)
@@ -269,6 +279,37 @@ export default function BajasPage() {
         <StatCard icon={Tv} label="Cortesías" value={stats.cortesias} variant="light" sub="Servicio gratuito" />
         <StatCard icon={BarChart3} label="Mes pico" value={stats.mesMasAlto ? stats.mesMasAlto[0] : '—'} variant="solid" sub={stats.mesMasAlto ? `${stats.mesMasAlto[1]} bajas` : ''} />
       </div>
+
+      {/* Comparativo año a año (movido desde el Dashboard) */}
+      {bajasPorAnio.length > 0 && (
+        <Card className="border-orange-100 mb-6">
+          <CardHeader className="border-orange-50">
+            <CardTitle>Bajas — comparativo año a año</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Cancelaciones registradas por año — la otra cara de la moneda del crecimiento de la cartera</p>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={240}>
+              <ComposedChart data={bajasPorAnio} margin={{ top: 22, right: 20, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
+                <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#78716c' }} allowDecimals={false} />
+                <Tooltip
+                  formatter={(v, name) => [v, name === 'total' ? 'Bajas' : name]}
+                  labelFormatter={(v, payload) => {
+                    const d = payload?.[0]?.payload
+                    return d?.variacionPct != null ? `Año ${v} · ${d.variacionPct >= 0 ? '+' : ''}${d.variacionPct}% vs. año anterior` : `Año ${v}`
+                  }}
+                />
+                <Bar dataKey="total" name="Bajas" radius={[6, 6, 0, 0]} barSize={36}>
+                  {bajasPorAnio.map((_, i) => <Cell key={i} fill="#f43f5e" />)}
+                  <LabelList dataKey="total" position="top" formatter={(v) => v.toLocaleString('es-CO')} style={{ ...LABEL_STYLE, fontSize: 12 }} />
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={narrarBajasPorAnio(bajasPorAnio)} />
+          </CardBody>
+        </Card>
+      )}
 
       {/* Search */}
       <div className="mb-4">

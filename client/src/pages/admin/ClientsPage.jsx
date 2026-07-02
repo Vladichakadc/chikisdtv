@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Search, Users, Globe, UserCheck, Repeat,
   ChevronUp, ChevronDown, ChevronsUpDown,
   Plus, Pencil, Trash2, X, Upload
 } from 'lucide-react'
+import { ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from 'recharts'
+import { ChartInsight, narrarGeografia, LABEL_STYLE, PIE_COLORS } from './dashboard/biShared'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { useUi } from '../../context/UiContext'
@@ -129,6 +131,14 @@ export default function ClientsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [form, setForm]         = useState(EMPTY)
+  const [paisesClientes, setPaisesClientes] = useState([])
+
+  // Distribución geográfica (agregado del dashboard-bi, movido desde el Dashboard)
+  useEffect(() => {
+    api.get('/admin/dashboard-bi')
+      .then(r => setPaisesClientes(r.data.paisesClientes || []))
+      .catch(() => {})
+  }, [])
 
   const handleImport = async () => {
     if (!confirm('¿Re-importar todos los clientes desde el Excel? Los cambios manuales se conservan si el ID ya existe.')) return
@@ -250,6 +260,31 @@ export default function ClientsPage() {
         <StatCard icon={Repeat}    label="Revendedores"     value={stats.revendedores.toLocaleString()}  variant="outline" sub="Canal de reventa" />
         <StatCard icon={Globe}     label="Países"           value={stats.paises.toLocaleString()}        variant="light"   sub="Cobertura global" />
       </div>
+
+      {/* Distribución geográfica (movido desde el Dashboard) */}
+      {paisesClientes.length > 0 && (
+        <Card className="border-orange-100 mb-6">
+          <CardHeader className="border-orange-50">
+            <CardTitle>Distribución geográfica de clientes</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Países con más clientes registrados en la tabla de clientes</p>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={240}>
+              <ComposedChart data={paisesClientes} layout="vertical" margin={{ top: 10, right: 40, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} horizontal={false} />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#78716c' }} />
+                <YAxis type="category" dataKey="pais" tick={{ fontSize: 11, fill: '#78716c' }} width={90} />
+                <Tooltip formatter={(v, name, p) => [`${v} clientes (${p.payload.pct}%)`, 'Cantidad']} />
+                <Bar dataKey="cantidad" name="Clientes" radius={[0, 6, 6, 0]} barSize={18}>
+                  {paisesClientes.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  <LabelList dataKey="cantidad" position="right" formatter={(v) => v.toLocaleString('es-CO')} style={{ ...LABEL_STYLE, fontSize: 11 }} />
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={narrarGeografia(paisesClientes)} />
+          </CardBody>
+        </Card>
+      )}
 
       {/* Búsqueda */}
       <div className="mb-4">

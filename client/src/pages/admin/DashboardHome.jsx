@@ -2,28 +2,30 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Package, FileText, Tv, DollarSign, AlertCircle, Clock, TrendingUp,
-  TrendingDown, Minus, Wallet, PiggyBank, Percent, Repeat,
-  BarChart3, Lightbulb, Target, Activity, Scale, UserCheck,
-  UserX, Server, Monitor, ArrowRight, Sparkles, Trophy, Hourglass,
-  Gem, RefreshCw, Calendar, Receipt, Download, Upload, ShieldAlert,
+  Wallet, PiggyBank, Percent, BarChart3, Lightbulb, Activity,
+  Trophy, Hourglass, RefreshCw, Calendar, Receipt, Download, Upload, ShieldAlert,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, AreaChart, Area, PieChart, Pie, Cell, LabelList,
+  Tooltip, Legend, Area, PieChart, Pie, Cell, LabelList,
 } from 'recharts'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
 import { calcDias, getRowVariant } from './planificador/rowHelpers'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
+import {
+  BiCard, GrowthBadge, SmartTag, ChartTooltip, ChartInsight,
+  PIE_COLORS, MES_LABELS, LABEL_STYLE, formatCompactCurrency, renderDonutLabel,
+} from './dashboard/biShared'
 
 // ─── Stat card (KPIs operativos) ─────────────────────────────────────────────
-// Si recibe `onClick`, se vuelve interactiva: funciona como acceso directo al
-// módulo relacionado (mismo patrón "tarjeta inteligente" del Planificador).
+// Al hacer clic abre el modal explicativo del cálculo (con acceso al módulo fuente).
 
 function StatCard({ icon: Icon, title, value, color, subtitle, onClick }) {
   const interactive = typeof onClick === 'function'
@@ -46,9 +48,7 @@ function StatCard({ icon: Icon, title, value, color, subtitle, onClick }) {
           <p className="text-3xl font-bold text-brand-accent mt-2">{value}</p>
           {subtitle && <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{subtitle}</p>}
           {interactive && (
-            <p className="flex items-center gap-1 text-xs font-semibold text-brand-primary mt-2">
-              Ver módulo <ArrowRight size={12} />
-            </p>
+            <p className="text-xs font-semibold text-brand-primary mt-2">¿Cómo se calcula?</p>
           )}
         </div>
         <div className={`p-3 rounded-xl flex-shrink-0 ${color}`}>
@@ -59,249 +59,7 @@ function StatCard({ icon: Icon, title, value, color, subtitle, onClick }) {
   )
 }
 
-// ─── KPI card con variación (estilo BI / Power BI) ───────────────────────────
-
-function GrowthBadge({ pct }) {
-  if (pct == null) return null
-  const up = pct > 0
-  const flat = Math.abs(pct) < 0.05
-  const Icon = flat ? Minus : up ? TrendingUp : TrendingDown
-  const color = flat ? 'text-gray-500 bg-gray-100' : up ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100'
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${color}`}>
-      <Icon size={12} />
-      {up && !flat ? '+' : ''}{pct.toFixed(1)}%
-    </span>
-  )
-}
-
-function BiCard({ icon: Icon, label, value, growth, growthLabel, sub, variant = 'light', tag, onClick }) {
-  const styles = {
-    solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
-    light:   'bg-white border-2 border-orange-200 text-orange-700',
-    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
-  }
-  const iconBg = { solid: 'bg-white/20', light: 'bg-orange-100', outline: 'bg-orange-200/60' }
-  const interactive = typeof onClick === 'function'
-  return (
-    <div
-      className={cn(
-        styles[variant], 'rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5',
-        interactive && 'cursor-pointer'
-      )}
-      {...(interactive ? {
-        role: 'button',
-        tabIndex: 0,
-        onClick,
-        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
-      } : {})}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
-          {tag && <div className="mt-1.5"><SmartTag tone={tag.tone}>{tag.text}</SmartTag></div>}
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            {growth != null && <GrowthBadge pct={growth} />}
-            {(growthLabel || sub) && (
-              <span className={`text-xs ${variant === 'solid' ? 'opacity-75' : 'text-gray-400'}`}>{growthLabel || sub}</span>
-            )}
-          </div>
-          {interactive && (
-            <p className={`flex items-center gap-1 text-xs font-semibold mt-2 ${variant === 'solid' ? 'text-white' : 'text-brand-primary'}`}>
-              Ver detalle por cliente <ArrowRight size={12} />
-            </p>
-          )}
-        </div>
-        <div className={`${iconBg[variant]} rounded-lg p-3`}>
-          <Icon size={22} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Tooltip personalizado para charts ───────────────────────────────────────
-
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-white rounded-lg shadow-lg border border-orange-100 px-3 py-2 text-xs">
-      <p className="font-semibold text-gray-700 mb-1">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color }} className="font-medium">
-          {p.name}: {typeof p.value === 'number' ? formatCurrency(p.value) : p.value}
-        </p>
-      ))}
-    </div>
-  )
-}
-
-const PIE_COLORS = ['#f97316', '#3b82f6', '#10b981', '#a855f7', '#ef4444']
-
-const MES_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-
-// Formato compacto para etiquetas de valor sobre las barras (ej. $1.2M, $850K)
-// — el tooltip sigue mostrando el valor exacto con formatCurrency().
-function formatCompactCurrency(value) {
-  if (!value) return ''
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000) return `$${Math.round(value / 1000)}K`
-  return formatCurrency(value)
-}
-
-// ─── Estilo unificado de etiquetas de valor sobre los gráficos ──────────────
-// Tinta neutra (slate-800) + halo blanco detrás del texto (paint-order):
-// queda legible sobre cualquier fondo —barra naranja, gris, línea verde o
-// blanco de la tarjeta— sin competir con el color propio de cada serie.
-
-const LABEL_STYLE = {
-  fontWeight: 700,
-  fill: '#1e293b',
-  stroke: '#fff',
-  strokeWidth: 3,
-  strokeLinejoin: 'round',
-  paintOrder: 'stroke',
-}
-
-// ─── Etiqueta % sobre cada porción de los gráficos de dona ──────────────────
-// Solo se dibuja si la porción es lo bastante grande para no solaparse con
-// sus vecinas; las porciones pequeñas quedan identificadas en la leyenda.
-// Texto blanco con halo oscuro: legible sobre cualquier color de porción y
-// también si el texto se asoma fuera del anillo, sobre el fondo blanco.
-
-const RADIAN = Math.PI / 180
-function renderDonutLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
-  if (percent < 0.05) return null
-  const radius = innerRadius + (outerRadius - innerRadius) / 2
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
-  return (
-    <text
-      x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700}
-      fill="#fff" stroke="rgba(15,23,42,0.55)" strokeWidth={3} strokeLinejoin="round" paintOrder="stroke"
-    >
-      {`${Math.round(percent * 100)}%`}
-    </text>
-  )
-}
-
-// ─── Etiqueta de variación % para el gráfico de momentum: se dibuja fuera de
-// la barra (encima si es positiva, debajo si es negativa) para no chocar con
-// la barra ni con la línea base de 0% ────────────────────────────────────────
-
-function MomentumValueLabel({ x, y, width, height, value }) {
-  if (value == null) return null
-  const positivo = value >= 0
-  const labelY = positivo ? y - 6 : y + height + 14
-  return (
-    <text
-      x={x + width / 2} y={labelY} textAnchor="middle" fontSize={11}
-      {...LABEL_STYLE}
-    >
-      {`${positivo ? '+' : ''}${value.toFixed(1)}%`}
-    </text>
-  )
-}
-
-// ─── Recuadro de lectura por gráfica (storytelling al pie de cada chart) ─────
-// Texto corto, generado dinámicamente desde los datos, que explica "qué dice
-// esta gráfica" en lenguaje simple pero técnico — el puente entre el dato y
-// la decisión de negocio.
-
-function ChartInsight({ text }) {
-  if (!text) return null
-  return (
-    <div className="mt-3 flex gap-2.5 bg-orange-50/70 border border-orange-100 rounded-lg px-3.5 py-2.5">
-      <Lightbulb size={16} className="text-orange-500 flex-shrink-0 mt-0.5" />
-      <p className="text-sm text-gray-600 leading-relaxed">
-        {text.split('**').map((chunk, j) => (j % 2 === 1 ? <strong key={j} className="text-gray-800">{chunk}</strong> : chunk))}
-      </p>
-    </div>
-  )
-}
-
-// ─── Etiquetas inteligentes: clasificación automática del KPI a partir de su
-// valor (no texto fijo) — el atajo visual entre el número y su lectura ───────
-
-function SmartTag({ tone = 'info', icon: Icon = Sparkles, children }) {
-  const styles = {
-    good: 'bg-emerald-100 text-emerald-700',
-    warn: 'bg-amber-100 text-amber-700',
-    bad:  'bg-red-100 text-red-700',
-    info: 'bg-sky-100 text-sky-700',
-  }
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${styles[tone]}`}>
-      <Icon size={10} />
-      {children}
-    </span>
-  )
-}
-
-function tagMarkup(k) {
-  if (k.markupPct >= 150) return { tone: 'good', text: 'Retorno sobre costo alto' }
-  if (k.markupPct >= 80) return { tone: 'info', text: 'Retorno sobre costo saludable' }
-  return { tone: 'warn', text: 'Margen ajustado sobre el costo' }
-}
-
-function tagCobertura(k) {
-  if (k.coberturaCostos >= 2.5) return { tone: 'good', text: 'Colchón financiero amplio' }
-  if (k.coberturaCostos >= 1.5) return { tone: 'info', text: 'Colchón financiero adecuado' }
-  return { tone: 'bad', text: 'Colchón financiero ajustado' }
-}
-
-function tagPuntoEquilibrio(k, porAnio) {
-  const cerrados = (porAnio || []).filter(a => a.crecimientoIngresosPct != null)
-  const ref = cerrados[cerrados.length - 1]
-  if (!ref || !k.puntoEquilibrioVentas) return { tone: 'info', text: 'Umbral mínimo de ventas para no perder' }
-  const ratio = ref.numVentas / k.puntoEquilibrioVentas
-  if (ratio >= 1.5) return { tone: 'good', text: `${ref.anio} operó ${ratio.toFixed(1)}× sobre el umbral` }
-  if (ratio >= 1) return { tone: 'info', text: `${ref.anio} superó el umbral` }
-  return { tone: 'bad', text: `${ref.anio} no alcanzó el umbral` }
-}
-
-function tagConcentracion(k) {
-  if (k.concentracionTop20Pct >= 60) return { tone: 'bad', text: 'Alta dependencia de pocos clientes' }
-  if (k.concentracionTop20Pct >= 45) return { tone: 'warn', text: 'Concentración moderada — vigilar' }
-  return { tone: 'good', text: 'Cartera diversificada' }
-}
-
-function tagArpu(k) {
-  const ratio = k.ticketPromedio > 0 ? k.arpu / k.ticketPromedio : 0
-  return { tone: 'info', text: `≈ ${ratio.toFixed(1)} compras por cliente en su histórico` }
-}
-
-function tagPantalla(k) {
-  const margenPct = k.ingresoPorPantalla > 0 ? ((k.ingresoPorPantalla - k.costoPorPantalla) / k.ingresoPorPantalla) * 100 : 0
-  if (margenPct >= 60) return { tone: 'good', text: `Unidad muy rentable (${margenPct.toFixed(0)}% margen)` }
-  if (margenPct >= 40) return { tone: 'info', text: `Margen saludable (${margenPct.toFixed(0)}%)` }
-  return { tone: 'warn', text: `Margen ajustado (${margenPct.toFixed(0)}%)` }
-}
-
-function tagMomentum(k) {
-  if (k.momentumVentasPct > 5) return { tone: 'good', text: 'Acelerando' }
-  if (k.momentumVentasPct > -5) return { tone: 'info', text: 'Ritmo estable' }
-  return { tone: 'warn', text: 'Desacelerando — vigilar' }
-}
-
-function tagLtv(ltvPromedio) {
-  if (ltvPromedio >= 200000) return { tone: 'good', text: 'LTV alto' }
-  if (ltvPromedio >= 80000)  return { tone: 'info', text: 'LTV moderado' }
-  return { tone: 'warn', text: 'LTV bajo — priorizar retención' }
-}
-
-function tagValorEnRiesgo(valorEnRiesgo, ltvPromedio) {
-  if (!ltvPromedio || !valorEnRiesgo) return { tone: 'info', text: 'Sin clientes en riesgo hoy' }
-  const n = Math.round(valorEnRiesgo / ltvPromedio)
-  if (n > 15) return { tone: 'bad',  text: `Equivale a ${n} LTV promedios en juego` }
-  if (n > 5)  return { tone: 'warn', text: `Equivale a ${n} LTV promedios en juego` }
-  return { tone: 'info', text: `Equivale a ${n} LTV promedios en juego` }
-}
-
-// ─── Generadores de narrativa: explican el comportamiento año a año / mes a
-// mes de cada gráfica con lenguaje sencillo pero técnico, a partir de datos
-// reales (no texto fijo) ──────────────────────────────────────────────────────
+// ─── Narrativas de las gráficas que permanecen en el Dashboard ───────────────
 
 function narrarIngresosCostosAnio(porAnio) {
   if (!porAnio?.length) return null
@@ -323,9 +81,6 @@ function narrarIngresosCostosAnio(porAnio) {
     : ` La línea morada (margen %) se mantiene en un rango alto y estable, lo que confirma que el crecimiento del negocio no ha sacrificado eficiencia de costos.`}`
 }
 
-// Lectura de la curva completa ingresos/costos/ganancia, desde el primer año
-// con datos hasta el año en curso — complementa la lectura "barra por barra"
-// de narrarIngresosCostosAnio con una vista de tendencia de largo plazo.
 function narrarEvolucionAnual(porAnio) {
   if (!porAnio?.length) return null
   const primero = porAnio[0]
@@ -357,8 +112,6 @@ function narrarTendenciaMensual(porMes) {
   return `El mes de mayor ingreso histórico fue **${pico.label}** (${formatCurrency(pico.ingresos)}) y el más bajo **${valle.label}** (${formatCurrency(valle.ingresos)}) — esa diferencia es la huella de la **estacionalidad** (meses de mayor actividad de recargas y renovaciones). El promedio mensual histórico es ${formatCurrency(Math.round(promedio))}; los últimos tres meses con actividad promedian ${formatCurrency(Math.round(promUltimos3))}, **${tendencia}** del promedio histórico — una pista temprana de hacia dónde se dirige la tendencia de corto plazo, antes de que se refleje en el cierre anual.`
 }
 
-// Resumen + conclusión del gráfico "Ventas de licencias — mes a mes" para el
-// año seleccionado en el filtro (incluye comparación contra el año anterior).
 function narrarVentasLicenciaAnio(resumen, anio) {
   if (!resumen) return null
   const { totalIngresos, totalVentas, ticketPromedio, promedioMensual, mejorMes, peorMes, crecimientoIngresosPct, crecimientoVentasPct, mesesConDatos } = resumen
@@ -383,9 +136,6 @@ function narrarVentasLicenciaAnio(resumen, anio) {
   return partes.join('')
 }
 
-// Resumen + conclusión de "Ventas de licencias — mes a mes" cuando el filtro
-// de Mes está activo: detalle del mes puntual vs. el mismo mes del año
-// anterior, y su peso dentro del total del año.
 function narrarVentasLicenciaMes(resumen, mes, anio) {
   if (!resumen?.mesDetalle) return null
   const { mesActual, mesAnteriorAnio, ticketPromedioMes, crecimientoIngresosMesPct, crecimientoVentasMesPct, pctDelAnio } = resumen.mesDetalle
@@ -410,68 +160,6 @@ function narrarVentasLicenciaMes(resumen, mes, anio) {
   return partes.join('')
 }
 
-function narrarPareto(paretoIngresos, kpis) {
-  if (!paretoIngresos?.length) return null
-  const p20 = paretoIngresos.find(p => p.pctClientes === 20)
-  const p50 = paretoIngresos.find(p => p.pctClientes === 50)
-  if (!p20 || !p50) return null
-  const brecha20 = (p20.pctIngresos - 20).toFixed(1)
-  return `Si la cartera estuviera repartida en partes iguales, el 20% de los clientes generaría el 20% del ingreso — esa es la diagonal punteada (distribución equitativa). En la realidad ese 20% genera **${p20.pctIngresos.toFixed(1)}%** del ingreso, **+${brecha20} puntos por encima de la equidad**, y solo la mitad de la cartera ya concentra ${p50.pctIngresos.toFixed(1)}%. ${kpis.concentracionTop20Pct > 50
-    ? 'Cuanto más se "infla" la curva naranja sobre la diagonal, mayor es la dependencia de unos pocos clientes — y mayor el golpe en caja si alguno de ellos cancela. Vale la pena identificar a esos clientes "ancla" y diseñarles un plan de fidelización dedicado.'
-    : 'La curva no se aleja demasiado de la diagonal: el ingreso está razonablemente repartido entre la base de clientes, lo que reduce el riesgo de que la salida de unos pocos golpee la caja de forma material.'}`
-}
-
-function narrarProductividad(kpis) {
-  const margenPantalla = kpis.ingresoPorPantalla - kpis.costoPorPantalla
-  const margenPct = kpis.ingresoPorPantalla > 0 ? (margenPantalla / kpis.ingresoPorPantalla) * 100 : 0
-  return `Cada una de las ${kpis.totalPantallas} pantallas activas produce, en promedio, ${formatCurrency(kpis.ingresoPorPantalla)} de ingreso y consume ${formatCurrency(kpis.costoPorPantalla)} de costo — dejando **${formatCurrency(margenPantalla)} de margen por pantalla** (${margenPct.toFixed(1)}% de su ingreso). Esta es la "unidad económica" más pequeña del negocio: si el costo por pantalla sube — por ejemplo, por variaciones en la TRM o en el precio de las credenciales — esta barra gris sería la primera en moverse, y el primer lugar donde se vería la presión sobre la rentabilidad.`
-}
-
-function narrarMomentum(serie, kpis) {
-  if (!serie?.length) return null
-  const positivos = serie.filter(m => m.variacionPct >= 0).length
-  const negativos = serie.length - positivos
-  const ultimo = serie[serie.length - 1]
-  return `De los últimos ${serie.length} meses con actividad, ${positivos} cerraron en **crecimiento** frente al mes anterior y ${negativos} en **caída**. El más reciente (${ultimo.label}) varió ${ultimo.variacionPct >= 0 ? '+' : ''}${ultimo.variacionPct.toFixed(1)}%, y el promedio de esas variaciones — el "momentum" — es de ${kpis.momentumVentasPct >= 0 ? '+' : ''}${kpis.momentumVentasPct.toFixed(1)}% mensual. ${kpis.momentumVentasPct >= 0
-    ? 'Un momentum positivo y sostenido sugiere que el ritmo comercial actual debería seguir empujando los ingresos al alza en los próximos cierres mensuales.'
-    : 'Un momentum negativo no es alarmante por sí solo si el histórico ya muestra estacionalidad (meses bajos seguidos de recuperación), pero si se sostiene dos o tres meses más, es la señal para activar acciones comerciales de reactivación (campañas de renovación, recuperación de cartera).'}`
-}
-
-function narrarMrr(bi) {
-  if (!bi) return null
-  const { kpis, mrrPorTipoPlan, porMes } = bi
-  if (!kpis?.mrrActual) return null
-  const principal = mrrPorTipoPlan?.[0]
-  const distorsion = kpis.mrrActual > 0 && kpis.ticketPromedio > 0
-    ? Number((kpis.ticketPromedio / (kpis.mrrActual / Math.max(1, porMes.filter(m => m.mrr > 0).slice(-1)[0]?.numVentas || 1))).toFixed(1))
-    : null
-  const mesAnual = porMes.filter(m => m.mrr > 0 && m.ingresos > 0)
-    .reduce((worst, m) => {
-      const ratio = m.ingresos / m.mrr
-      return (!worst || ratio > worst.ratio) ? { label: m.label, ratio } : worst
-    }, null)
-  return [
-    `El **MRR normalizado de ${kpis.mrrMesLabel || 'último mes'} es ${formatCurrency(kpis.mrrActual)}**, equivalente a un ARR de **${formatCurrency(kpis.arrActual)}**. `,
-    `Este valor corrige el efecto "lump-sum" de los planes no-mensuales: cuando un cliente paga un plan anual de ~${formatCurrency(190000)}, ese monto aparece como ingreso bruto en el mes de la venta, aunque corresponde a 12 meses de servicio. Al dividir cada venta por la duración de su plan, el MRR muestra el ingreso recurrente real por mes — la métrica adecuada para evaluar crecimiento sostenible. `,
-    mesAnual ? `El mes con mayor distorsión reciente fue **${mesAnual.label}**, donde el ingreso bruto fue **${mesAnual.ratio.toFixed(1)}× mayor** al MRR normalizado, señal de ventas concentradas en planes largos ese período. ` : '',
-    principal ? `La estructura del ingreso recurrente histórico está dominada por **${principal.plan}** (${principal.pct}% del MRR total) — ` : '',
-    principal?.plan === 'Plan Mensual'
-      ? `lo que da **alta predictibilidad mensual** pero también mayor exposición al churn, ya que cada mes el cliente decide si renueva.`
-      : principal?.plan === 'Plan Semestral'
-      ? `un buen balance entre flujo de caja anticipado y flexibilidad para el cliente.`
-      : `lo que genera **flujo de caja anticipado** pero puede dificultar detectar churn temprano (el cliente "desaparece" 12 meses después).`,
-    kpis.momentumMrrPct != null
-      ? ` El **momentum MRR** (variación promedio MoM normalizado) es ${kpis.momentumMrrPct >= 0 ? '+' : ''}${kpis.momentumMrrPct.toFixed(1)}%${Math.abs(kpis.momentumMrrPct) < Math.abs(kpis.momentumVentasPct) ? `, más moderado que el momentum bruto de ${kpis.momentumVentasPct >= 0 ? '+' : ''}${kpis.momentumVentasPct.toFixed(1)}% — la diferencia confirma que parte de la volatilidad del indicador bruto era ruido de planes largos, no señal de crecimiento real` : ''}.`
-      : '',
-  ].join('')
-}
-
-function narrarLtv(ltv) {
-  if (!ltv?.numClientes) return null
-  const { ltvPromedio, vidaPromedioMeses, arpuMensualLtv, valorEnRiesgo, clientesEnRiesgoCount, numClientes, percentiles } = ltv
-  return `Analizando **${numClientes} clientes** con al menos una activación registrada, el **LTV promedio es ${formatCurrency(ltvPromedio)}**: el ingreso que un cliente típico generó durante su **vida activa de ${vidaPromedioMeses} meses** al ritmo de **${formatCurrency(arpuMensualLtv)}/mes** (ARPU mensual normalizado). Esto establece el techo de lo que vale invertir en retener a un cliente antes de que el costo de retención supere el beneficio — si una campaña de reactivación, un descuento o una llamada de seguimiento cuesta menos de ${formatCurrency(ltvPromedio)}, siempre conviene retener antes que perder. La distribución no es uniforme: el 25% con menor LTV no supera ${formatCurrency(percentiles.p25)}, mientras que el 25% superior genera más de ${formatCurrency(percentiles.p75)} — la **asimetría premia fuertemente la retención del segmento alto**. ${clientesEnRiesgoCount > 0 ? `Hoy hay **${clientesEnRiesgoCount} clientes con pantallas próximas a vencer o ya vencidas**, con un **LTV histórico acumulado de ${formatCurrency(valorEnRiesgo)}** en juego — atender esas cuentas es la acción de mayor ROI inmediato disponible en este momento.` : 'Actualmente no hay clientes con pantallas en estado crítico de vencimiento — buen momento para acciones proactivas de fidelización.'}`
-}
-
 function narrarComposicion(tipoPago) {
   if (!tipoPago?.length) return null
   const principal = tipoPago[0]
@@ -479,48 +167,6 @@ function narrarComposicion(tipoPago) {
   return `**${principal.tipo}** domina la composición del ingreso con ${principal.pctTotal.toFixed(1)}% (${formatCurrency(principal.total)} en ${principal.cantidad} transacciones)${segundo ? `, seguido de **${segundo.tipo}** con ${segundo.pctTotal.toFixed(1)}%` : ''}. ${principal.tipo === 'Renovacion'
     ? 'Que las renovaciones encabecen la lista confirma que el ingreso es, en su mayoría, **recurrente y predecible** — la prioridad financiera es proteger esa base (retención) antes que invertir agresivamente en captar clientes nuevos.'
     : 'Conviene vigilar si esta composición se mantiene estable en el tiempo: un peso alto de activaciones nuevas frente a renovaciones puede señalar dependencia de la adquisición constante de clientes, con su correspondiente costo.'}`
-}
-
-// ─── Narrativas del cruce por módulo: Bajas, Clientes, Planificador ──────────
-
-function narrarBajasPorAnio(serie) {
-  if (!serie?.length) return null
-  const aniosCompletos = serie.slice(0, -1)
-  const ultimo = serie[serie.length - 1]
-  const penultimo = serie[serie.length - 2]
-  if (!aniosCompletos.length) return null
-  const pico = aniosCompletos.reduce((a, b) => (b.total > a.total ? b : a))
-  const tendenciaTexto = aniosCompletos.length > 1
-    ? (aniosCompletos[aniosCompletos.length - 1].total >= aniosCompletos[0].total
-        ? `creció de ${aniosCompletos[0].total} bajas en ${aniosCompletos[0].anio} a ${aniosCompletos[aniosCompletos.length - 1].total} en ${aniosCompletos[aniosCompletos.length - 1].anio}`
-        : `bajó de ${aniosCompletos[0].total} bajas en ${aniosCompletos[0].anio} a ${aniosCompletos[aniosCompletos.length - 1].total} en ${aniosCompletos[aniosCompletos.length - 1].anio}`)
-    : null
-  const parcial = penultimo && ultimo.total < penultimo.total
-  return `El año con más cancelaciones registradas hasta ahora es **${pico.anio}** (${pico.total} bajas, principalmente de ${pico.tipoPrincipal}).${tendenciaTexto ? ` Mirando los años ya cerrados, el volumen anual de bajas ${tendenciaTexto} — ${aniosCompletos[aniosCompletos.length - 1].total >= aniosCompletos[0].total ? 'una señal de que el churn crece junto con la base de clientes (algo esperable en un negocio en expansión), pero que conviene monitorear como % de la cartera activa, no solo en valor absoluto' : 'una mejora que vale la pena sostener con las prácticas actuales de retención'}.` : ''}${parcial
-    ? ` La barra de **${ultimo.anio}** luce más baja porque el año sigue en curso (${ultimo.total} bajas registradas frente a ${penultimo.total} del ${penultimo.anio} ya cerrado) — no es necesariamente una mejora real, es un corte parcial; compárala contra el mismo punto del año anterior antes de sacar conclusiones.`
-    : ''}`
-}
-
-function narrarGeografia(paises) {
-  if (!paises?.length) return null
-  const principal = paises[0]
-  const internacional = paises.slice(1).reduce((s, p) => s + p.cantidad, 0)
-  const totalMuestra = paises.reduce((s, p) => s + p.cantidad, 0)
-  const pctInternacional = totalMuestra > 0 ? (internacional / totalMuestra) * 100 : 0
-  return `**${principal.pais}** concentra ${principal.pct}% de la cartera con país registrado — el mercado natural y de menor fricción operativa (zona horaria, idioma, medios de pago). El ${pctInternacional.toFixed(1)}% restante está repartido en otros ${paises.length - 1} países de esta muestra (${paises.slice(1, 4).map(p => p.pais).join(', ')}…), lo que confirma que el negocio ya opera como un **proveedor digital sin fronteras** — una base diversificada geográficamente diluye el riesgo de que una sola economía local (devaluación, regulación, competencia local) golpee toda la cartera a la vez, aunque también implica más husos horarios y canales de soporte que atender.`
-}
-
-function narrarSaludPlanificador(alertas, pantallasConDeuda, totalPantallas) {
-  if (!alertas?.length || !totalPantallas) return null
-  const find = (k) => alertas.find(a => a.alerta === k)?.cantidad || 0
-  const vencidas = find('VENCIDO')
-  const proximas = find('PROXIMO A VENCER')
-  const cortesias = find('CORTESIA')
-  const sinNovedad = find('Sin novedad')
-  const pctSano = (sinNovedad / totalPantallas) * 100
-  return `De las ${totalPantallas} pantallas activas en el Planificador, ${sinNovedad} (${pctSano.toFixed(1)}%) están **sin novedad** — la base operativa sana del negocio. El resto requiere algún tipo de gestión: ${proximas} **próxima${proximas === 1 ? '' : 's'} a vencer** (oportunidad de renovación inmediata, ya priorizada en el módulo), ${vencidas} ya **vencida${vencidas === 1 ? '' : 's'}** (requiere contacto urgente para no perder el cupo), ${cortesias} marcada${cortesias === 1 ? '' : 's'} como **cortesía** (no generan ingreso — vale la pena revisar periódicamente si siguen vigentes) y ${pantallasConDeuda} con **saldo pendiente** (\`debe\`) registrado directamente en el planificador. ${(vencidas + proximas) > 0
-    ? `Atender primero esas ${vencidas + proximas} pantallas vencidas o próximas a vencer es la acción de mayor retorno inmediato: convertirlas en renovación protege ingreso que ya existe, a un costo de adquisición prácticamente nulo.`
-    : 'No hay pantallas vencidas ni próximas a vencer en este momento — buen punto para usar el tiempo en campañas de fidelización proactivas en lugar de gestión reactiva de cartera.'}`
 }
 
 // ─── Análisis económico-financiero (narrativa generada desde los datos) ──────
@@ -532,18 +178,15 @@ function FinancialAnalysis({ bi }) {
   const penultimo = porAnio[porAnio.length - 2]
   const primero = porAnio[0]
 
-  // CAGR de ingresos entre el primer y penúltimo año completo
   const aniosCompletos = porAnio.slice(0, -1)
   const cagr = aniosCompletos.length > 1
     ? (Math.pow(aniosCompletos[aniosCompletos.length - 1].ingresos / aniosCompletos[0].ingresos, 1 / (aniosCompletos.length - 1)) - 1) * 100
     : null
 
-  const renovacion = tipoPago.find(t => t.tipo === 'Renovacion')
   const activacion = tipoPago.find(t => t.tipo === 'Activacion Pantalla')
 
   const items = []
 
-  // 1) Lectura macro del crecimiento histórico
   if (cagr != null) {
     items.push({
       tone: cagr > 15 ? 'good' : cagr > 0 ? 'neutral' : 'bad',
@@ -552,7 +195,6 @@ function FinancialAnalysis({ bi }) {
     })
   }
 
-  // 2) Desaceleración reciente
   if (penultimo?.crecimientoIngresosPct != null) {
     const desacelera = aniosCompletos.length >= 3 && aniosCompletos[aniosCompletos.length - 2].crecimientoIngresosPct > penultimo.crecimientoIngresosPct
     items.push({
@@ -562,7 +204,6 @@ function FinancialAnalysis({ bi }) {
     })
   }
 
-  // 3) Lectura del año en curso (YTD)
   if (comparativoYTD) {
     const { etiqueta, anioActual, anioAnterior, ingresosActual, ingresosAnterior, costosActual, costosAnterior, crecimientoIngresosPct, crecimientoCostosPct } = comparativoYTD
     const tijera = crecimientoIngresosPct - crecimientoCostosPct
@@ -575,23 +216,12 @@ function FinancialAnalysis({ bi }) {
     })
   }
 
-  // 4) Estructura del margen
   items.push({
     tone: kpis.margenPctTotal > 60 ? 'good' : kpis.margenPctTotal > 40 ? 'neutral' : 'bad',
     title: 'Estructura de márgenes y unit economics',
     text: `El margen bruto histórico es de ${kpis.margenPctTotal.toFixed(1)}% (${formatCurrency(kpis.margenTotal)} sobre ${formatCurrency(kpis.ingresosTotales)} de ingresos, frente a ${formatCurrency(kpis.costosTotales)} de costo de pantallas/cuentas). Es un margen ${kpis.margenPctTotal > 60 ? 'alto, propio de un modelo de reventa de licencias digitales con muy bajo costo marginal por usuario adicional' : 'razonable, aunque con espacio para optimizar el costo unitario por pantalla'}. El ticket promedio por transacción es de ${formatCurrency(kpis.ticketPromedio)}, y el ${kpis.tasaRenovacionPct.toFixed(1)}% de las ventas corresponden a **renovaciones** (vs. ${activacion ? activacion.pctTotal.toFixed(1) : '—'}% de activaciones nuevas). ${kpis.tasaRenovacionPct > 70 ? 'Esta proporción confirma que el negocio vive principalmente de su **base instalada** — la prioridad estratégica debería ser la retención (reducir churn) más que la adquisición pura, porque cada punto de churn cuesta proporcionalmente más que un punto de nueva activación.' : 'La proporción de activaciones nuevas es relevante — conviene vigilar el costo de adquisición frente al valor de vida del cliente (LTV) para asegurar que cada activación nueva sea rentable en el mediano plazo.'}`,
   })
 
-  // 4b) Rentabilidad sobre el costo y riesgo de concentración de cartera
-  items.push({
-    tone: kpis.coberturaCostos > 2 ? 'good' : kpis.coberturaCostos > 1.3 ? 'neutral' : 'bad',
-    title: 'Rentabilidad sobre el costo y punto de equilibrio',
-    text: `Visto desde el costo (no desde el ingreso): por cada $1.000 invertidos en pantallas/cuentas, el negocio recupera ${formatCurrency(Math.round(kpis.markupPct * 10))} de margen — un **markup de ${kpis.markupPct.toFixed(1)}%** — y el ingreso cubre ${kpis.coberturaCostos.toFixed(2)} veces el costo operativo (cobertura de costos). Esto implica un **punto de equilibrio de ${kpis.puntoEquilibrioVentas.toLocaleString('es-CO')} ventas** al ticket promedio de ${formatCurrency(kpis.ticketPromedio)} — todo lo que se venda por encima de ese umbral es, en términos de costo de pantalla, prácticamente **utilidad incremental** (apalancamiento operativo favorable: la estructura de costo es mayormente variable y escala con cada activación/renovación). \n\nDesde el ángulo de **concentración de cartera**, el 20% de los clientes (≈${Math.ceil(kpis.numClientesCompradores * 0.2)} de ${kpis.numClientesCompradores}) explica el ${kpis.concentracionTop20Pct.toFixed(1)}% del ingreso histórico. ${kpis.concentracionTop20Pct > 50
-      ? 'Esa concentración es **alta**: una porción relativamente pequeña de la cartera sostiene más de la mitad del ingreso, lo que crea **riesgo de dependencia** — la pérdida de unos pocos clientes "ancla" tendría un impacto desproporcionado en caja. Conviene mapear a esos clientes top y diseñar un plan de fidelización dedicado (planes anuales, descuentos por permanencia).'
-      : 'Esa concentración es **moderada/saludable**: el ingreso está razonablemente distribuido entre la base de clientes, lo que reduce el riesgo de que la salida de unos pocos afecte materialmente la caja — un perfil de riesgo de cartera favorable para un negocio de suscripción.'} El ingreso promedio por cliente (**ARPU**) es de ${formatCurrency(kpis.arpu)}, y cada una de las ${kpis.totalPantallas} pantallas en operación produce en promedio ${formatCurrency(kpis.ingresoPorPantalla)} frente a un costo de ${formatCurrency(kpis.costoPorPantalla)} — es decir, **cada pantalla deja cerca de ${formatCurrency(kpis.ingresoPorPantalla - kpis.costoPorPantalla)} de margen** a lo largo de su vida útil registrada, el indicador más cercano a una "unidad económica" (unit economics) de este modelo de negocio.`,
-  })
-
-  // 5) Riesgo de cancelación / churn
   items.push({
     tone: kpis.churnPct < 20 ? 'good' : kpis.churnPct < 35 ? 'neutral' : 'bad',
     title: 'Riesgo de cancelación (churn) y solidez de la base',
@@ -600,7 +230,6 @@ function FinancialAnalysis({ bi }) {
       : 'Es un nivel de churn manejable, coherente con un negocio de contenidos digitales de bajo costo de cambio (switching cost). Aun así, cada punto de reducción de churn impacta directamente el margen, porque el costo de retener a un cliente existente es estructuralmente menor que el de activar uno nuevo.'}`,
   })
 
-  // 6) Conclusión / recomendación ejecutiva
   const tendenciaGlobal = comparativoYTD?.crecimientoIngresosPct ?? penultimo?.crecimientoIngresosPct
   items.push({
     tone: 'reco',
@@ -657,6 +286,7 @@ export default function DashboardHome() {
   const [showVencidasPanel, setShowVencidasPanel] = useState(false)
   const [showProximasPanel, setShowProximasPanel] = useState(false)
   const [showArpuPanel, setShowArpuPanel] = useState(false)
+  const [explain, setExplain] = useState(null)
 
   const load = () => Promise.all([
     api.get('/admin/dashboard-stats').then((r) => setStats(r.data)),
@@ -677,9 +307,6 @@ export default function DashboardHome() {
     }
   }, [])
 
-  // Sincroniza Cuentas Padre → Planificador (cuenta/contraseña/crédito/inicio/fin)
-  // y refresca de inmediato las estadísticas del dashboard con esos cambios ya
-  // guardados en la base de datos.
   const handleSync = async () => {
     setSyncing(true)
     try {
@@ -693,8 +320,6 @@ export default function DashboardHome() {
     }
   }
 
-  // Descarga una copia .sqlite de la base de datos actual del servidor
-  // (la de producción, si se usa desde el panel desplegado en Railway).
   const handleDownloadBackup = async () => {
     setDownloadingBackup(true)
     try {
@@ -714,10 +339,6 @@ export default function DashboardHome() {
     }
   }
 
-  // Solo-desarrollo: reemplaza la base de datos local por un archivo .sqlite
-  // subido (ej. un respaldo descargado de producción). El backend reabre la
-  // conexión contra el archivo nuevo sin reiniciarse, así que basta recargar
-  // la página para ver los datos actualizados. Rechazado si NODE_ENV es 'production'.
   const handleRestoreLocalBackup = async (e) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -743,8 +364,6 @@ export default function DashboardHome() {
     return bi.tipoPago.map(t => ({ name: t.tipo, value: t.total, pct: t.pctTotal }))
   }, [bi])
 
-  // Pantallas del Planificador enriquecidas con su variante y días — misma
-  // clasificación (getRowVariant/calcDias) que usa PlanificadorPage.
   const pantallasEnriquecidas = useMemo(() => {
     if (!planificador) return []
     const { pantallas, diasAlerta } = planificador
@@ -755,8 +374,6 @@ export default function DashboardHome() {
     }))
   }, [planificador])
 
-  // Suma del campo "#" (pantallas por plan) — misma métrica que la tarjeta
-  // "Pantallas activas" del Planificador.
   const pantallasActivasTotal = useMemo(() => {
     if (!planificador?.pantallas) return 0
     return planificador.pantallas.reduce((sum, p) => sum + (Number(p.pantallas) || 0), 0)
@@ -764,13 +381,11 @@ export default function DashboardHome() {
 
   const byDiasAsc = (a, b) => (a._dias ?? Infinity) - (b._dias ?? Infinity)
 
-  // Cuentas vencidas: misma data que la tarjeta "Vencidas" del Planificador (categoría 'vencido').
   const cuentasVencidas = useMemo(
     () => pantallasEnriquecidas.filter(p => p._variant === 'vencido').sort(byDiasAsc),
     [pantallasEnriquecidas]
   )
 
-  // Próximas a vencer: misma data que la tarjeta "Próx. a vencer" del Planificador (categoría 'alerta').
   const proximasAVencer = useMemo(
     () => pantallasEnriquecidas.filter(p => p._variant === 'alerta').sort(byDiasAsc),
     [pantallasEnriquecidas]
@@ -787,24 +402,6 @@ export default function DashboardHome() {
     })
   }
 
-  // Serie de variación mensual de ingresos (momentum) — derivada de porMes,
-  // tomando solo meses con ventas registradas para no distorsionar con ceros.
-  const momentumSerie = useMemo(() => {
-    if (!bi) return []
-    const meses = bi.porMes.filter(m => m.numVentas > 0)
-    const out = []
-    for (let i = 1; i < meses.length; i++) {
-      const prev = meses[i - 1].ingresos
-      const cur = meses[i].ingresos
-      if (prev > 0) {
-        out.push({ label: meses[i].label, variacionPct: Number((((cur - prev) / prev) * 100).toFixed(1)) })
-      }
-    }
-    return out.slice(-12)
-  }, [bi])
-
-  // Crecimiento de la ganancia (margen en pesos) del último año cerrado vs.
-  // el anterior — mismo criterio que crecimientoIngresosUltimo/CostosUltimo.
   const crecimientoMargenUltimo = useMemo(() => {
     if (!bi?.porAnio?.length) return null
     const ultimo = bi.porAnio[bi.porAnio.length - 1]
@@ -819,15 +416,12 @@ export default function DashboardHome() {
     return [...new Set(bi.porMes.map(m => Number(m.anio)))].filter(Boolean).sort((a, b) => b - a)
   }, [bi])
 
-  // Por defecto, selecciona el año más reciente con datos en cuanto estén disponibles.
   useEffect(() => {
     if (anioVentasLicencia == null && aniosVentasLicencia.length > 0) {
       setAnioVentasLicencia(aniosVentasLicencia[0])
     }
   }, [aniosVentasLicencia, anioVentasLicencia])
 
-  // Serie de 12 meses (Ene-Dic) del año seleccionado, completando con ceros
-  // los meses sin ventas registradas para una vista "mes a mes" completa.
   const ventasLicenciaPorMes = useMemo(() => {
     if (!bi || anioVentasLicencia == null) return []
     const porMesMap = {}
@@ -840,7 +434,6 @@ export default function DashboardHome() {
     })
   }, [bi, anioVentasLicencia])
 
-  // Resumen ejecutivo del año seleccionado, con comparativo vs. el año anterior.
   const resumenVentasLicencia = useMemo(() => {
     if (!bi || !ventasLicenciaPorMes.length) return null
     const conDatos = ventasLicenciaPorMes.filter(m => m.numVentas > 0)
@@ -859,8 +452,6 @@ export default function DashboardHome() {
     const crecimientoVentasPct = totalVentasAnterior > 0
       ? Number((((totalVentas - totalVentasAnterior) / totalVentasAnterior) * 100).toFixed(1)) : null
 
-    // Si hay un mes seleccionado en el filtro, agrega su detalle puntual
-    // (comparado contra el mismo mes del año anterior y su peso en el año).
     let mesDetalle = null
     if (mesVentasLicencia != null) {
       const mesActual = ventasLicenciaPorMes.find(m => m.mes === mesVentasLicencia)
@@ -887,6 +478,8 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-8">
+      <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
       {showVencidasPanel && (
         <CategoryPanel
           catKey="vencido"
@@ -912,7 +505,7 @@ export default function DashboardHome() {
       <div className="mb-2 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-brand-accent">Dashboard</h1>
-          <p className="text-gray-500">Panel general de ChikisdTV</p>
+          <p className="text-gray-500">Pulso diario de ChikisdTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-brand-primary font-semibold hover:underline">Análisis Financiero</button></p>
         </div>
         <div className="flex items-center gap-2">
           {import.meta.env.DEV && (
@@ -949,84 +542,89 @@ export default function DashboardHome() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Users} title="Clientes Activos" value={stats.totalClients} color="bg-brand-primary"
-          subtitle={`${stats.clientesFinal} finales · ${stats.clientesRevendedor} revendedores — presencia en ${stats.paisesCount} países (ver Clientes)`}
-          onClick={() => navigate('/admin/clients')}
+          subtitle={`${stats.clientesFinal} finales · ${stats.clientesRevendedor} revendedores — presencia en ${stats.paisesCount} países`}
+          onClick={() => setExplain({
+            title: 'Clientes Activos', value: stats.totalClients, icon: Users,
+            queEs: 'La cantidad de clientes que hoy tienen su cuenta habilitada en el sistema — la base viva del negocio.',
+            comoSeCalcula: 'Se cuentan todos los clientes registrados cuyo estado sea **Activo**. Los clientes dados de baja o suspendidos no entran en este número.',
+            origen: `Módulo de **Clientes**. De esa misma tabla salen los ${stats.clientesFinal} clientes finales, ${stats.clientesRevendedor} revendedores y la presencia en ${stats.paisesCount} países.`,
+            action: { label: 'Ver Clientes', onClick: () => navigate('/admin/clients') },
+          })}
         />
         <StatCard
           icon={Package} title="Planes" value={stats.totalPlans} color="bg-blue-500"
           subtitle={`Catálogo vigente que respalda ${stats.activeSubscriptions} suscripciones activas hoy`}
-          onClick={() => navigate('/admin/plans')}
+          onClick={() => setExplain({
+            title: 'Planes', value: stats.totalPlans, icon: Package,
+            queEs: 'Cuántos planes de venta (mensual, semestral, anual…) están disponibles hoy en el catálogo para ofrecer a los clientes.',
+            comoSeCalcula: 'Se cuentan los planes marcados como **activos** en el catálogo. Los planes desactivados quedan por fuera aunque tengan historial.',
+            origen: `Módulo de **Planes**. Estos planes respaldan las ${stats.activeSubscriptions} suscripciones activas actuales.`,
+            action: { label: 'Ver Planes', onClick: () => navigate('/admin/plans') },
+          })}
         />
         <StatCard
           icon={FileText} title="Pantallas activas" value={pantallasActivasTotal} color="bg-green-500"
-          subtitle="Suma de pantallas por plan del Planificador — clic para ver Estatus Cliente"
-          onClick={() => navigate('/admin/planificador', { state: { openEstatusPanel: true } })}
+          subtitle="Suma de pantallas por plan del Planificador"
+          onClick={() => setExplain({
+            title: 'Pantallas activas', value: pantallasActivasTotal, icon: FileText,
+            queEs: 'El total de pantallas de streaming que están configuradas para clientes en el Planificador — la "base instalada" que genera el ingreso recurrente.',
+            comoSeCalcula: 'Se **suma la columna #** (cantidad de pantallas) de cada fila del Planificador. No es un conteo de filas: un cliente con 2 pantallas bajo el mismo registro aporta 2 a este total.',
+            origen: 'Módulo **Planificador** — cada fila representa un slot de pantalla dentro de una cuenta padre.',
+            action: { label: 'Ver Planificador', onClick: () => navigate('/admin/planificador', { state: { openEstatusPanel: true } }) },
+          })}
         />
         <StatCard
           icon={Tv} title="Dispositivos Activos" value={stats.totalDevices} color="bg-purple-500"
-          subtitle={`Módulo sin registros propios — el control operativo real vive en el Planificador: ${stats.totalPantallas} pantallas, ${stats.pantallasLibres} libres`}
-          onClick={() => navigate('/admin/devices')}
+          subtitle={`Inventario de equipos — ${stats.totalPantallas} pantallas, ${stats.pantallasLibres} libres en el Planificador`}
+          onClick={() => setExplain({
+            title: 'Dispositivos Activos', value: stats.totalDevices, icon: Tv,
+            queEs: 'Cuántos equipos físicos (Fire TV, ONN…) están registrados como activos en el inventario.',
+            comoSeCalcula: 'Se cuentan los dispositivos del inventario marcados como **activos**. Si este número está en cero es porque el módulo de inventario no tiene registros propios — el control operativo real vive en el Planificador.',
+            origen: `Módulo **Inventario Equipos**. El Planificador, por su parte, registra ${stats.totalPantallas} pantallas con ${stats.pantallasLibres} libres.`,
+            action: { label: 'Ver Inventario', onClick: () => navigate('/admin/devices') },
+          })}
         />
       </div>
 
-      {/* ─── KPIs operativos: ingresos y cartera ─────────────────────────── */}
+      {/* ─── KPIs operativos: cartera y vencimientos ─────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           icon={Clock} title="Pagos Pendientes" value={stats.pendingPayments} color="bg-amber-500"
-          subtitle="A la espera de conciliación — revísalos en Pagos antes de que se vuelvan cartera vencida"
-          onClick={() => navigate('/admin/payments')}
+          subtitle="A la espera de conciliación en el módulo de Pagos"
+          onClick={() => setExplain({
+            title: 'Pagos Pendientes', value: stats.pendingPayments, icon: Clock,
+            queEs: 'Pagos que fueron registrados pero aún no se han confirmado/conciliado — dinero que debería entrar pero todavía no está asegurado.',
+            comoSeCalcula: 'Se cuentan los registros de pago cuyo estado es **Pendiente**.',
+            origen: 'Módulo de **Pagos** (campo estado de cada pago).',
+            action: { label: 'Ver Pagos', onClick: () => navigate('/admin/payments') },
+          })}
         />
         <StatCard
           icon={AlertCircle} title="Pagos Vencidos" value={cuentasVencidas.length} color="bg-red-500"
           subtitle={cuentasVencidas.length > 0
-            ? 'Cuentas vencidas del Planificador — haz clic para ver cliente, fecha de vencimiento y días de mora'
+            ? 'Cuentas vencidas del Planificador — requieren contacto urgente'
             : 'Sin cuentas vencidas en el Planificador — cartera sana por ahora'}
-          onClick={() => setShowVencidasPanel(true)}
+          onClick={() => setExplain({
+            title: 'Pagos Vencidos', value: cuentasVencidas.length, icon: AlertCircle,
+            queEs: 'Pantallas de clientes cuya fecha de vencimiento **ya pasó** y siguen sin renovar — cada día que pasa aumenta el riesgo de perder al cliente.',
+            comoSeCalcula: 'Para cada pantalla del Planificador se compara la **fecha de finalización** (o fin real) contra la fecha de hoy. Si ya pasó, la pantalla se clasifica como vencida. Es la misma clasificación que usa la tarjeta "Vencidas" del Planificador.',
+            origen: 'Módulo **Planificador** — campos de fecha de finalización y fin real de cada pantalla.',
+            action: { label: 'Ver detalle de vencidas', onClick: () => setShowVencidasPanel(true) },
+          })}
         />
         <StatCard
           icon={TrendingUp} title="Próximas a vencer" value={proximasAVencer.length} color="bg-orange-500"
           subtitle={proximasAVencer.length > 0
-            ? `Cuentas del Planificador a ≤${planificador?.diasAlerta ?? 8} días de vencer — haz clic para ver cliente, fecha y días restantes`
-            : 'Sin cuentas próximas a vencer — buen momento para campañas de retención preventiva'}
-          onClick={() => setShowProximasPanel(true)}
+            ? `Cuentas a ≤${planificador?.diasAlerta ?? 8} días de vencer — oportunidad de renovación`
+            : 'Sin cuentas próximas a vencer'}
+          onClick={() => setExplain({
+            title: 'Próximas a vencer', value: proximasAVencer.length, icon: TrendingUp,
+            queEs: 'Pantallas que vencen dentro de los próximos días — la ventana ideal para contactar al cliente y asegurar la renovación **antes** del corte del servicio.',
+            comoSeCalcula: `Se calculan los días que faltan entre hoy y la fecha de vencimiento de cada pantalla. Si faltan **${planificador?.diasAlerta ?? 8} días o menos** (y aún no venció), entra en esta lista.`,
+            origen: 'Módulo **Planificador** — el umbral de alerta es configurable en el servidor.',
+            action: { label: 'Ver detalle', onClick: () => setShowProximasPanel(true) },
+          })}
         />
-      </div>
-
-      {/* ─── Pulso de otros módulos: lo que no se ve a simple vista ──────── */}
-      <div>
-        <div className="flex items-center gap-3 mb-4 pt-2">
-          <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl p-2.5 shadow-md">
-            <Activity size={22} className="text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-brand-accent">Pulso de otros módulos</h2>
-            <p className="text-sm text-gray-500">Señales clave de Bajas, Cuentas Padre, Costo Pantalla y Planificador que no aparecen en el resumen operativo, pero mueven el negocio</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            icon={UserX} title={`Bajas en ${stats.anioActual}`} value={stats.bajasEsteAnio} color="bg-rose-500"
-            subtitle={`${stats.bajasHistorico} históricas — equivalen a ${Math.round((stats.bajasHistorico / Math.max(stats.totalClients, 1)) * 100)}% de la base activa actual. Cada cancelación evitada protege el ingreso recurrente.`}
-            onClick={() => navigate('/admin/bajas')}
-          />
-          <StatCard
-            icon={Server} title="Cuentas Padre" value={stats.cuentasPadreTotal} color="bg-sky-600"
-            subtitle={`${stats.creditoCuentasPadreTotal.toLocaleString('es-CO')} cupos de pantalla en inventario — la materia prima detrás de cada nueva venta`}
-            onClick={() => navigate('/admin/cuentas-padre')}
-          />
-          <StatCard
-            icon={PiggyBank} title={`Inversión en recargas ${stats.anioActual}`} value={formatCurrency(stats.inversionRecargasAnio)} color="bg-slate-500"
-            subtitle="Costo operativo del año en curso — el insumo que define directamente el margen bruto reportado en la sección de Inteligencia de Negocio"
-            onClick={() => navigate('/admin/costo-pantalla')}
-          />
-          <StatCard
-            icon={Monitor} title="Pantallas disponibles" value={`${stats.pantallasLibres} de ${stats.totalPantallas}`} color="bg-emerald-500"
-            subtitle={stats.pantallasLibres > 0
-              ? 'Sin asignar en el Planificador — listas para activar una nueva venta hoy mismo, sin comprar más cupos'
-              : 'Ocupación al máximo — considera ampliar cupos en Cuentas Padre antes de la próxima campaña de activaciones'}
-            onClick={() => navigate('/admin/planificador')}
-          />
-        </div>
       </div>
 
       {bi && (
@@ -1037,8 +635,8 @@ export default function DashboardHome() {
               <BarChart3 size={22} className="text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-brand-accent">Inteligencia de Negocio · Ventas vs. Costos</h2>
-              <p className="text-sm text-gray-500">Comparativos año a año, márgenes y análisis financiero del comportamiento del negocio</p>
+              <h2 className="text-xl font-bold text-brand-accent">Resultados del negocio · Ventas vs. Costos</h2>
+              <p className="text-sm text-gray-500">Los cuatro números que resumen la salud financiera — haz clic en cualquier tarjeta para ver cómo se calcula</p>
             </div>
           </div>
 
@@ -1049,25 +647,76 @@ export default function DashboardHome() {
               value={formatCurrency(k.ingresosTotales)}
               growth={k.crecimientoIngresosUltimo}
               growthLabel={`vs. ${k.anioAnterior} (año cerrado)`}
+              onClick={() => setExplain({
+                title: 'Ingresos históricos', value: formatCurrency(k.ingresosTotales), icon: Wallet,
+                queEs: 'Todo el dinero que ha entrado al negocio por ventas de licencias desde que hay registros — el tamaño acumulado del negocio.',
+                comoSeCalcula: 'Se **suma el precio de venta de todas las ventas** registradas (renovaciones, activaciones y activaciones de pantalla). El % de variación compara el último año cerrado contra el anterior.',
+                origen: 'Módulo de **Pagos** — la tabla de ventas de licencias registrada e importada desde el Excel original.',
+                action: { label: 'Ver Pagos', onClick: () => navigate('/admin/payments') },
+              })}
             />
             <BiCard
               icon={PiggyBank} variant="light" label="Costos históricos"
               value={formatCurrency(k.costosTotales)}
               growth={k.crecimientoCostosUltimo}
               growthLabel={`vs. ${k.anioAnterior} (año cerrado)`}
+              onClick={() => setExplain({
+                title: 'Costos históricos', value: formatCurrency(k.costosTotales), icon: PiggyBank,
+                queEs: 'Todo lo que el negocio ha gastado en comprar los créditos/recargas que hacen funcionar las pantallas — el costo directo del servicio.',
+                comoSeCalcula: 'Se suma el **costo en pesos de cada recarga** más el **impuesto 4x1000** de cada transacción. No incluye otros gastos (equipos, tiempo, internet) porque no están registrados en el sistema.',
+                origen: 'Módulo **Costo Pantalla** — cada fila es una recarga de créditos con su costo en USD, la TRM del día y el costo final en pesos.',
+                action: { label: 'Ver Costo Pantalla', onClick: () => navigate('/admin/costo-pantalla') },
+              })}
             />
             <BiCard
               icon={TrendingUp} variant="solid" label="Ganancia histórica"
               value={formatCurrency(k.margenTotal)}
               growth={crecimientoMargenUltimo}
               growthLabel={`vs. ${k.anioAnterior} (año cerrado) · margen ${k.margenPctTotal.toFixed(1)}%`}
+              onClick={() => setExplain({
+                title: 'Ganancia histórica', value: formatCurrency(k.margenTotal), icon: TrendingUp,
+                queEs: 'Lo que queda en el bolsillo después de pagar el costo de las recargas — la utilidad bruta acumulada del negocio.',
+                comoSeCalcula: '**Ingresos históricos − Costos históricos**. Es una resta directa: todo lo vendido menos todo lo gastado en recargas e impuesto 4x1000.',
+                origen: 'Cruce entre el módulo de **Pagos** (ingresos) y **Costo Pantalla** (costos).',
+                action: { label: 'Ver Análisis Financiero', onClick: () => navigate('/admin/analisis-financiero') },
+              })}
             />
             <BiCard
               icon={Percent} variant="outline" label="Margen bruto"
               value={`${k.margenPctTotal.toFixed(1)}%`}
               sub={`${k.margenPctUltimo?.toFixed(1)}% en ${k.anioActual}`}
+              onClick={() => setExplain({
+                title: 'Margen bruto', value: `${k.margenPctTotal.toFixed(1)}%`, icon: Percent,
+                queEs: 'De cada $100 que entran por ventas, cuántos quedan como ganancia después de pagar las recargas. Es el termómetro de eficiencia del negocio.',
+                comoSeCalcula: '**(Ganancia ÷ Ingresos) × 100**. Por ejemplo: si entran $100 y las recargas costaron $30, el margen bruto es 70%.',
+                origen: `Derivado de Pagos y Costo Pantalla. El margen del año en curso (${k.anioActual}) va en ${k.margenPctUltimo?.toFixed(1)}%.`,
+                action: { label: 'Ver Análisis Financiero', onClick: () => navigate('/admin/analisis-financiero') },
+              })}
             />
           </div>
+
+          {bi.comparativoYTD && (
+            <Card className="border-orange-100">
+              <CardBody className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Comparativo año corrido (YTD)</p>
+                  <p className="text-sm text-gray-600">{bi.comparativoYTD.etiqueta} {bi.comparativoYTD.anioActual} vs. {bi.comparativoYTD.anioAnterior}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign size={16} className="text-orange-500" />
+                  <span className="text-sm text-gray-500">Ingresos:</span>
+                  <span className="font-bold text-brand-accent">{formatCurrency(bi.comparativoYTD.ingresosActual)}</span>
+                  <GrowthBadge pct={bi.comparativoYTD.crecimientoIngresosPct} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <PiggyBank size={16} className="text-orange-500" />
+                  <span className="text-sm text-gray-500">Costos:</span>
+                  <span className="font-bold text-brand-accent">{formatCurrency(bi.comparativoYTD.costosActual)}</span>
+                  <GrowthBadge pct={bi.comparativoYTD.crecimientoCostosPct} />
+                </div>
+              </CardBody>
+            </Card>
+          )}
 
           {/* ─── Gráficos: evolución anual (línea) + comparativo por año (barras) ─── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1089,9 +738,6 @@ export default function DashboardHome() {
                     <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4 }} />
                     <Line type="monotone" dataKey="costos" name="Costos" stroke="#94a3b8" strokeWidth={2.5} dot={{ r: 4 }} />
                     <Line type="monotone" dataKey="margen" name="Ganancia" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4 }} />
-                    {/* Barras invisibles: solo sirven de soporte para las etiquetas de
-                        valor y % de cada línea (LabelList sobre <Line> no se renderiza
-                        en esta versión de recharts) */}
                     <Bar dataKey="ingresos" fill="transparent" legendType="none" barSize={2} isAnimationActive={false}>
                       <LabelList dataKey="ingresos" position="top" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#f97316' }} />
                     </Bar>
@@ -1140,183 +786,6 @@ export default function DashboardHome() {
               </CardBody>
             </Card>
           </div>
-
-          {bi.comparativoYTD && (
-            <Card className="border-orange-100">
-              <CardBody className="flex flex-wrap items-center gap-x-8 gap-y-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Comparativo año corrido (YTD)</p>
-                  <p className="text-sm text-gray-600">{bi.comparativoYTD.etiqueta} {bi.comparativoYTD.anioActual} vs. {bi.comparativoYTD.anioAnterior}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign size={16} className="text-orange-500" />
-                  <span className="text-sm text-gray-500">Ingresos:</span>
-                  <span className="font-bold text-brand-accent">{formatCurrency(bi.comparativoYTD.ingresosActual)}</span>
-                  <GrowthBadge pct={bi.comparativoYTD.crecimientoIngresosPct} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <PiggyBank size={16} className="text-orange-500" />
-                  <span className="text-sm text-gray-500">Costos:</span>
-                  <span className="font-bold text-brand-accent">{formatCurrency(bi.comparativoYTD.costosActual)}</span>
-                  <GrowthBadge pct={bi.comparativoYTD.crecimientoCostosPct} />
-                </div>
-              </CardBody>
-            </Card>
-          )}
-
-          {/* ─── Indicadores de rentabilidad y ventas (lectura financiera) ──── */}
-          <div className="flex items-center gap-3 pt-4">
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-2.5 shadow-md">
-              <Target size={22} className="text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-brand-accent">Rentabilidad y Ventas · Lectura financiera</h2>
-              <p className="text-sm text-gray-500">Indicadores que un analista financiero y un economista usarían para medir eficiencia, riesgo de cartera y productividad comercial</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <BiCard
-              icon={Scale} variant="solid" label="Markup sobre el costo"
-              value={`${k.markupPct.toFixed(1)}%`}
-              sub={`cada $1.000 de costo deja ${formatCurrency(Math.round(k.markupPct * 10))} de margen bruto`}
-              tag={tagMarkup(k)}
-            />
-            <BiCard
-              icon={Activity} variant="light" label="Cobertura de costos"
-              value={`${k.coberturaCostos.toFixed(2)}×`}
-              sub="veces que el ingreso operativo cubre el costo de pantallas/cuentas"
-              tag={tagCobertura(k)}
-            />
-            <BiCard
-              icon={Target} variant="outline" label="Punto de equilibrio"
-              value={`${k.puntoEquilibrioVentas.toLocaleString('es-CO')} ventas`}
-              sub={`al ticket promedio de ${formatCurrency(k.ticketPromedio)} para cubrir el costo total`}
-              tag={tagPuntoEquilibrio(k, bi.porAnio)}
-            />
-            <BiCard
-              icon={Users} variant="light" label="Concentración de cartera"
-              value={`${k.concentracionTop20Pct.toFixed(1)}%`}
-              sub={`del ingreso histórico lo aporta el 20% top de clientes (${Math.ceil(k.numClientesCompradores * 0.2)} de ${k.numClientesCompradores})`}
-              tag={tagConcentracion(k)}
-            />
-            <BiCard
-              icon={UserCheck} variant="outline" label="ARPU · ingreso por cliente"
-              value={formatCurrency(k.arpu)}
-              sub={`promedio histórico sobre ${k.numClientesCompradores} clientes con compras registradas`}
-              tag={tagArpu(k)}
-              onClick={() => setShowArpuPanel(true)}
-            />
-            <BiCard
-              icon={Tv} variant="light" label="Ingreso por pantalla"
-              value={formatCurrency(k.ingresoPorPantalla)}
-              sub={`costo por pantalla ${formatCurrency(k.costoPorPantalla)} · ${k.totalPantallas} pantallas en operación`}
-              tag={tagPantalla(k)}
-            />
-            <BiCard
-              icon={TrendingUp} variant={k.momentumMrrPct >= 0 ? 'solid' : 'outline'} label="Momentum MRR"
-              value={`${k.momentumMrrPct > 0 ? '+' : ''}${k.momentumMrrPct.toFixed(1)}%`}
-              sub={`bruto: ${k.momentumVentasPct > 0 ? '+' : ''}${k.momentumVentasPct.toFixed(1)}% · MRR corregido (sin ruido de planes largos)`}
-              tag={k.momentumMrrPct > 5  ? { tone: 'good',  text: 'Acelerando (MRR)' }
-                : k.momentumMrrPct > -5  ? { tone: 'info',  text: 'Ritmo estable' }
-                : { tone: 'warn', text: 'Desacelerando — vigilar' }}
-            />
-            <BiCard
-              icon={Repeat} variant="light" label="Renovaciones"
-              value={`${k.tasaRenovacionPct.toFixed(1)}%`}
-              sub={`del ingreso total · churn ${k.churnPct.toFixed(1)}%`}
-            />
-          </div>
-
-          {/* ─── Gráficos: concentración de cartera y productividad ────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="border-orange-100">
-              <CardHeader className="border-orange-50">
-                <CardTitle>Concentración de ingresos por cliente</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">% del ingreso acumulado según el % de clientes (ordenados de mayor a menor aporte) — la brecha frente a la diagonal mide el riesgo de dependencia de la cartera</p>
-              </CardHeader>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={bi.paretoIngresos} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="paretoFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#f97316" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                    <XAxis dataKey="pctClientes" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#78716c' }} />
-                    <YAxis tickFormatter={(v) => `${v}%`} domain={[0, 100]} tick={{ fontSize: 11, fill: '#78716c' }} />
-                    <Tooltip formatter={(v, name) => [`${v}%`, name]} labelFormatter={(v) => `${v}% de los clientes`} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Area type="monotone" dataKey="pctIngresos" name="% del ingreso acumulado" stroke="#f97316" strokeWidth={2.5} fill="url(#paretoFill)" />
-                    <Line type="monotone" dataKey="pctClientes" name="Distribución equitativa (referencia)" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-                <ChartInsight text={narrarPareto(bi.paretoIngresos, k)} />
-              </CardBody>
-            </Card>
-
-            <Card className="border-orange-100">
-              <CardHeader className="border-orange-50">
-                <CardTitle>Productividad por pantalla</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">Ingreso, costo y margen promedio por cada una de las {k.totalPantallas} pantallas en operación — la "unidad económica" del negocio</p>
-              </CardHeader>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart
-                    data={[
-                      { concepto: 'Ingreso', valor: k.ingresoPorPantalla },
-                      { concepto: 'Costo', valor: k.costoPorPantalla },
-                      { concepto: 'Margen', valor: k.ingresoPorPantalla - k.costoPorPantalla },
-                    ]}
-                    layout="vertical"
-                    margin={{ top: 10, right: 70, left: 10, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} horizontal={false} />
-                    <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 11, fill: '#78716c' }} />
-                    <YAxis type="category" dataKey="concepto" tick={{ fontSize: 12, fill: '#78716c', fontWeight: 600 }} width={70} />
-                    <Tooltip formatter={(v) => formatCurrency(v)} />
-                    <Bar dataKey="valor" radius={[0, 6, 6, 0]} barSize={32}>
-                      <Cell fill="#f97316" />
-                      <Cell fill="#94a3b8" />
-                      <Cell fill="#16a34a" />
-                      <LabelList dataKey="valor" position="right" formatter={(v) => formatCurrency(v)} style={{ ...LABEL_STYLE, fontSize: 12 }} />
-                    </Bar>
-                  </ComposedChart>
-                </ResponsiveContainer>
-                <ChartInsight text={narrarProductividad(k)} />
-              </CardBody>
-            </Card>
-          </div>
-
-          {/* ─── Gráfico: momentum mensual de ventas ───────────────────────── */}
-          <Card className="border-orange-100">
-            <CardHeader className="border-orange-50">
-              <CardTitle>Momentum de ventas — variación mensual de ingresos</CardTitle>
-              <p className="text-sm text-gray-400 mt-0.5">
-                Variación porcentual mes a mes de los últimos periodos con actividad; su promedio es el indicador "Momentum de ventas" (
-                {k.momentumVentasPct > 0 ? '+' : ''}{k.momentumVentasPct.toFixed(1)}%)
-              </p>
-            </CardHeader>
-            <CardBody>
-              <ResponsiveContainer width="100%" height={260}>
-                <ComposedChart data={momentumSerie} margin={{ top: 24, right: 20, left: 0, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#78716c' }} />
-                  <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#78716c' }} />
-                  <Tooltip formatter={(v) => [`${v}%`, 'Variación']} />
-                  <Bar dataKey="variacionPct" name="Variación mensual %" radius={[6, 6, 0, 0]} barSize={28}>
-                    {momentumSerie.map((m, i) => (
-                      <Cell key={i} fill={m.variacionPct >= 0 ? '#16a34a' : '#ef4444'} />
-                    ))}
-                    <LabelList dataKey="variacionPct" content={<MomentumValueLabel />} />
-                  </Bar>
-                </ComposedChart>
-              </ResponsiveContainer>
-              <ChartInsight text={narrarMomentum(momentumSerie, k)} />
-            </CardBody>
-          </Card>
 
           {/* ─── Gráfico: tendencia mensual + MRR normalizado ─────────────── */}
           <Card className="border-orange-100">
@@ -1394,8 +863,6 @@ export default function DashboardHome() {
             <CardBody>
               {resumenVentasLicencia?.totalVentas > 0 ? (
                 <>
-                  {/* Resumen: si hay un mes seleccionado se muestra su detalle puntual,
-                      de lo contrario el resumen del año completo. */}
                   {resumenVentasLicencia.mesDetalle ? (() => {
                     const { mesActual, mesAnteriorAnio, ticketPromedioMes, crecimientoIngresosMesPct, crecimientoVentasMesPct, pctDelAnio } = resumenVentasLicencia.mesDetalle
                     const nombreMes = MES_LABELS[mesVentasLicencia - 1]
@@ -1491,198 +958,7 @@ export default function DashboardHome() {
             </CardBody>
           </Card>
 
-          {/* ─── MRR / ARR normalizado ─────────────────────────────────────── */}
-          {(() => {
-            const k = bi.kpis
-            return (
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-gradient-to-br from-violet-500 to-violet-700 rounded-xl p-2.5 shadow-md">
-                    <Repeat size={22} className="text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-brand-accent">MRR · Ingreso Recurrente Mensual</h2>
-                    <p className="text-sm text-gray-500">Ingresos normalizados por duración de plan — corrige la distorsión de planes anuales y semestrales en el momentum</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                  <BiCard icon={Wallet} variant="solid" label={`MRR · ${k.mrrMesLabel || 'Último mes'}`}
-                    value={formatCurrency(k.mrrActual)}
-                    sub="ingreso recurrente mensual normalizado por duración de plan"
-                    tag={k.mrrActual > 0 ? { tone: 'info', text: 'Base recurrente real' } : null}
-                  />
-                  <BiCard icon={PiggyBank} variant="light" label="ARR estimado"
-                    value={formatCurrency(k.arrActual)}
-                    sub="MRR × 12 — proyección anualizada del ingreso recurrente actual"
-                    tag={k.arrActual > 0 ? { tone: 'info', text: 'Proyección sostenida' } : null}
-                  />
-                  <BiCard icon={TrendingUp}
-                    variant={k.crecimientoMrrMomPct == null ? 'light' : k.crecimientoMrrMomPct >= 0 ? 'solid' : 'outline'}
-                    label="Crecimiento MRR · MoM"
-                    value={k.crecimientoMrrMomPct != null ? `${k.crecimientoMrrMomPct >= 0 ? '+' : ''}${k.crecimientoMrrMomPct.toFixed(1)}%` : '—'}
-                    sub="variación del MRR normalizado respecto al mes anterior"
-                    tag={k.crecimientoMrrMomPct != null
-                      ? k.crecimientoMrrMomPct >= 5  ? { tone: 'good', text: 'Crecimiento MRR sólido' }
-                      : k.crecimientoMrrMomPct >= -5 ? { tone: 'info', text: 'MRR estable' }
-                      : { tone: 'warn', text: 'MRR en contracción' }
-                      : null}
-                  />
-                  <BiCard icon={Activity}
-                    variant={k.momentumMrrPct >= 0 ? 'solid' : 'outline'}
-                    label="Momentum MRR (7 meses)"
-                    value={`${k.momentumMrrPct > 0 ? '+' : ''}${k.momentumMrrPct.toFixed(1)}%`}
-                    sub="promedio MoM del MRR normalizado — señal de tendencia sin ruido de planes largos"
-                    tag={k.momentumMrrPct > 5  ? { tone: 'good', text: 'Acelerando (MRR)' }
-                      : k.momentumMrrPct > -5  ? { tone: 'info', text: 'Ritmo MRR estable' }
-                      : { tone: 'warn', text: 'MRR desacelerando' }}
-                  />
-                </div>
-
-                {/* Mix de planes por contribución MRR */}
-                <Card className="border-violet-100">
-                  <CardHeader className="border-violet-50">
-                    <CardTitle>Mix de planes por contribución al MRR histórico</CardTitle>
-                    <p className="text-sm text-gray-400 mt-0.5">Distribución del ingreso recurrente total generado, por tipo de plan</p>
-                  </CardHeader>
-                  <CardBody>
-                    <div className="space-y-3">
-                      {(bi.mrrPorTipoPlan || []).map((p, i) => {
-                        const PLAN_COLORS = { 'Plan Mensual': '#f97316', 'Plan Semestral': '#7c3aed', 'Plan Anual': '#16a34a' }
-                        const color = PLAN_COLORS[p.plan] || '#64748b'
-                        return (
-                          <div key={i}>
-                            <div className="flex items-center justify-between text-sm mb-1">
-                              <span className="font-semibold text-slate-700">{p.plan}</span>
-                              <span className="text-slate-500">{formatCurrency(p.mrr)} · <strong style={{ color }}>{p.pct}%</strong></span>
-                            </div>
-                            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full transition-all" style={{ width: `${p.pct}%`, backgroundColor: color }} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <ChartInsight text={narrarMrr(bi)} />
-                  </CardBody>
-                </Card>
-              </div>
-            )
-          })()}
-
-          {/* ─── LTV · Valor de Vida del Cliente ──────────────────────────── */}
-          {bi.ltv && (() => {
-            const ltv = bi.ltv
-            const QUINTIL_COLORS = ['#94a3b8', '#60a5fa', '#34d399', '#f97316', '#a855f7']
-            return (
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-gradient-to-br from-teal-500 to-teal-700 rounded-xl p-2.5 shadow-md">
-                    <Gem size={22} className="text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-brand-accent">LTV · Valor de Vida del Cliente</h2>
-                    <p className="text-sm text-gray-500">Cuánto ingreso generó cada cliente desde su primera activación — define el techo de lo que vale invertir en retenerlo antes de perderlo</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                  <BiCard icon={Gem} variant="solid" label="LTV promedio"
-                    value={formatCurrency(ltv.ltvPromedio)}
-                    sub={`sobre ${ltv.numClientes} clientes con historial de compras`}
-                    tag={tagLtv(ltv.ltvPromedio)}
-                  />
-                  <BiCard icon={Wallet} variant="light" label="ARPU mensual"
-                    value={formatCurrency(ltv.arpuMensualLtv)}
-                    sub="ingreso promedio por cliente por mes activo"
-                    tag={{ tone: 'info', text: 'Tasa de consumo mensual' }}
-                  />
-                  <BiCard icon={Clock} variant="outline" label="Vida promedio"
-                    value={`${ltv.vidaPromedioMeses} meses`}
-                    sub="desde primera activación hasta última transacción registrada"
-                    tag={ltv.vidaPromedioMeses >= 12
-                      ? { tone: 'good', text: 'Clientes de largo aliento' }
-                      : ltv.vidaPromedioMeses >= 6
-                      ? { tone: 'info', text: 'Vida media razonable' }
-                      : { tone: 'warn', text: 'Alta rotación — reforzar retención' }}
-                  />
-                  <BiCard
-                    icon={AlertCircle}
-                    variant={ltv.valorEnRiesgo > 0 ? 'outline' : 'light'}
-                    label="Valor LTV en riesgo"
-                    value={formatCurrency(ltv.valorEnRiesgo)}
-                    sub={`LTV histórico de ${ltv.clientesEnRiesgoCount} clientes con pantallas vencidas o próximas`}
-                    tag={tagValorEnRiesgo(ltv.valorEnRiesgo, ltv.ltvPromedio)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Card className="border-teal-100">
-                    <CardHeader className="border-teal-50">
-                      <CardTitle>Distribución del LTV por quintil</CardTitle>
-                      <p className="text-sm text-gray-400 mt-0.5">Clientes agrupados en 5 segmentos según su LTV acumulado — de menor a mayor aporte histórico</p>
-                    </CardHeader>
-                    <CardBody>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <ComposedChart data={ltv.distribucion} margin={{ top: 22, right: 20, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#99f6e4" opacity={0.4} />
-                          <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#78716c' }} />
-                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#78716c' }} />
-                          <Tooltip
-                            formatter={(v, name) => [v, 'Clientes']}
-                            labelFormatter={(label, payload) => {
-                              const d = payload?.[0]?.payload
-                              return d ? `${label} · hasta ${formatCurrency(d.maxLtv)}` : label
-                            }}
-                          />
-                          <Bar dataKey="cantidad" name="Clientes" radius={[6, 6, 0, 0]} barSize={38}>
-                            {(ltv.distribucion || []).map((_, i) => (
-                              <Cell key={i} fill={QUINTIL_COLORS[i % QUINTIL_COLORS.length]} />
-                            ))}
-                            <LabelList dataKey="cantidad" position="top" formatter={(v) => v.toLocaleString('es-CO')} style={{ ...LABEL_STYLE, fontSize: 11 }} />
-                          </Bar>
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </CardBody>
-                  </Card>
-
-                  <Card className="border-teal-100">
-                    <CardHeader className="border-teal-50">
-                      <CardTitle>Percentiles de LTV</CardTitle>
-                      <p className="text-sm text-gray-400 mt-0.5">La brecha entre P25 y P90 revela la asimetría de la cartera — cuánto "valen" los clientes en distintos segmentos</p>
-                    </CardHeader>
-                    <CardBody>
-                      <div className="space-y-4 py-2">
-                        {[
-                          { label: 'P25 · cuartil bajo',   val: ltv.percentiles.p25, pct: 25,  color: '#94a3b8' },
-                          { label: 'P50 · mediana',         val: ltv.percentiles.p50, pct: 50,  color: '#60a5fa' },
-                          { label: 'P75 · cuartil alto',   val: ltv.percentiles.p75, pct: 75,  color: '#34d399' },
-                          { label: 'P90 · top 10%',        val: ltv.percentiles.p90, pct: 90,  color: '#a855f7' },
-                          { label: 'Máximo histórico',     val: ltv.percentiles.max, pct: 100, color: '#f97316' },
-                        ].map(({ label, val, pct, color }) => {
-                          const barPct = ltv.percentiles.max > 0 ? Math.round((val / ltv.percentiles.max) * 100) : 0
-                          return (
-                            <div key={label}>
-                              <div className="flex items-center justify-between text-sm mb-1">
-                                <span className="font-medium text-slate-600">{label}</span>
-                                <span className="font-bold" style={{ color }}>{formatCurrency(val)}</span>
-                              </div>
-                              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full transition-all" style={{ width: `${barPct}%`, backgroundColor: color }} />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                      <ChartInsight text={narrarLtv(ltv)} />
-                    </CardBody>
-                  </Card>
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* ─── Desglose por tipo de pago ─────────────────────────────────── */}
+          {/* ─── Composición del ingreso + tabla año a año ─────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <Card className="border-orange-100 lg:col-span-2">
               <CardHeader className="border-orange-50">
@@ -1713,7 +989,6 @@ export default function DashboardHome() {
               </CardBody>
             </Card>
 
-            {/* ─── Tabla comparativa por año ───────────────────────────────── */}
             <Card className="border-orange-100 lg:col-span-3">
               <CardHeader className="border-orange-50">
                 <CardTitle>Comparativo año a año</CardTitle>
@@ -1742,7 +1017,7 @@ export default function DashboardHome() {
                               {mejorAnio && r.anio === mejorAnio.anio && (
                                 <SmartTag tone="good" icon={Trophy}>Mejor año histórico</SmartTag>
                               )}
-                              {anioEnCurso && r.anio === anioEnCurso && (
+                              {anioEnCurso && Number(r.anio) === Number(anioEnCurso) && (
                                 <SmartTag tone="info" icon={Hourglass}>Año en curso</SmartTag>
                               )}
                             </span>
@@ -1758,109 +1033,6 @@ export default function DashboardHome() {
                     })()}
                   </tbody>
                 </table>
-              </CardBody>
-            </Card>
-          </div>
-
-          {/* ─── Cruce por módulo: Bajas, Clientes y Planificador ──────────── */}
-          <div className="flex items-center gap-3 pt-4">
-            <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl p-2.5 shadow-md">
-              <Scale size={22} className="text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-brand-accent">Cruce por módulo · Bajas, Clientes y Planificador</h2>
-              <p className="text-sm text-gray-500">Comparativos año a año y composición de cartera, leídos directamente desde Bajas, Clientes y Planificador — no solo desde Pagos</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="border-orange-100">
-              <CardHeader className="border-orange-50">
-                <CardTitle>Bajas — comparativo año a año</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">Cancelaciones registradas por año, según el módulo de Bajas — la otra cara de la moneda del crecimiento de la cartera</p>
-              </CardHeader>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={260}>
-                  <ComposedChart data={bi.bajasPorAnioDetalle} margin={{ top: 22, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                    <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#78716c' }} allowDecimals={false} />
-                    <Tooltip formatter={(v, name) => [v, name === 'total' ? 'Bajas' : name]} labelFormatter={(v) => `Año ${v}`} />
-                    <Bar dataKey="total" name="Bajas" radius={[6, 6, 0, 0]} barSize={36}>
-                      {(bi.bajasPorAnioDetalle || []).map((_, i) => <Cell key={i} fill="#f43f5e" />)}
-                      <LabelList dataKey="total" position="top" formatter={(v) => v.toLocaleString('es-CO')} style={{ ...LABEL_STYLE, fontSize: 12 }} />
-                    </Bar>
-                  </ComposedChart>
-                </ResponsiveContainer>
-                <ChartInsight text={narrarBajasPorAnio(bi.bajasPorAnioDetalle)} />
-              </CardBody>
-            </Card>
-
-            <Card className="border-orange-100">
-              <CardHeader className="border-orange-50">
-                <CardTitle>Clientes — distribución geográfica</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">Países con más clientes registrados, según el módulo de Clientes (tabla de clientes importada)</p>
-              </CardHeader>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={260}>
-                  <ComposedChart data={bi.paisesClientes} layout="vertical" margin={{ top: 10, right: 40, left: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#78716c' }} />
-                    <YAxis type="category" dataKey="pais" tick={{ fontSize: 11, fill: '#78716c' }} width={90} />
-                    <Tooltip formatter={(v, name, p) => [`${v} clientes (${p.payload.pct}%)`, 'Cantidad']} />
-                    <Bar dataKey="cantidad" name="Clientes" radius={[0, 6, 6, 0]} barSize={18}>
-                      {(bi.paisesClientes || []).map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                      <LabelList dataKey="cantidad" position="right" formatter={(v) => v.toLocaleString('es-CO')} style={{ ...LABEL_STYLE, fontSize: 11 }} />
-                    </Bar>
-                  </ComposedChart>
-                </ResponsiveContainer>
-                <ChartInsight text={narrarGeografia(bi.paisesClientes)} />
-              </CardBody>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <Card className="border-orange-100 lg:col-span-2">
-              <CardHeader className="border-orange-50">
-                <CardTitle>Planificador — salud operativa</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">Pantallas según su tipo de alerta en el Planificador</p>
-              </CardHeader>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={(bi.planificadorAlertas || []).map(a => ({ name: a.alerta, value: a.cantidad }))}
-                      dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={3}
-                      label={renderDonutLabel} labelLine={false}
-                    >
-                      {(bi.planificadorAlertas || []).map((a, i) => (
-                        <Cell key={i} fill={a.alerta === 'Sin novedad' ? '#16a34a' : a.alerta === 'VENCIDO' ? '#ef4444' : a.alerta === 'PROXIMO A VENCER' ? '#f97316' : '#a855f7'} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v, name) => [`${v} pantallas`, name]} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-1.5 mt-1">
-                  {(bi.planificadorAlertas || []).map((a, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2 text-gray-600">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: a.alerta === 'Sin novedad' ? '#16a34a' : a.alerta === 'VENCIDO' ? '#ef4444' : a.alerta === 'PROXIMO A VENCER' ? '#f97316' : '#a855f7' }} />
-                        {a.alerta}
-                      </span>
-                      <span className="font-semibold text-brand-accent">{a.cantidad}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-
-            <Card className="border-orange-100 lg:col-span-3">
-              <CardHeader className="border-orange-50">
-                <CardTitle>Lectura operativa del Planificador</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">Qué tan saludable está la base instalada de pantallas hoy, y dónde priorizar la gestión</p>
-              </CardHeader>
-              <CardBody>
-                <ChartInsight text={narrarSaludPlanificador(bi.planificadorAlertas, bi.pantallasConDeuda, k.totalPantallas)} />
               </CardBody>
             </Card>
           </div>
