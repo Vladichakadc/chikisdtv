@@ -8,39 +8,13 @@ import {
 } from 'lucide-react'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
-import { Card, CardBody } from '../../components/ui/Card'
+import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
-
-// ─── KPI Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ icon: Icon, label, value, sub, variant }) {
-  const styles = {
-    solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
-    light:   'bg-white border-2 border-orange-200 text-orange-700',
-    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
-  }
-  const iconBg = {
-    solid:   'bg-white/20',
-    light:   'bg-orange-100',
-    outline: 'bg-orange-200/60',
-  }
-  return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
-          <p className="text-3xl font-bold mt-1">{value}</p>
-          {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-orange-500'}`}>{sub}</p>}
-        </div>
-        <div className={`${iconBg[variant]} rounded-lg p-3`}>
-          <Icon size={24} />
-        </div>
-      </div>
-    </div>
-  )
-}
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts'
+import { ModuleStatCard as StatCard, ChartInsight, PIE_COLORS, LABEL_STYLE, renderDonutLabel } from './dashboard/biShared'
 
 // ─── Icono de orden ───────────────────────────────────────────────────────────
 
@@ -205,6 +179,7 @@ export default function PaymentsPage() {
   const monthMenuRef = useRef(null)
   const [sortCol, setSortCol]   = useState('fecha')
   const [sortDir, setSortDir]   = useState('desc')
+  const [explain, setExplain]   = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [form, setForm]         = useState(EMPTY)
@@ -567,6 +542,33 @@ export default function PaymentsPage() {
     return { total, ingresos, renovaciones, activaciones }
   }, [searched])
 
+  // ─── Composición financiera del resultado filtrado ─────────────────────────
+  // Ingresos por medio de pago y por tipo de plan — mismos registros que las
+  // tarjetas, por lo que los totales siempre coinciden entre sí.
+  const porMedioPago = useMemo(() => {
+    const map = {}
+    for (const r of searched) {
+      const medio = (r.medioPago || '').trim() || 'Sin registrar'
+      map[medio] = (map[medio] || 0) + (Number(r.precioVenta) || 0)
+    }
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value)
+  }, [searched])
+
+  const porTipoPlan = useMemo(() => {
+    const map = {}
+    for (const r of searched) {
+      const plan = (r.tipoPlan || '').trim() || 'Sin clasificar'
+      if (!map[plan]) map[plan] = { plan, ingresos: 0, ventas: 0 }
+      map[plan].ingresos += Number(r.precioVenta) || 0
+      map[plan].ventas += 1
+    }
+    return Object.values(map)
+      .map(p => ({ ...p, ingresos: Math.round(p.ingresos), ticket: p.ventas > 0 ? Math.round(p.ingresos / p.ventas) : 0 }))
+      .sort((a, b) => b.ingresos - a.ingresos)
+  }, [searched])
+
   const filtered = useMemo(() => {
     return [...searched].sort((a, b) => {
       let va = a[sortCol] ?? ''
@@ -600,12 +602,96 @@ export default function PaymentsPage() {
         </button>
       </div>
 
+      <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={ShoppingCart} label="Total Registros"  value={stats.total.toLocaleString()}          variant="solid"   sub={(search || selectedYears !== null || selectedMonths !== null) ? 'Resultados filtrados' : 'Histórico completo'} />
-        <StatCard icon={DollarSign}   label="Ingresos Totales" value={fmtCOP(stats.ingresos)}                variant="light"   sub="Licencias vendidas" />
-        <StatCard icon={RotateCcw}    label="Renovaciones"     value={stats.renovaciones.toLocaleString()}   variant="outline" sub="Clientes recurrentes" />
-        <StatCard icon={Zap}          label="Activaciones"     value={stats.activaciones.toLocaleString()}   variant="light"   sub="Nuevas pantallas" />
+        <StatCard icon={ShoppingCart} label="Total Registros"  value={stats.total.toLocaleString()}          variant="solid"   sub={(search || selectedYears !== null || selectedMonths !== null) ? 'Resultados filtrados' : 'Histórico completo'}
+          onClick={() => setExplain({
+            title: 'Total Registros', value: stats.total.toLocaleString(), icon: ShoppingCart,
+            queEs: 'Cuántas ventas de licencias hay en la vista actual. Si tienes un filtro de búsqueda, año o mes activo, el número refleja solo lo filtrado.',
+            comoSeCalcula: 'Conteo simple de las filas de la tabla de ventas que pasan el filtro activo. **Sin filtros, coincide con el histórico completo.**',
+            origen: 'Tabla de ventas de licencias de este módulo (importada del Excel original y alimentada con cada venta nueva).',
+          })} />
+        <StatCard icon={DollarSign}   label="Ingresos Totales" value={fmtCOP(stats.ingresos)}                variant="light"   sub="Licencias vendidas"
+          onClick={() => setExplain({
+            title: 'Ingresos Totales', value: fmtCOP(stats.ingresos), icon: DollarSign,
+            queEs: 'La plata que ha entrado por ventas de licencias en la vista actual (filtros incluidos).',
+            comoSeCalcula: 'Se **suma el precio de venta** de cada registro visible. Sin filtros activos, este número es el mismo "Ingresos históricos" que muestran el Dashboard y Análisis Financiero — todos beben de la misma tabla.',
+            origen: 'Campo precio de venta de cada fila de este módulo.',
+          })} />
+        <StatCard icon={RotateCcw}    label="Renovaciones"     value={stats.renovaciones.toLocaleString()}   variant="outline" sub="Clientes recurrentes"
+          onClick={() => setExplain({
+            title: 'Renovaciones', value: stats.renovaciones.toLocaleString(), icon: RotateCcw,
+            queEs: 'Ventas de clientes que ya estaban y volvieron a pagar — el ingreso recurrente y más barato de conseguir.',
+            comoSeCalcula: 'Se cuentan los registros visibles cuyo **tipo de pago es "Renovacion"**.',
+            origen: 'Campo tipo de pago de cada venta de este módulo.',
+          })} />
+        <StatCard icon={Zap}          label="Activaciones"     value={stats.activaciones.toLocaleString()}   variant="light"   sub="Nuevas pantallas"
+          onClick={() => setExplain({
+            title: 'Activaciones', value: stats.activaciones.toLocaleString(), icon: Zap,
+            queEs: 'Ventas que representan pantallas o clientes nuevos — el motor de crecimiento de la base.',
+            comoSeCalcula: 'Se cuentan los registros visibles cuyo tipo de pago **empieza por "Activacion"** (incluye "Activacion" y "Activacion Pantalla").',
+            origen: 'Campo tipo de pago de cada venta de este módulo.',
+          })} />
+      </div>
+
+      {/* ─── Composición financiera (refleja el filtro activo) ──────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <Card className="border-orange-100">
+          <CardHeader className="border-orange-50">
+            <CardTitle>Ingresos por medio de pago</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Por dónde entra la plata — refleja el filtro activo de la tabla</p>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={230}>
+              <PieChart>
+                <Pie data={porMedioPago} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={3} label={renderDonutLabel} labelLine={false}>
+                  {porMedioPago.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(v) => formatCurrency(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="space-y-1.5 mt-1">
+              {porMedioPago.slice(0, 5).map((p, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 text-gray-600">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                    {p.name}
+                  </span>
+                  <span className="font-semibold text-brand-accent">{formatCurrency(p.value)}</span>
+                </div>
+              ))}
+            </div>
+            <ChartInsight text={porMedioPago.length > 0
+              ? `**${porMedioPago[0].name}** es el canal de recaudo dominante con ${formatCurrency(porMedioPago[0].value)}${porMedioPago.length > 1 ? `, seguido de **${porMedioPago[1].name}** (${formatCurrency(porMedioPago[1].value)})` : ''}. Concentrar el recaudo en pocos canales simplifica la conciliación, pero conviene mantener al menos dos activos por si uno falla o cambia sus comisiones.`
+              : null} />
+          </CardBody>
+        </Card>
+
+        <Card className="border-orange-100">
+          <CardHeader className="border-orange-50">
+            <CardTitle>Ingresos por tipo de plan</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Qué planes sostienen el ingreso — con ticket promedio por plan</p>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={230}>
+              <ComposedChart data={porTipoPlan} layout="vertical" margin={{ top: 5, right: 70, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} horizontal={false} />
+                <XAxis type="number" tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`} tick={{ fontSize: 11, fill: '#78716c' }} />
+                <YAxis type="category" dataKey="plan" tick={{ fontSize: 11, fill: '#78716c' }} width={100} />
+                <Tooltip formatter={(v, name, p) => [`${formatCurrency(v)} · ${p.payload.ventas} ventas · ticket ${formatCurrency(p.payload.ticket)}`, 'Ingresos']} />
+                <Bar dataKey="ingresos" name="Ingresos" radius={[0, 6, 6, 0]} barSize={22}>
+                  {porTipoPlan.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  <LabelList dataKey="ingresos" position="right" formatter={(v) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : formatCurrency(v)} style={{ ...LABEL_STYLE, fontSize: 11 }} />
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={porTipoPlan.length > 0
+              ? `**${porTipoPlan[0].plan}** lidera con ${formatCurrency(porTipoPlan[0].ingresos)} en ${porTipoPlan[0].ventas} ventas (ticket promedio ${formatCurrency(porTipoPlan[0].ticket)}). Los planes largos (semestral/anual) adelantan caja pero "esconden" el churn; los mensuales dan señal temprana de fuga. El detalle del MRR normalizado por plan está en **Análisis Financiero**.`
+              : null} />
+          </CardBody>
+        </Card>
       </div>
 
       {/* Búsqueda y filtros */}

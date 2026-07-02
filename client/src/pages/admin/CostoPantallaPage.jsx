@@ -8,38 +8,18 @@ import {
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { useUi } from '../../context/UiContext'
-import { Card, CardBody } from '../../components/ui/Card'
+import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
+import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatDate, formatCurrency, formatUSD, formatNumber } from '../../utils/excelUtils'
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { ModuleStatCard as StatCard, ChartInsight } from './dashboard/biShared'
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ icon: Icon, label, value, sub, variant }) {
-  const styles = {
-    solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
-    light:   'bg-white border-2 border-orange-200 text-orange-700',
-    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
-  }
-  const iconBg = {
-    solid:   'bg-white/20',
-    light:   'bg-orange-100',
-    outline: 'bg-orange-200/60',
-  }
-  return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
-          <p className="text-3xl font-bold mt-1">{value}</p>
-          {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-orange-500'}`}>{sub}</p>}
-        </div>
-        <div className={`${iconBg[variant]} rounded-lg p-3`}>
-          <Icon size={24} />
-        </div>
-      </div>
-    </div>
-  )
+const MES_ORDEN = {
+  ENERO: 1, FEBRERO: 2, MARZO: 3, ABRIL: 4, MAYO: 5, JUNIO: 6,
+  JULIO: 7, AGOSTO: 8, SEPTIEMBRE: 9, OCTUBRE: 10, NOVIEMBRE: 11, DICIEMBRE: 12,
 }
+const MES_ABREV = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 // ─── Sort icon ────────────────────────────────────────────────────────────────
 
@@ -152,6 +132,7 @@ export default function CostoPantallaPage() {
   const [sortCol, setSortCol]   = useState('id')
   const [sortDir, setSortDir]   = useState('desc')
   const [showForm, setShowForm] = useState(false)
+  const [explain, setExplain]   = useState(null)
   const [editing, setEditing]   = useState(null)
   const [form, setForm]         = useState(EMPTY)
 
@@ -310,9 +291,32 @@ export default function CostoPantallaPage() {
   const stats = useMemo(() => {
     const total         = rows.length
     const totalCostoCOP = rows.reduce((s, r) => s + (Number(r.costoCOP) || 0), 0)
+    const totalImpuesto = rows.reduce((s, r) => s + (Number(r.impuesto4x100COP) || 0), 0)
     const totalCostoUSD = rows.reduce((s, r) => s + (Number(r.costoUSD) || 0), 0)
     const totalCreditos = rows.reduce((s, r) => s + (Number(r.creditos) || 0), 0)
-    return { total, totalCostoCOP, totalCostoUSD, totalCreditos }
+    return { total, totalCostoCOP, totalImpuesto, totalConImpuesto: totalCostoCOP + totalImpuesto, totalCostoUSD, totalCreditos }
+  }, [rows])
+
+  // Serie mensual: costo total (con 4x1000) + TRM promedio — la misma
+  // agregación que usan el Dashboard y Análisis Financiero como "OPEX".
+  const serieMensualCosto = useMemo(() => {
+    const map = {}
+    for (const r of rows) {
+      const m = MES_ORDEN[(r.mes || '').toString().trim().toUpperCase()] || 0
+      if (!m || !r.anio) continue
+      const key = `${r.anio}-${String(m).padStart(2, '0')}`
+      if (!map[key]) map[key] = { key, costo: 0, trmSum: 0, trmN: 0 }
+      map[key].costo += (Number(r.costoCOP) || 0) + (Number(r.impuesto4x100COP) || 0)
+      if (Number(r.trm) > 0) { map[key].trmSum += Number(r.trm); map[key].trmN += 1 }
+    }
+    return Object.values(map).sort((a, b) => a.key.localeCompare(b.key)).map(x => {
+      const [anio, mm] = x.key.split('-')
+      return {
+        label: `${MES_ABREV[Number(mm)]} ${anio.slice(2)}`,
+        costo: Math.round(x.costo),
+        trm: x.trmN > 0 ? Math.round(x.trmSum / x.trmN) : null,
+      }
+    })
   }, [rows])
 
   const filtered = useMemo(() => {
@@ -359,13 +363,78 @@ export default function CostoPantallaPage() {
         </div>
       </div>
 
+      <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
+
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={Monitor}     label="Total Recargas"    value={stats.total.toLocaleString()}        variant="solid"   sub="Histórico completo" />
-        <StatCard icon={DollarSign}  label="Total Costo COP"   value={fmtCOP(stats.totalCostoCOP)}        variant="light"   sub="Inversión en pesos" />
-        <StatCard icon={TrendingUp}  label="Total Costo USD"   value={fmtUSD(stats.totalCostoUSD)}        variant="outline" sub="Inversión en dólares" />
-        <StatCard icon={BarChart3}   label="Total Créditos"    value={stats.totalCreditos.toLocaleString()} variant="light"  sub="Créditos comprados" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <StatCard icon={Monitor}     label="Total Recargas"    value={stats.total.toLocaleString()}        variant="solid"   sub="Histórico completo"
+          onClick={() => setExplain({
+            title: 'Total Recargas', value: stats.total.toLocaleString(), icon: Monitor,
+            queEs: 'Cuántas compras de créditos se han hecho en el histórico — cada recarga es una transacción con el proveedor de IPTV.',
+            comoSeCalcula: 'Conteo simple de los registros de este módulo.',
+            origen: 'Tabla de costos de pantalla de este módulo.',
+          })} />
+        <StatCard icon={DollarSign}  label="Total Costo COP"   value={fmtCOP(stats.totalCostoCOP)}        variant="light"   sub="Sin impuesto 4x1000"
+          onClick={() => setExplain({
+            title: 'Total Costo COP', value: fmtCOP(stats.totalCostoCOP), icon: DollarSign,
+            queEs: 'Lo pagado en pesos por las recargas, **sin incluir** el impuesto 4x1000 de las transferencias.',
+            comoSeCalcula: 'Se suma el campo **Costo COP** de cada recarga. Ojo: el Dashboard y Análisis Financiero reportan el costo **con** impuesto — esa cifra es la tarjeta "Costo Total" de al lado.',
+            origen: 'Campo Costo COP de cada registro de este módulo.',
+          })} />
+        <StatCard icon={DollarSign}  label="Costo Total (+4x1000)" value={fmtCOP(stats.totalConImpuesto)}  variant="outline" sub="La cifra del Dashboard"
+          onClick={() => setExplain({
+            title: 'Costo Total (+4x1000)', value: fmtCOP(stats.totalConImpuesto), icon: DollarSign,
+            queEs: 'El costo real completo de operar: recargas más el impuesto 4x1000 que cobra el banco por cada transferencia.',
+            comoSeCalcula: '**Costo COP + impuesto 4x1000** de cada recarga, sumados. Esta es exactamente la cifra que el Dashboard muestra como "Costos históricos" y Análisis Financiero como "OPEX" — así todo coincide entre módulos.',
+            origen: `Campos Costo COP (${fmtCOP(stats.totalCostoCOP)}) + Imp. 4x1000 (${fmtCOP(stats.totalImpuesto)}) de este módulo.`,
+          })} />
+        <StatCard icon={TrendingUp}  label="Total Costo USD"   value={fmtUSD(stats.totalCostoUSD)}        variant="light" sub="Inversión en dólares"
+          onClick={() => setExplain({
+            title: 'Total Costo USD', value: fmtUSD(stats.totalCostoUSD), icon: TrendingUp,
+            queEs: 'Lo pagado en dólares por las recargas — el proveedor cobra en USD y la TRM del día define cuántos pesos cuesta.',
+            comoSeCalcula: 'Se suma el campo **Costo USD** de cada recarga. La relación con el costo en pesos es la TRM: Costo COP ÷ Costo USD.',
+            origen: 'Campo Costo USD de cada registro de este módulo.',
+          })} />
+        <StatCard icon={BarChart3}   label="Total Créditos"    value={stats.totalCreditos.toLocaleString()} variant="light"  sub="Créditos comprados"
+          onClick={() => setExplain({
+            title: 'Total Créditos', value: stats.totalCreditos.toLocaleString(), icon: BarChart3,
+            queEs: 'Cuántos créditos (cupos de cuenta) se han comprado en total — la "materia prima" que luego se convierte en pantallas vendibles.',
+            comoSeCalcula: 'Se suma el campo **Créditos** de cada recarga. Cada crédito habilita una cuenta que suele soportar 3 pantallas.',
+            origen: 'Campo Créditos de cada registro de este módulo.',
+          })} />
       </div>
+
+      {/* ─── Evolución mensual del costo (OPEX) y TRM ─────────────────────── */}
+      {serieMensualCosto.length >= 2 && (
+        <Card className="border-orange-100 mb-6">
+          <CardHeader className="border-orange-50">
+            <CardTitle>Evolución mensual del costo (con 4x1000) y TRM</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Barras = costo total del mes (la misma serie "OPEX" de Análisis Financiero) · Línea azul = TRM promedio pagada</p>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={250}>
+              <ComposedChart data={serieMensualCosto} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#78716c' }} interval="preserveStartEnd" />
+                <YAxis yAxisId="cop" tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`} tick={{ fontSize: 10, fill: '#78716c' }} width={52} />
+                <YAxis yAxisId="trm" orientation="right" tickFormatter={(v) => `$${v.toLocaleString('es-CO')}`} tick={{ fontSize: 10, fill: '#78716c' }} width={54} domain={['auto', 'auto']} />
+                <Tooltip formatter={(v, name) => name === 'TRM promedio' ? [`$${Number(v).toLocaleString('es-CO')}`, name] : [formatCurrency(v), name]} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar yAxisId="cop" dataKey="costo" name="Costo total" fill="#94a3b8" radius={[3, 3, 0, 0]} />
+                <Line yAxisId="trm" dataKey="trm" name="TRM promedio" stroke="#3b82f6" strokeWidth={2} dot={false} connectNulls />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={(() => {
+              const conTrm = serieMensualCosto.filter(m => m.trm != null)
+              if (conTrm.length < 2) return null
+              const primera = conTrm[0], ultima = conTrm[conTrm.length - 1]
+              const varTrm = ((ultima.trm - primera.trm) / primera.trm) * 100
+              const pico = serieMensualCosto.reduce((a, b) => (b.costo > a.costo ? b : a))
+              return `El mes de mayor inversión fue **${pico.label}** (${formatCurrency(pico.costo)}). La TRM promedio pasó de $${primera.trm.toLocaleString('es-CO')} a $${ultima.trm.toLocaleString('es-CO')} (${varTrm >= 0 ? '+' : ''}${varTrm.toFixed(1)}%) — ${varTrm > 5 ? 'cada crédito cuesta más pesos que antes: si el precio de venta no sube en la misma proporción, el margen se comprime.' : varTrm < -5 ? 'el dólar ha bajado y cada crédito cuesta menos pesos — un viento a favor del margen.' : 'la estabilidad cambiaria mantiene el costo unitario predecible.'}`
+            })()} />
+          </CardBody>
+        </Card>
+      )}
 
       {/* Búsqueda */}
       <div className="mb-4">
