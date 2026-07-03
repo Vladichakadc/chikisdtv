@@ -10,6 +10,14 @@ function excelSerial(n) {
   return new Date(Date.UTC(1899, 11, 30) + n * 86400000).toISOString().split('T')[0];
 }
 
+// "Cambio de Plan" (valor histórico del Excel) cuenta como renovación en el
+// negocio: la BD se normalizó el 2026-07-02 y ni un reimport del .xlsx ni una
+// venta creada por API deben reintroducirlo.
+function normalizeTipoPago(v) {
+  if (!v) return v;
+  return /^cambio de plan$/i.test(String(v).trim()) ? 'Renovacion' : v;
+}
+
 async function importVentas() {
   const filePath = path.join(__dirname, '../../../Tablas/1-orders_table_Ventas_LicenciaIPVT2024.xlsx');
   const wb = XLSX.readFile(filePath);
@@ -38,7 +46,7 @@ async function importVentas() {
       precioVenta:    row[17] != null ? Number(row[17]) : null,
       medioPago:      row[18] || null,
       itemQuantity:   row[19] != null ? Number(row[19]) : null,
-      tipoPago:       row[20] || null,
+      tipoPago:       normalizeTipoPago(row[20]) || null,
       tipoPlan:       row[21] || null,
       tipoPantalla:   row[22] || null,
       cuentaDedicada: row[23] || null,
@@ -85,6 +93,7 @@ function sanitizeVentaBody(body) {
     if (body[f] === undefined) continue;
     out[f] = (body[f] || '').toString().trim() || null;
   }
+  if (out.tipoPago) out.tipoPago = normalizeTipoPago(out.tipoPago);
 
   // Auto-calcular año y mes si se provee la fecha (Acción 8)
   if (out.fecha) {
