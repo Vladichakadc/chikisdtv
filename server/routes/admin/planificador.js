@@ -16,6 +16,15 @@ function estadoFromDias(dias) {
   return 'VIGENTE';
 }
 
+const DIAS_ALERTA_CP = 30;
+
+function calcCPVariante(dias) {
+  if (dias == null) return 'sin_fecha';
+  if (dias <= 0) return 'vencida';
+  if (dias <= DIAS_ALERTA_CP) return 'alerta';
+  return 'vigente';
+}
+
 // Detecta pantallas cuyo cuentaId no coincide con el prefijo de su idPantalla
 // DESPUÉS de que autoFixCuentaIdMismatches() ya corrió: lo que queda son filas
 // sin CuentaPadre coincidente — requieren revisión manual.
@@ -227,7 +236,77 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
   else await autoFixCuentaIdMismatches();   // self-healing en cada carga sobre BD existente
   const records = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-  res.json({ diasAlerta: DIAS_ALERTA, pantallas, inconsistencias: findCuentaIdMismatches(pantallas) });
+
+  // ── Cuentas Padre: estado en tiempo real ────────────────────────────────
+  const cps = await CuentaPadre.findAll();
+  const cpMap = Object.fromEntries(cps.map(cp => [String(cp.cuentaId).trim(), cp]));
+
+  const cuentasPadreStatus = cps.map(cp => {
+    const diasAlFin = calcDiasDB(cp.fechaFin);
+    return {
+      cuentaId: cp.cuentaId,
+      nombre:   cp.nombreUsuario || null,
+      fin:      cp.fechaFin      || null,
+      diasAlFin,
+      variante: calcCPVariante(diasAlFin),
+      estado:   cp.estado || null,
+    };
+  }).sort((a, b) => (a.diasAlFin ?? Infinity) - (b.diasAlFin ?? Infinity));
+
+  // ── Capacidad por cuenta (pantallas totales vs. libres/ocupadas) ────────
+  const byAccount = {};
+  pantallas.forEach(p => {
+    if (!byAccount[p.cuentaId]) byAccount[p.cuentaId] = [];
+    byAccount[p.cuentaId].push(p);
+  });
+  const capacidadPorCuenta = Object.entries(byAccount).map(([cuentaId, rows]) => {
+    const cp       = cpMap[cuentaId];
+    const capacidad = rows.reduce((s, p) => s + (Number(p.pantallas) || 1), 0);
+    const libres    = rows
+      .filter(p => getRowVariantExport(p, DIAS_ALERTA) === 'libre')
+      .reduce((s, p) => s + (Number(p.pantallas) || 1), 0);
+    const ocupadas  = capacidad - libres;
+    const diasAlFin = cp ? calcDiasDB(cp.fechaFin) : null;
+    return {
+      cuentaId,
+      nombre:      cp?.nombreUsuario || null,
+      diasAlFin,
+      varianteCp:  calcCPVariante(diasAlFin),
+      capacidad,
+      ocupadas,
+      libres,
+      pctOcupacion: capacidad ? Math.round((ocupadas / capacidad) * 100) : 0,
+    };
+  }).sort((a, b) => a.cuentaId.localeCompare(b.cuentaId));
+
+  // ── Sync pendiente: alguna CP tiene datos distintos a los del Planificador
+  const planSnapshot = await Planificador.findAll({
+    attributes: ['cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion'],
+    raw: true,
+  });
+  const planMap = {};
+  planSnapshot.forEach(r => { if (!planMap[r.cuentaId]) planMap[r.cuentaId] = r; });
+  const syncPendiente = cps.some(cp => {
+    const plan = planMap[String(cp.cuentaId).trim()];
+    if (!plan) return false;
+    const newVals = {
+      cuenta:       cp.nombreUsuario || null,
+      password:     cp.contrasena    || null,
+      credito:      cp.credito       ?? null,
+      inicio:       cp.fechaInicio   || null,
+      finalizacion: cp.fechaFin      || null,
+    };
+    return SYNC_FIELDS.some(f => syncFieldChanged(newVals[f], plan[f], f === 'credito'));
+  });
+
+  res.json({
+    diasAlerta: DIAS_ALERTA,
+    pantallas,
+    inconsistencias:     findCuentaIdMismatches(pantallas),
+    cuentasPadreStatus,
+    capacidadPorCuenta,
+    syncPendiente,
+  });
 }));
 
 // GET /planificador/export — descarga el Planificador completo como .xlsx
@@ -256,6 +335,58 @@ router.post('/planificador/save-to-excel', asyncHandler(async (_req, res) => {
     message: `Planificador guardado: ${pantallas.length} pantallas exportadas a Planificador_actualizado.xlsx`,
     archivo: 'Planificador_actualizado.xlsx',
   });
+}));
+
+// GET /planificador/sync-preview — diff de lo que cambiaría al sincronizar (sin aplicar cambios)
+router.get('/planificador/sync-preview', asyncHandler(async (_req, res) => {
+  const cuentas = await CuentaPadre.findAll();
+  const cuentaMap = Object.fromEntries(cuentas.map(c => [String(c.cuentaId).trim(), c]));
+
+  const planSnapshot = await Planificador.findAll({
+    attributes: ['cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion'],
+    raw: true,
+  });
+  const beforeMap = {};
+  const countMap  = {};
+  planSnapshot.forEach(r => {
+    if (!beforeMap[r.cuentaId]) beforeMap[r.cuentaId] = r;
+    countMap[r.cuentaId] = (countMap[r.cuentaId] || 0) + 1;
+  });
+
+  const diff = Object.entries(cuentaMap).map(([cuentaId, cp]) => {
+    const newVals = {
+      cuenta:       cp.nombreUsuario || null,
+      password:     cp.contrasena    || null,
+      credito:      cp.credito       ?? null,
+      inicio:       cp.fechaInicio   || null,
+      finalizacion: cp.fechaFin      || null,
+    };
+    const before    = beforeMap[cuentaId];
+    const count     = countMap[cuentaId] || 0;
+    const diasAlFin = calcDiasDB(cp.fechaFin);
+
+    if (count === 0) {
+      return { cuentaId, cuenta: cp.nombreUsuario || null, estado: cp.estado || null, diasAlFin, status: 'sin_pantallas', pantallasAfectadas: 0, cambios: [] };
+    }
+    const cambios = SYNC_FIELDS.flatMap(f => {
+      const oldVal = before ? (before[f] ?? null) : null;
+      const newVal = newVals[f] ?? null;
+      return syncFieldChanged(newVal, oldVal, f === 'credito')
+        ? [{ campo: f, antes: oldVal, despues: newVal }]
+        : [];
+    });
+    return {
+      cuentaId,
+      cuenta:             cp.nombreUsuario || null,
+      estado:             cp.estado || null,
+      diasAlFin,
+      status:             cambios.length > 0 ? 'actualizada' : 'sin_cambio',
+      pantallasAfectadas: count,
+      cambios,
+    };
+  });
+
+  res.json({ diff, totalConCambios: diff.filter(d => d.status === 'actualizada').length });
 }));
 
 // PUT /planificador/:idPantalla — actualiza un registro

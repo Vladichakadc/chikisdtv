@@ -8,6 +8,7 @@ import {
   Link2, Undo2,
   XCircle, Wallet, Gift, DollarSign, Percent,
   Users, Maximize2, Minimize2, KeyRound, Copy, Check,
+  Building2, ExternalLink, ChevronDown,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import api from '../../config/api'
@@ -25,6 +26,8 @@ import { EditModal } from './planificador/EditModal'
 import {
   calcDias, getRowVariant, ROW_BG, estadoBadgeVariant, getPlanSortVal,
 } from './planificador/rowHelpers'
+
+const DIAS_ALERTA_CP = 30
 
 // ─── Labels de campo para el diff de sincronización ──────────────────────────
 
@@ -240,6 +243,68 @@ function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
   )
 }
 
+// ─── Panel de alertas de Cuentas Padre (vencidas / en alerta) ────────────────
+
+function CuentasPadreAlertPanel({ cuentas, titulo, variante, onClose, navigate }) {
+  const isVencidas = variante === 'vencida'
+  const headerGrad = isVencidas ? 'from-red-600 to-red-700' : 'from-amber-500 to-amber-600'
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div className={`bg-gradient-to-r ${headerGrad} rounded-t-2xl px-6 py-4 flex items-center justify-between flex-shrink-0`}>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Building2 size={20} /> {titulo}
+          </h2>
+          <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="overflow-auto flex-1 min-h-0">
+          <table className="w-full text-sm border-separate border-spacing-0">
+            <thead>
+              <tr className="text-left text-gray-500 bg-gray-50">
+                <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold border-b border-gray-200">ID Cuenta</th>
+                <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold border-b border-gray-200">Usuario IPTV</th>
+                <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold text-center border-b border-gray-200">Vencimiento</th>
+                <th className="sticky top-0 bg-gray-50 px-4 py-2.5 font-semibold text-center border-b border-gray-200">Días</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cuentas.length === 0 ? (
+                <tr><td colSpan={4} className="px-4 py-10 text-center text-gray-400">Sin registros en esta categoría</td></tr>
+              ) : cuentas.map(cp => (
+                <tr key={cp.cuentaId} className={`border-b border-gray-50 ${isVencidas ? 'bg-red-50 hover:bg-red-100' : 'bg-amber-50 hover:bg-amber-100'}`}>
+                  <td className="px-4 py-2.5 font-mono font-bold text-brand-accent">{cp.cuentaId}</td>
+                  <td className="px-4 py-2.5 text-gray-700">{cp.nombre || <span className="text-gray-400 italic">—</span>}</td>
+                  <td className="px-4 py-2.5 text-center text-gray-600">{cp.fin ? formatDate(cp.fin) : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    {cp.diasAlFin != null ? (
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${cp.diasAlFin <= 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {cp.diasAlFin <= 0 ? `${Math.abs(cp.diasAlFin)}d vencida` : `${cp.diasAlFin}d`}
+                      </span>
+                    ) : <span className="text-gray-300">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+          <button
+            onClick={() => navigate('/admin/cuentas-padre')}
+            className="flex items-center gap-1.5 text-sm text-brand-primary hover:underline font-medium"
+          >
+            <ExternalLink size={13} /> Ver en Cuentas Padre
+          </button>
+          <button onClick={onClose} className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold transition-colors">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Página principal ────────────────────────────────────────────────────────
 
 export default function PlanificadorPage() {
@@ -268,6 +333,9 @@ export default function PlanificadorPage() {
   const [estatusExpanded, setEstatusExpanded]   = useState(false)
   const [showEstatusPwd, setShowEstatusPwd]     = useState(false)
   const [copied, setCopied]                     = useState(false)
+  const [showCpPanel, setShowCpPanel]           = useState(false)
+  const [cpPanelVariante, setCpPanelVariante]   = useState('vencida')
+  const [showCapacidad, setShowCapacidad]       = useState(false)
 
   // Guarda una "foto" del estado actual antes de aplicar un cambio, para poder deshacerlo
   const snapshotBeforeChange = () => {
@@ -485,6 +553,10 @@ export default function PlanificadorPage() {
     }
   }, [data])
 
+  const cpVencidas    = useMemo(() => (data?.cuentasPadreStatus || []).filter(cp => cp.variante === 'vencida'), [data])
+  const cpAlerta      = useMemo(() => (data?.cuentasPadreStatus || []).filter(cp => cp.variante === 'alerta'),  [data])
+  const syncPendiente = data?.syncPendiente ?? false
+
   // Abre Pagos → "Nueva Venta" con los datos del cliente/pantalla ya pre-cargados,
   // salvo en "Pantallas sin asignar", donde lo que corresponde es asignar un titular
   // a la pantalla libre directamente desde el formulario de edición.
@@ -600,6 +672,19 @@ export default function PlanificadorPage() {
         />
       )}
 
+      {/* Panel de alertas Cuentas Padre */}
+      {showCpPanel && (
+        <CuentasPadreAlertPanel
+          cuentas={cpPanelVariante === 'vencida' ? cpVencidas : cpAlerta}
+          titulo={cpPanelVariante === 'vencida'
+            ? `${cpVencidas.length} Cuenta${cpVencidas.length !== 1 ? 's' : ''} Padre Vencida${cpVencidas.length !== 1 ? 's' : ''}`
+            : `${cpAlerta.length} Cuenta${cpAlerta.length !== 1 ? 's' : ''} Padre en Alerta`}
+          variante={cpPanelVariante}
+          onClose={() => setShowCpPanel(false)}
+          navigate={navigate}
+        />
+      )}
+
       {/* Modal de edición */}
       {editRow && (
         <EditModal
@@ -639,9 +724,15 @@ export default function PlanificadorPage() {
           )}
           <Button
             onClick={handleSync} variant="secondary" disabled={syncing}
-            className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
+            className="relative border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
           >
             <Link2 size={15} /> {syncing ? 'Sincronizando…' : 'Sincronizar Cuentas Padre'}
+            {syncPendiente && !syncing && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500" />
+              </span>
+            )}
           </Button>
           <Button
             onClick={handleExport} variant="secondary" disabled={exporting}
@@ -741,6 +832,96 @@ export default function PlanificadorPage() {
             origen: 'Filas del Planificador (asignadas = con nombre o nickname distinto de "libre").',
           })} />
       </div>
+
+      {/* Alertas de Cuentas Padre — visibles cuando hay vencidas o en alerta */}
+      {(cpVencidas.length > 0 || cpAlerta.length > 0) && (
+        <div className="mb-4">
+          <div className="grid grid-cols-2 gap-4">
+            <StatCard
+              icon={Building2} label="CP Vencidas" value={cpVencidas.length}
+              variant="outline" tone="red" sub="Cuentas padre con servicio vencido"
+              onClick={() => { setCpPanelVariante('vencida'); setShowCpPanel(true) }}
+            />
+            <StatCard
+              icon={AlertTriangle} label="CP En Alerta" value={cpAlerta.length}
+              variant="outline" tone="amber" sub={`Vencen en ≤ ${DIAS_ALERTA_CP} días`}
+              onClick={() => { setCpPanelVariante('alerta'); setShowCpPanel(true) }}
+            />
+          </div>
+          {data?.capacidadPorCuenta?.length > 0 && (
+            <button
+              onClick={() => setShowCapacidad(p => !p)}
+              className="mt-2 flex items-center gap-1.5 text-xs text-gray-400 hover:text-brand-accent transition-colors"
+            >
+              <ChevronDown size={12} className={cn('transition-transform', showCapacidad && 'rotate-180')} />
+              {showCapacidad ? 'Ocultar capacidad por cuenta padre' : 'Ver capacidad por cuenta padre'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Widget colapsable de capacidad por cuenta padre */}
+      {data?.capacidadPorCuenta?.length > 0 && showCapacidad && (
+        <Card className="overflow-hidden mb-4">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+            <span className="text-sm font-semibold text-brand-accent">Capacidad por cuenta padre</span>
+            <button
+              onClick={() => setShowCapacidad(false)}
+              className="text-gray-400 hover:text-gray-600 p-1 rounded"
+            >
+              <ChevronDown size={15} className="rotate-180" />
+            </button>
+          </div>
+          <div className="overflow-x-auto max-h-64 overflow-y-auto">
+            <table className="w-full text-xs border-separate border-spacing-0">
+              <thead>
+                <tr className="text-gray-500 bg-gray-50 text-left">
+                  <th className="sticky top-0 bg-gray-50 px-3 py-2 font-semibold border-b border-gray-200">ID Cuenta</th>
+                  <th className="sticky top-0 bg-gray-50 px-3 py-2 font-semibold border-b border-gray-200">Usuario</th>
+                  <th className="sticky top-0 bg-gray-50 px-3 py-2 font-semibold text-center border-b border-gray-200">Cap.</th>
+                  <th className="sticky top-0 bg-gray-50 px-3 py-2 font-semibold text-center border-b border-gray-200">Ocup.</th>
+                  <th className="sticky top-0 bg-gray-50 px-3 py-2 font-semibold text-center border-b border-gray-200">Libres</th>
+                  <th className="sticky top-0 bg-gray-50 px-3 py-2 font-semibold border-b border-gray-200 min-w-[110px]">% Ocupación</th>
+                  <th className="sticky top-0 bg-gray-50 px-3 py-2 font-semibold text-center border-b border-gray-200">Estado CP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.capacidadPorCuenta.map(c => {
+                  const pct = c.pctOcupacion
+                  const barColor = pct >= 95 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                  const cpColor  = c.varianteCp === 'vencida' ? 'text-red-600 font-semibold'
+                                 : c.varianteCp === 'alerta'  ? 'text-amber-600 font-semibold'
+                                 : 'text-emerald-600'
+                  return (
+                    <tr key={c.cuentaId} className={`border-b border-gray-50 hover:bg-gray-50 ${c.varianteCp === 'vencida' ? 'bg-red-50' : c.varianteCp === 'alerta' ? 'bg-amber-50' : ''}`}>
+                      <td className="px-3 py-2 font-mono font-bold text-brand-accent">{c.cuentaId}</td>
+                      <td className="px-3 py-2 text-gray-700 max-w-[140px] truncate">{c.nombre || <span className="text-gray-400 italic">—</span>}</td>
+                      <td className="px-3 py-2 text-center font-medium">{c.capacidad}</td>
+                      <td className="px-3 py-2 text-center text-gray-700">{c.ocupadas}</td>
+                      <td className="px-3 py-2 text-center text-emerald-700 font-medium">{c.libres}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2 min-w-[60px]">
+                            <div className={`${barColor} h-2 rounded-full`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-gray-600 w-8 text-right">{pct}%</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {c.varianteCp === 'sin_fecha'
+                          ? <span className="text-gray-400">Sin fecha</span>
+                          : <span className={cpColor}>
+                              {c.varianteCp === 'vencida' ? 'Vencida' : c.varianteCp === 'alerta' ? `${c.diasAlFin}d` : `${c.diasAlFin}d`}
+                            </span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="p-4 mb-3">
