@@ -265,8 +265,6 @@ export default function VentaDispositivosPage() {
 
       if (field === 'fecha' && val) {
         next.anio = val.slice(0, 4)
-        const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-        next.mes = months[parseInt(val.slice(5, 7), 10) - 1] || ''
       }
       return next
     })
@@ -661,8 +659,17 @@ export default function VentaDispositivosPage() {
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Fecha del pago</label>
                     <input type="date" value={form.fecha} onChange={f('fecha')} className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Mes facturado</label>
+                    <select value={form.mes} onChange={f('mes')} className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none text-sm bg-white">
+                      <option value="">— Seleccionar mes —</option>
+                      {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Precio Venta</label>
