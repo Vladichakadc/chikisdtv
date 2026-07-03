@@ -6,31 +6,14 @@ const ExcelJS = require('exceljs');
 const { Planificador, CuentaPadre } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { importFromExcel, autoFixCuentaIdMismatches } = require('../../services/planificadorImportService');
-
-const DIAS_ALERTA = 8;
-
-function calcDiasDB(fecha) {
-  if (!fecha) return null;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const d = new Date(fecha); if (isNaN(d.getTime())) return null;
-  d.setHours(0, 0, 0, 0);
-  return Math.round((d - today) / 86400000);
-}
+// La alerta se recalcula según la fecha vigente; "CORTESIA" es un valor manual que se respeta
+const { DIAS_ALERTA, calcDias: calcDiasDB, alertaFromDias } = require('../../utils/planificadorAlerta');
 
 function estadoFromDias(dias) {
   if (dias == null) return '';
   if (dias <= 0) return 'VENCIDO';
   if (dias <= DIAS_ALERTA) return 'ALERTA';
   return 'VIGENTE';
-}
-
-// La alerta se recalcula según la fecha vigente; "CORTESIA" es un valor manual que se respeta
-function alertaFromDias(dias, stored) {
-  if ((stored || '').trim().toUpperCase() === 'CORTESIA') return 'CORTESIA';
-  if (dias == null) return '';
-  if (dias <= 0) return 'VENCIDO';
-  if (dias <= DIAS_ALERTA) return 'PROXIMO A VENCER';
-  return '';
 }
 
 // Detecta pantallas cuyo cuentaId no coincide con el prefijo de su idPantalla
