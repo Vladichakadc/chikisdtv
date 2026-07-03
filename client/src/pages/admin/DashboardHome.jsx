@@ -16,7 +16,7 @@ import { Button } from '../../components/ui/Button'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
-import { calcDias, getRowVariant } from './planificador/rowHelpers'
+import { calcDias, getRowVariant, diasLabel } from './planificador/rowHelpers'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
 import {
@@ -1146,7 +1146,7 @@ export default function DashboardHome() {
                         )}
                       </div>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">Ordenados por LTV histórico — prioriza los de mayor valor</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Pantallas con fin real vencido o a ≤ 8 días según el Planificador — ordenados por LTV histórico</p>
                   </CardHeader>
                   <CardBody className="p-0">
                     <div className="overflow-auto max-h-72">
@@ -1156,6 +1156,7 @@ export default function DashboardHome() {
                             <th className="px-4 py-2 text-left font-semibold">Cliente</th>
                             <th className="px-4 py-2 text-left font-semibold">Nickname</th>
                             <th className="px-4 py-2 text-right font-semibold">LTV</th>
+                            <th className="px-4 py-2 text-center font-semibold">Vence</th>
                             <th className="px-4 py-2 text-center font-semibold">Estado</th>
                           </tr>
                         </thead>
@@ -1166,6 +1167,16 @@ export default function DashboardHome() {
                               <td className="px-4 py-2 font-mono text-gray-500">{c.nickname || '—'}</td>
                               <td className="px-4 py-2 text-right font-semibold text-brand-accent tabular-nums">
                                 {c.ltvHistorico > 0 ? formatCurrency(c.ltvHistorico) : <span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-4 py-2 text-center whitespace-nowrap tabular-nums">
+                                {c.venceEl ? (
+                                  <>
+                                    <span className="text-gray-600">{c.venceEl}</span>
+                                    <span className={cn('block text-[10px] font-semibold', c.diasRestantes <= 0 ? 'text-red-600' : 'text-amber-600')}>
+                                      {diasLabel(c.diasRestantes)}
+                                    </span>
+                                  </>
+                                ) : <span className="text-gray-300">—</span>}
                               </td>
                               <td className="px-4 py-2 text-center">
                                 {c.alerta === 'VENCIDO'

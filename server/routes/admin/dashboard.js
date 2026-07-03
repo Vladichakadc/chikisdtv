@@ -3,6 +3,7 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const { Client, Plan, Subscription, Payment, Device, Baja, Venta, VentaEquipo, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
 const { todayStr, daysFromNow } = require('../../utils/dateUtils');
+const { calcDias, alertaFromDias } = require('../../utils/planificadorAlerta');
 const asyncHandler = require('../../middleware/asyncHandler');
 
 // ============ DASHBOARD STATS ============
@@ -312,7 +313,14 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
 
   // pantallas = SUM(columna #): una fila puede representar más de una pantalla
   // cuando un cliente tiene varias configuradas. Usar COUNT(*) subestima el total.
-  const alertaRows = await Planificador.findAll({ attributes: ['alertaReal', 'debe', 'customerId', 'cuentaId', 'nombre', 'apellido', 'nickname', 'pantallas'], raw: true });
+  // alertaReal se recalcula desde la fecha de fin real (duracionReal): el texto
+  // almacenado viene del import de Excel y queda obsoleto tras una renovación
+  // (misma regla que enrichPantalla en routes/admin/planificador.js).
+  const alertaRowsRaw = await Planificador.findAll({ attributes: ['alertaReal', 'debe', 'customerId', 'cuentaId', 'nombre', 'apellido', 'nickname', 'pantallas', 'duracionReal'], raw: true });
+  const alertaRows = alertaRowsRaw.map(r => {
+    const diasRestantes = calcDias(r.duracionReal);
+    return { ...r, diasRestantes, alertaReal: alertaFromDias(diasRestantes, r.alertaReal) };
+  });
   const totalPantallas = alertaRows.reduce((s, r) => s + (Number(r.pantallas) || 0), 0);
   const ingresoPorPantalla = totalPantallas > 0 ? Math.round(totalIngresos / totalPantallas) : 0;
   const costoPorPantalla = totalPantallas > 0 ? Math.round(totalCostos / totalPantallas) : 0;
@@ -520,10 +528,18 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
         nickname:     a.nickname || '',
         alerta:       a.alertaReal,
         ltvHistorico: Math.round(ltvByCid[a.customerId] || 0),
+        venceEl:       a.duracionReal || null,
+        diasRestantes: a.diasRestantes ?? null,
       };
     }
+    const acc = riesgoAcc[a.customerId];
     // Si tiene pantalla VENCIDA, escalar la alerta independientemente del orden
-    if (a.alertaReal === 'VENCIDO') riesgoAcc[a.customerId].alerta = 'VENCIDO';
+    if (a.alertaReal === 'VENCIDO') acc.alerta = 'VENCIDO';
+    // Conservar la pantalla más urgente (menos días restantes) como referencia visible
+    if (a.diasRestantes != null && (acc.diasRestantes == null || a.diasRestantes < acc.diasRestantes)) {
+      acc.diasRestantes = a.diasRestantes;
+      acc.venceEl = a.duracionReal || null;
+    }
   }
   const clientesEnRiesgo = Object.values(riesgoAcc)
     .sort((a, b) => b.ltvHistorico - a.ltvHistorico)
