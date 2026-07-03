@@ -8,10 +8,6 @@ import {
   FileSpreadsheet, CheckCircle2, AlertCircle, Undo2,
   Layers, TrendingUp, Percent, Lightbulb, Sparkles,
 } from 'lucide-react'
-import {
-  ComposedChart, Bar, CartesianGrid, XAxis, YAxis,
-  Tooltip, ResponsiveContainer,
-} from 'recharts'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { useUi } from '../../context/UiContext'
@@ -79,17 +75,7 @@ function tagOcupacionCP(pct) {
   return { tone: 'info', text: 'Margen amplio disponible' }
 }
 
-function narrarCapacidadCP(oc) {
-  if (!oc?.totalCapacidad) return null
-  const { totalCapacidad, totalOcupadas, totalLibres, pctOcupacionGlobal, detalle } = oc
-  const cuentasLlenas = (detalle || []).filter(c => c.pctOcupacion >= 100).length
-  const cuentasBaja   = (detalle || []).filter(c => c.pctOcupacion < 50).length
-  const pctLibre = 100 - pctOcupacionGlobal
-  const margen = pctOcupacionGlobal < 92
-    ? `Quedan **${totalLibres} pantalla${totalLibres === 1 ? '' : 's'} libre${totalLibres === 1 ? '' : 's'}** (${pctLibre}% de las registradas) disponibles para asignar a un cliente sin ampliar la infraestructura.`
-    : `Prácticamente todas las pantallas registradas ya tienen cliente — para seguir creciendo hay que abrir pantallas nuevas en el Planificador (y recargar las cuentas que lo requieran).`
-  return `La red de **${(detalle || []).length} cuentas padre con pantallas** suma **${totalCapacidad} pantallas registradas en el Planificador** (la fuente real de capacidad), de las cuales **${totalOcupadas} están asignadas** (${pctOcupacionGlobal}% de ocupación). ${margen}${cuentasLlenas > 0 ? ` **${cuentasLlenas} cuenta${cuentasLlenas > 1 ? 's están' : ' está'} al tope** — sin pantallas libres.` : ''}${cuentasBaja > 0 ? ` **${cuentasBaja} cuenta${cuentasBaja > 1 ? 's tienen' : ' tiene'} menos del 50% de ocupación** — pantallas abiertas que no generan ingreso.` : ''}`
-}
+
 
 // ─── Icono de orden ───────────────────────────────────────────────────────────
 
@@ -406,13 +392,14 @@ export default function CuentasPadrePage() {
   const [uploadResult, setUploadResult] = useState(null)
   const [showDiff, setShowDiff]     = useState(false)
   const [diffData, setDiffData]     = useState([])
-  const [ocupacion, setOcupacion]   = useState(null)
+  const [ocupacion, setOcupacion] = useState(null)
 
   useEffect(() => {
     api.get('/admin/dashboard-bi')
       .then(r => setOcupacion(r.data.ocupacion))
       .catch(() => {})
   }, [])
+
   const [dragOver, setDragOver]     = useState(false)
   const [prevRows, setPrevRows]     = useState([])
   const [canUndo, setCanUndo]       = useState(false)
@@ -1060,41 +1047,9 @@ export default function CuentasPadrePage() {
             />
           </div>
 
-          <Card className="border-sky-100">
-            <CardHeader className="border-sky-50">
-              <CardTitle>Ocupación por cuenta padre</CardTitle>
-              <p className="text-sm text-gray-400 mt-0.5">Pantallas activas vs. capacidad total por cuenta — en naranja las cuentas con alta disponibilidad libre</p>
-            </CardHeader>
-            <CardBody>
-              <ResponsiveContainer width="100%" height={Math.max(180, ocupacion.detalle.length * 26)}>
-                <ComposedChart
-                  data={ocupacion.detalle.map((c, i) => ({
-                    nombre: `CP-${String(i + 1).padStart(2, '0')}`,
-                    cuentaId: c.cuentaId,
-                    ocupadas: c.ocupadas,
-                    libres: c.libres,
-                    capacidad: c.capacidad,
-                    pct: c.pctOcupacion,
-                  }))}
-                  layout="vertical"
-                  margin={{ top: 4, right: 40, left: 48, bottom: 4 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#bae6fd" opacity={0.4} horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#78716c' }} />
-                  <YAxis type="category" dataKey="nombre" tick={{ fontSize: 10, fill: '#78716c' }} width={42} />
-                  <Tooltip
-                    formatter={(v, name) => [v, name === 'ocupadas' ? 'Activas' : 'Libres']}
-                    labelFormatter={(_, payload) => payload?.[0]?.payload?.cuentaId || ''}
-                  />
-                  <Bar dataKey="ocupadas" name="Activas" stackId="a" fill="#0ea5e9" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="libres"   name="Libres"  stackId="a" fill="#fed7aa" radius={[0, 4, 4, 0]} />
-                </ComposedChart>
-              </ResponsiveContainer>
-              <ChartInsightCP text={narrarCapacidadCP(ocupacion)} />
-            </CardBody>
-          </Card>
         </div>
       )}
+
 
       {/* Modal informe comparativo de importación */}
       {showDiff && diffData.length > 0 && (
