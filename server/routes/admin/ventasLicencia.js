@@ -95,16 +95,18 @@ function sanitizeVentaBody(body) {
   }
   if (out.tipoPago) out.tipoPago = normalizeTipoPago(out.tipoPago);
 
-  // Auto-calcular año y mes si se provee la fecha (Acción 8)
+  // Auto-calcular año desde la fecha siempre que venga; mes solo si el usuario
+  // no lo eligió explícitamente (el formulario permite que fecha y mes sean independientes,
+  // p.ej. cuando un socio paga en diciembre pero el mes facturado es enero).
   if (out.fecha) {
-    // Si la fecha viene como YYYY-MM-DD
     const parts = out.fecha.split('-');
     if (parts.length === 3) {
       out.anio = parts[0];
-      const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-      const monthIndex = parseInt(parts[1], 10) - 1;
-      if (monthIndex >= 0 && monthIndex < 12) {
-        out.mes = meses[monthIndex];
+      const mesExplicito = (body.mes || '').toString().trim();
+      if (!mesExplicito) {
+        const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        const monthIndex = parseInt(parts[1], 10) - 1;
+        if (monthIndex >= 0 && monthIndex < 12) out.mes = meses[monthIndex];
       }
     }
   }
