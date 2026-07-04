@@ -920,14 +920,14 @@ export default function DashboardHome() {
                   )}
 
                   <ResponsiveContainer width="100%" height={320}>
-                    <ComposedChart data={ventasLicenciaPorMes} margin={{ top: 28, right: 20, left: 0, bottom: 0 }}>
+                    <ComposedChart data={ventasLicenciaPorMes} margin={{ top: 54, right: 32, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
                       <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#78716c' }} />
                       <YAxis
-                        yAxisId="left" domain={[0, 'auto']} tick={{ fontSize: 11, fill: '#78716c' }}
+                        yAxisId="left" domain={[0, (dataMax) => Math.ceil(dataMax * 1.45)]} tick={{ fontSize: 11, fill: '#78716c' }}
                         tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${Math.round(v / 1e3)}K` : v}
                       />
-                      <YAxis yAxisId="right" orientation="right" domain={[0, 'auto']} allowDecimals={false} tick={{ fontSize: 11, fill: '#78716c' }} />
+                      <YAxis yAxisId="right" orientation="right" domain={[0, (dataMax) => Math.ceil(dataMax * 1.75)]} allowDecimals={false} tick={{ fontSize: 11, fill: '#78716c' }} />
                       <Tooltip
                         formatter={(value, name) => name === 'N° de ventas'
                           ? [`${value} venta${value === 1 ? '' : 's'}`, name]
@@ -939,11 +939,19 @@ export default function DashboardHome() {
                         {ventasLicenciaPorMes.map((m) => (
                           <Cell key={m.mes} fill={mesVentasLicencia === m.mes ? '#c2410c' : '#f97316'} />
                         ))}
-                        <LabelList dataKey="ingresos" position="top" formatter={formatCompactCurrency} style={{ ...LABEL_STYLE, fontSize: 10 }} />
+                        {/* Etiqueta dentro de la barra (barras altas ≥ $800 K) */}
+                        <LabelList dataKey="ingresos" position="insideTop" formatter={(v) => v >= 800_000 ? formatCompactCurrency(v) : ''} style={{ fill: '#fff', fontWeight: 700, fontSize: 10 }} />
+                        {/* Etiqueta sobre la barra (barras pequeñas < $800 K) */}
+                        <LabelList dataKey="ingresos" position="top" formatter={(v) => v > 0 && v < 800_000 ? formatCompactCurrency(v) : ''} style={{ ...LABEL_STYLE, fill: '#9a3412', fontSize: 10 }} />
                       </Bar>
-                      <Line yAxisId="right" type="monotone" dataKey="numVentas" name="N° de ventas" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6' }}>
-                        <LabelList dataKey="numVentas" position="top" offset={12} formatter={(v) => v > 0 ? v : ''} style={{ ...LABEL_STYLE, fontSize: 11 }} />
-                      </Line>
+                      <Line
+                        yAxisId="right" type="monotone" dataKey="numVentas" name="N° de ventas"
+                        stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6' }}
+                        isAnimationActive={false}
+                        label={({ x, y, value }) => value > 0
+                          ? <text key={`lv-${x}`} x={x} y={y - 16} textAnchor="middle" fill="#1d4ed8" fontSize={11} fontWeight={700} stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">{value}</text>
+                          : null}
+                      />
                     </ComposedChart>
                   </ResponsiveContainer>
                   <ChartInsight text={resumenVentasLicencia.mesDetalle
