@@ -13,7 +13,14 @@ router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   const activeSubscriptions = await Subscription.count({ where: { estado: 'Activo' } });
   const totalDevices = await Device.count({ where: { activo: true } });
 
-  const totalIngresos = (await Payment.sum('monto', { where: { estado: 'Pagado' } })) || 0;
+  // Fuente de verdad para ingresos = Venta (licencias) + VentaEquipo (hardware).
+  // La tabla Payment es un sistema CRM paralelo que NO refleja la actividad real del negocio
+  // y queda EXCLUIDA del cómputo de ingresos para que sea consistente con dashboard-bi/finanzas.
+  const [ingLicencias, ingEquipos] = await Promise.all([
+    Venta.sum('precioVenta').then(v => v || 0),
+    VentaEquipo.sum('precioVenta').then(v => v || 0),
+  ]);
+  const totalIngresos = Math.round(ingLicencias + ingEquipos);
 
   const pendingPayments = await Payment.count({ where: { estado: 'Pendiente' } });
   const vencidosPayments = await Payment.count({ where: { estado: 'Vencido' } });
