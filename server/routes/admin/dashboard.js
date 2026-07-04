@@ -765,6 +765,81 @@ router.get('/dashboard-bi/finanzas', asyncHandler(async (_req, res) => {
   });
 }));
 
+// ============ ANÁLISIS FINANCIERO — EQUIPOS ============
+router.get('/dashboard-bi/finanzas-equipos', asyncHandler(async (_req, res) => {
+  const equipos = await VentaEquipo.findAll({
+    attributes: ['anio', 'mes', 'precioVenta', 'costo', 'tipoFire', 'itemQuantity', 'tipoPago'],
+    raw: true,
+  });
+
+  const MES_LABEL_ARR = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const mKey = (anio, mes) => `${anio}-${String(mesNum(mes)).padStart(2, '0')}`;
+
+  const totalIngresos  = Math.round(equipos.reduce((s, e) => s + (Number(e.precioVenta) || 0), 0));
+  const totalCogs      = Math.round(equipos.reduce((s, e) => s + (Number(e.costo) || 0), 0));
+  const totalRegistros = equipos.length;
+  const sinCostoCount  = equipos.filter(e => !(Number(e.costo) > 0)).length;
+
+  // Agregación mensual
+  const porMesMap = {};
+  for (const e of equipos) {
+    const k = mKey(e.anio, e.mes);
+    if (k.endsWith('-00')) continue;
+    if (!porMesMap[k]) porMesMap[k] = { ingresos: 0, cogs: 0, unidades: 0 };
+    porMesMap[k].ingresos += Number(e.precioVenta) || 0;
+    porMesMap[k].cogs     += Number(e.costo) || 0;
+    porMesMap[k].unidades += Number(e.itemQuantity) || 1;
+  }
+  const porMes = Object.keys(porMesMap).sort().map(k => {
+    const [anio, mm] = k.split('-');
+    const m   = porMesMap[k];
+    const ing  = Math.round(m.ingresos);
+    const cogs = Math.round(m.cogs);
+    return {
+      key: k, label: `${MES_LABEL_ARR[Number(mm)]} ${anio}`, anio,
+      ingresos: ing, cogs, margen: ing - cogs,
+      margenPct: ing > 0 ? Number((((ing - cogs) / ing) * 100).toFixed(1)) : null,
+      unidades: Math.round(m.unidades),
+    };
+  });
+
+  // Agregación por tipo de equipo (tipoFire)
+  const porTipoMap = {};
+  for (const e of equipos) {
+    const tipo = (e.tipoFire || 'Sin clasificar').trim() || 'Sin clasificar';
+    if (!porTipoMap[tipo]) porTipoMap[tipo] = { tipo, ingresos: 0, cogs: 0, unidades: 0 };
+    porTipoMap[tipo].ingresos += Number(e.precioVenta) || 0;
+    porTipoMap[tipo].cogs     += Number(e.costo) || 0;
+    porTipoMap[tipo].unidades += Number(e.itemQuantity) || 1;
+  }
+  const porTipo = Object.values(porTipoMap)
+    .map(t => ({
+      tipo: t.tipo,
+      ingresos: Math.round(t.ingresos),
+      cogs:     Math.round(t.cogs),
+      margen:   Math.round(t.ingresos - t.cogs),
+      margenPct: t.ingresos > 0 ? Number((((t.ingresos - t.cogs) / t.ingresos) * 100).toFixed(1)) : null,
+      unidades: Math.round(t.unidades),
+      pct: totalIngresos > 0 ? Number(((t.ingresos / totalIngresos) * 100).toFixed(1)) : 0,
+    }))
+    .sort((a, b) => b.ingresos - a.ingresos);
+
+  res.json({
+    kpis: {
+      totalIngresos,
+      totalCogs,
+      margenBruto:    totalIngresos - totalCogs,
+      margenBrutoPct: totalIngresos > 0 ? Number((((totalIngresos - totalCogs) / totalIngresos) * 100).toFixed(1)) : null,
+      ticketPromedio: totalRegistros > 0 ? Math.round(totalIngresos / totalRegistros) : 0,
+      totalRegistros,
+      sinCostoCount,
+      sinCostoPct: totalRegistros > 0 ? Number(((sinCostoCount / totalRegistros) * 100).toFixed(0)) : 0,
+    },
+    porMes,
+    porTipo,
+  });
+}));
+
 // ============ COHORT RETENTION ANALYSIS ============
 router.get('/dashboard-bi/cohorts', asyncHandler(async (_req, res) => {
   const MAX_MESES = 18;
