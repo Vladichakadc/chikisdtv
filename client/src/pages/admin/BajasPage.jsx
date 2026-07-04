@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useUi } from '../../context/UiContext'
 import { Plus, Pencil, Trash2, X, Search, UserX, Tv, ArrowDownCircle, BarChart3, Calendar, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
-import { ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from 'recharts'
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList, Legend } from 'recharts'
 import { ModuleStatCard as StatCard, ChartInsight, narrarBajasPorAnio, LABEL_STYLE } from './dashboard/biShared'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import api from '../../config/api'
@@ -169,6 +169,44 @@ export default function BajasPage() {
   }, [bajas])
 
   // Filtrar
+  // ── Análisis por mes ─────────────────────────────────────────────────────────
+
+  // Estacionalidad: cuántas bajas por mes del calendario (suma histórica)
+  const bajasPorMesCalendario = useMemo(() => {
+    const counts = {}
+    bajas.forEach(b => { if (b.mes) counts[b.mes] = (counts[b.mes] || 0) + 1 })
+    const max = Math.max(...Object.values(counts), 1)
+    return MESES.map(m => ({ mes: m.slice(0, 3), mesNombre: m, total: counts[m] || 0, max }))
+  }, [bajas])
+
+  // Tendencia reciente: 2025 vs 2026 por mes del calendario
+  const bajasMensualReciente = useMemo(() => {
+    const mesIdx = Object.fromEntries(MESES.map((m, i) => [m, i]))
+    const map = {}
+    bajas.forEach(b => {
+      const anio = Number(b.anio)
+      if (!b.mes || anio < 2025) return
+      const idx = mesIdx[b.mes] ?? -1
+      if (idx < 0) return
+      if (!map[idx]) map[idx] = { mesNum: idx, mes: MESES[idx].slice(0, 3), '2025': 0, '2026': 0 }
+      map[idx][String(anio)] = (map[idx][String(anio)] || 0) + 1
+    })
+    return MESES.map((_, i) => map[i] || { mesNum: i, mes: MESES[i].slice(0, 3), '2025': 0, '2026': 0 })
+  }, [bajas])
+
+  // Distribución por motivo de baja (top 8)
+  const bajasPorMotivo = useMemo(() => {
+    const counts = {}
+    bajas.forEach(b => {
+      const m = (b.motivo || '').trim() || 'Sin especificar'
+      counts[m] = (counts[m] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([motivo, total]) => ({ motivo: motivo.length > 30 ? motivo.slice(0, 28) + '…' : motivo, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8)
+  }, [bajas])
+
   const filtered = useMemo(() => {
     let result = bajas
     if (search) {
@@ -315,6 +353,124 @@ export default function BajasPage() {
               </ComposedChart>
             </ResponsiveContainer>
             <ChartInsight text={narrarBajasPorAnio(bajasPorAnio)} />
+          </CardBody>
+        </Card>
+      )}
+
+      {/* ─── Estacionalidad mensual ───────────────────────────────────────────── */}
+      {bajas.length > 0 && (
+        <Card className="border-orange-100 mb-6">
+          <CardHeader className="border-orange-50">
+            <CardTitle>Estacionalidad de bajas por mes</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Suma histórica de cancelaciones por mes del calendario · Revela cuándo se concentra el churn</p>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={bajasPorMesCalendario} margin={{ top: 22, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
+                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#78716c' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#78716c' }} allowDecimals={false} width={32} />
+                <Tooltip formatter={(v) => [v, 'Bajas']} />
+                <Bar dataKey="total" name="Bajas" radius={[5, 5, 0, 0]} maxBarSize={44}>
+                  {bajasPorMesCalendario.map((d, i) => (
+                    <Cell key={i} fill={
+                      d.total === d.max ? '#e11d48'
+                      : d.total >= d.max * 0.7 ? '#f43f5e'
+                      : d.total >= d.max * 0.4 ? '#fb923c'
+                      : '#fca5a5'
+                    } />
+                  ))}
+                  <LabelList dataKey="total" position="top"
+                    style={{ fontSize: 11, fontWeight: 700, fill: '#1e293b', stroke: '#fff', strokeWidth: 3, strokeLinejoin: 'round', paintOrder: 'stroke' }} />
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={(() => {
+              const total = bajasPorMesCalendario.reduce((s, m) => s + m.total, 0)
+              if (!total) return null
+              const pico = bajasPorMesCalendario.reduce((a, b) => b.total > a.total ? b : a)
+              const q1 = bajasPorMesCalendario.slice(0, 3).reduce((s, m) => s + m.total, 0)
+              const pctQ1 = Math.round(q1 / total * 100)
+              const picoIdx = bajasPorMesCalendario.findIndex(m => m.mes === pico.mes)
+              return `El mes con más cancelaciones históricas es **${MESES[picoIdx]} (${pico.total} bajas)**${pico.total === 0 ? '.' : `, con ${Math.round(pico.total / total * 100)}% del total histórico. `}${pctQ1 > 35 ? `El primer trimestre (Ene–Mar) concentra el **${pctQ1}% del churn anual** — señal de estacionalidad post-renovación de año que conviene anticipar con acciones de retención en diciembre.` : 'La distribución es relativamente uniforme, sin un pico estacional dominante — el churn ocurre todo el año.'}`
+            })()} />
+          </CardBody>
+        </Card>
+      )}
+
+      {/* ─── Tendencia reciente 2025 vs 2026 ─────────────────────────────────── */}
+      {bajas.some(b => Number(b.anio) >= 2025) && (
+        <Card className="border-orange-100 mb-6">
+          <CardHeader className="border-orange-50">
+            <CardTitle>Bajas mensuales — 2025 vs 2026</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Comparación mes a mes entre el año anterior y el año en curso · Detecta si el churn mejora o empeora</p>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={bajasMensualReciente} margin={{ top: 22, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
+                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#78716c' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#78716c' }} allowDecimals={false} width={32} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="2025" name="2025" fill="#94a3b8" radius={[3, 3, 0, 0]} maxBarSize={22}>
+                  <LabelList dataKey="2025" position="top"
+                    formatter={v => v > 0 ? v : ''}
+                    style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
+                </Bar>
+                <Bar dataKey="2026" name="2026" fill="#f43f5e" radius={[3, 3, 0, 0]} maxBarSize={22}>
+                  <LabelList dataKey="2026" position="top"
+                    formatter={v => v > 0 ? v : ''}
+                    style={{ fontSize: 10, fontWeight: 700, fill: '#be123c' }} />
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={(() => {
+              const total25 = bajasMensualReciente.reduce((s, m) => s + (m['2025'] || 0), 0)
+              const total26 = bajasMensualReciente.reduce((s, m) => s + (m['2026'] || 0), 0)
+              if (!total25 && !total26) return null
+              const meses26 = bajasMensualReciente.filter(m => m['2026'] > 0).length
+              const ritmo = meses26 > 0 ? (total26 / meses26).toFixed(1) : 0
+              const proyAnual = meses26 > 0 ? Math.round(total26 / meses26 * 12) : 0
+              const varPct = total25 > 0 ? ((total26 - total25) / total25 * 100).toFixed(1) : null
+              return `En **2025** se registraron **${total25} bajas** en el año completo. En lo corrido de **2026** van **${total26} bajas** (${meses26} mes${meses26 !== 1 ? 'es' : ''}, ritmo: ${ritmo}/mes → proyección anual ~${proyAnual}).${varPct ? ` Al ritmo actual el año cerraría con un **${Number(varPct) >= 0 ? '+' : ''}${varPct}% vs 2025** — ${Number(varPct) > 10 ? 'tendencia preocupante que requiere acciones de retención.' : Number(varPct) < -10 ? 'tendencia positiva, el churn está mejorando.' : 'variación dentro de rangos normales.'}` : ''}`
+            })()} />
+          </CardBody>
+        </Card>
+      )}
+
+      {/* ─── Motivos de baja ─────────────────────────────────────────────────── */}
+      {bajasPorMotivo.filter(m => m.motivo !== 'Sin especificar').length > 0 && (
+        <Card className="border-orange-100 mb-6">
+          <CardHeader className="border-orange-50">
+            <CardTitle>Motivos de cancelación (top {bajasPorMotivo.length})</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Razones declaradas al registrar la baja · Útil para priorizar mejoras de retención</p>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={Math.max(200, bajasPorMotivo.length * 34)}>
+              <ComposedChart layout="vertical" data={bajasPorMotivo} margin={{ top: 4, right: 48, left: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.3} horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#78716c' }} allowDecimals={false} />
+                <YAxis type="category" dataKey="motivo" tick={{ fontSize: 10, fill: '#4b5563' }} width={170} />
+                <Tooltip formatter={(v) => [v, 'Bajas']} />
+                <Bar dataKey="total" name="Bajas" radius={[0, 5, 5, 0]} maxBarSize={28}>
+                  {bajasPorMotivo.map((_, i) => (
+                    <Cell key={i} fill={i === 0 ? '#e11d48' : i < 3 ? '#f97316' : '#fbbf24'} />
+                  ))}
+                  <LabelList dataKey="total" position="right"
+                    style={{ fontSize: 11, fontWeight: 700, fill: '#1e293b' }} />
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={(() => {
+              const conMotivo = bajasPorMotivo.filter(m => m.motivo !== 'Sin especificar')
+              if (!conMotivo.length) return null
+              const total = bajasPorMotivo.reduce((s, m) => s + m.total, 0)
+              const top1 = conMotivo[0]
+              const top3 = conMotivo.slice(0, 3).reduce((s, m) => s + m.total, 0)
+              const pct3 = Math.round(top3 / total * 100)
+              return `El motivo más frecuente es **"${top1.motivo}" (${top1.total} bajas)**. Los **3 primeros motivos concentran el ${pct3}%** del total con causa declarada — atacar esas raíces es lo que más impacto tiene sobre la tasa de churn.`
+            })()} />
           </CardBody>
         </Card>
       )}

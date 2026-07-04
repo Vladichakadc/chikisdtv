@@ -770,7 +770,7 @@ router.get('/dashboard-bi/cohorts', asyncHandler(async (_req, res) => {
   const MAX_MESES = 18;
 
   const ventas = await Venta.findAll({
-    attributes: ['customerId', 'fecha', 'tipoPago'],
+    attributes: ['customerId', 'fecha', 'tipoPago', 'tipoPlan'],
     where: { fecha: { [Op.not]: null } },
   });
 
@@ -807,6 +807,30 @@ router.get('/dashboard-bi/cohorts', asyncHandler(async (_req, res) => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   };
 
+  // Actividad ajustada: expande el período de servicio según tipoPlan
+  // Plan Mensual = 1 mes, Plan Semestral = 6+1 gratis = 7 meses, Plan Anual = 12+2 gratis = 14 meses
+  const DURACION_PLAN = { 'Plan Mensual': 1, 'Plan Semestral': 7, 'Plan Anual': 14 };
+  const actividadAjustadaPorCliente = {};
+  for (const v of ventas) {
+    if (v.tipoPago === 'Cortesia') continue;
+    const ym = v.fecha.slice(0, 7);
+    const dur = DURACION_PLAN[v.tipoPlan] || 1;
+    if (!actividadAjustadaPorCliente[v.customerId]) actividadAjustadaPorCliente[v.customerId] = new Set();
+    for (let i = 0; i < dur; i++) actividadAjustadaPorCliente[v.customerId].add(addMeses(ym, i));
+  }
+
+  // Distribución por tipo de plan
+  const planCounts = {};
+  for (const v of ventas) {
+    if (v.tipoPago === 'Cortesia') continue;
+    const plan = v.tipoPlan || 'Sin clasificar';
+    planCounts[plan] = (planCounts[plan] || 0) + 1;
+  }
+  const totalVtasPlanes = Object.values(planCounts).reduce((s, n) => s + n, 0);
+  const distribucionPlanes = Object.entries(planCounts)
+    .map(([plan, count]) => ({ plan, count, pct: totalVtasPlanes > 0 ? Math.round((count / totalVtasPlanes) * 100) : 0 }))
+    .sort((a, b) => b.count - a.count);
+
   // Agrupar clientes por mes de cohorte
   const cohortMap = {};
   for (const [cid, mes] of Object.entries(primeraActivacion)) {
@@ -830,6 +854,23 @@ router.get('/dashboard-bi/cohorts', asyncHandler(async (_req, res) => {
       return { mes, clientesIniciales: clientes.length, retencion };
     });
 
+  // Cohortes ajustadas por duración de plan
+  const cohortesAjustadas = Object.entries(cohortMap)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([mes, clientes]) => {
+      const retencion = [];
+      for (let n = 0; n <= MAX_MESES; n++) {
+        const target = addMeses(mes, n);
+        if (target > maxMes) {
+          retencion.push(null);
+        } else {
+          const retenidos = clientes.filter(cid => actividadAjustadaPorCliente[cid]?.has(target)).length;
+          retencion.push(clientes.length > 0 ? Math.round((retenidos / clientes.length) * 100) : 0);
+        }
+      }
+      return { mes, clientesIniciales: clientes.length, retencion };
+    });
+
   // Curva promedio: media de los % no-nulos en cada posición N
   const curvaPromedio = [];
   for (let n = 0; n <= MAX_MESES; n++) {
@@ -837,17 +878,32 @@ router.get('/dashboard-bi/cohorts', asyncHandler(async (_req, res) => {
     curvaPromedio.push(vals.length > 0 ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null);
   }
 
+  // Curva promedio ajustada por plan
+  const curvaPromedioAjustada = [];
+  for (let n = 0; n <= MAX_MESES; n++) {
+    const vals = cohortesAjustadas.map(c => c.retencion[n]).filter(v => v !== null);
+    curvaPromedioAjustada.push(vals.length > 0 ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null);
+  }
+
   // Resumen de retención promedio en hitos clave
   const avgAt = (n) => {
     const vals = cohortes.map(c => c.retencion[n]).filter(v => v !== null);
     return vals.length > 0 ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null;
   };
+  const avgAtAj = (n) => {
+    const vals = cohortesAjustadas.map(c => c.retencion[n]).filter(v => v !== null);
+    return vals.length > 0 ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null;
+  };
 
   res.json({
     cohortes,
+    cohortesAjustadas,
     curvaPromedio,
+    curvaPromedioAjustada,
+    distribucionPlanes,
     maxMes,
     resumen: { mes1: avgAt(1), mes3: avgAt(3), mes6: avgAt(6), mes12: avgAt(12) },
+    resumenAjustado: { mes1: avgAtAj(1), mes3: avgAtAj(3), mes6: avgAtAj(6), mes12: avgAtAj(12) },
   });
 }));
 
