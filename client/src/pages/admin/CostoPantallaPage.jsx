@@ -13,7 +13,7 @@ import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatDate, formatCurrency, formatUSD, formatNumber } from '../../utils/excelUtils'
-import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList } from 'recharts'
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList, Cell, ReferenceLine } from 'recharts'
 import { ModuleStatCard as StatCard, ChartInsight } from './dashboard/biShared'
 
 const MES_ORDEN = {
@@ -170,6 +170,51 @@ function CpMesDetalleModal({ data, onClose }) {
             Cerrar
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ProyeccionTooltip({ active, payload, label, hayCost, fmtC }) {
+  if (!active || !payload?.length) return null
+  const m = payload[0]?.payload
+  if (!m) return null
+  return (
+    <div className="bg-white border border-indigo-100 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+      <p className="font-bold text-gray-800 mb-2 text-sm border-b border-gray-100 pb-1.5">{label}</p>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-gray-500">CPs que vencen</span>
+          <span className={`font-bold ${m.packs100 > 0 ? 'text-orange-600' : 'text-indigo-600'}`}>{m.cuentas}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-gray-500">Créditos necesarios</span>
+          <span className="font-semibold text-gray-700">{m.creditos} Cr</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-gray-500">Saldo antes</span>
+          <span className="font-semibold text-indigo-500">{m.saldoAntes} Cr</span>
+        </div>
+        {m.packs100 > 0 ? (
+          <div className="flex items-center justify-between gap-4 bg-orange-50 rounded px-2 py-1">
+            <span className="text-orange-600 font-semibold">Comprar packs</span>
+            <span className="font-bold text-orange-600">{m.packs100} × 100 Cr</span>
+          </div>
+        ) : m.cuentas > 0 ? (
+          <div className="text-emerald-600 font-semibold text-center bg-emerald-50 rounded py-1">✓ Cubierto con saldo</div>
+        ) : null}
+        <div className="flex items-center justify-between gap-4 border-t border-gray-100 pt-1.5">
+          <span className="text-emerald-600 font-semibold">Saldo después</span>
+          <span className={`font-bold ${m.saldoDespues <= 0 ? 'text-red-600' : m.saldoDespues < 12 ? 'text-amber-600' : 'text-emerald-600'}`}>
+            {m.saldoDespues} Cr
+          </span>
+        </div>
+        {hayCost && m.costoCOP > 0 && (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-gray-500">Costo estimado</span>
+            <span className="font-bold text-red-500">{fmtC(m.costoCOP)}</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -627,6 +672,83 @@ export default function CostoPantallaPage() {
           })} />
       </div>
 
+      {/* Búsqueda */}
+      <div className="mb-4">
+        <div className="relative max-w-md">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por ID, acción, mes, año, medio pago…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-orange-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition-all"
+          />
+        </div>
+      </div>
+
+      {/* Tabla */}
+      <Card className="shadow-lg border-orange-100 overflow-hidden mb-6">
+        <CardBody className="p-0">
+          {loading ? (
+            <div className="p-12 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-3" />
+              <p className="text-gray-500">Cargando costos…</p>
+            </div>
+          ) : error ? (
+            <p className="p-8 text-center text-red-500">{error}</p>
+          ) : (
+            <div className="overflow-auto max-h-[34rem] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-orange-200 hover:[&::-webkit-scrollbar-thumb]:bg-orange-300">
+              <table className="w-full text-sm border-separate border-spacing-0">
+                <thead>
+                  <tr className="text-left text-white">
+                    {COLS.map(col => (
+                      <th
+                        key={col.key}
+                        scope="col"
+                        onClick={() => handleSort(col.key)}
+                        className={`sticky top-0 z-10 bg-orange-600 px-3 py-3 font-semibold whitespace-nowrap transition-colors select-none shadow-[0_1px_0_0_rgba(0,0,0,0.08)] ${col.key !== 'acciones' ? 'cursor-pointer hover:bg-orange-700' : ''}`}
+                      >
+                        {col.key !== 'acciones' ? (
+                          <div className="flex items-center gap-1">
+                            {col.label}
+                            <SortIcon colKey={col.key} sortCol={sortCol} sortDir={sortDir} />
+                          </div>
+                        ) : null}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row, i) => (
+                    <tr
+                      key={row.id}
+                      className={`border-b border-orange-50 hover:bg-orange-50/70 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}`}
+                    >
+                      {COLS.map(col => (
+                        <td key={col.key} className="px-3 py-2 whitespace-nowrap">
+                          {renderCell(row, col.key, openEdit, handleDelete)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={COLS.length} className="px-4 py-12 text-center text-gray-400">
+                        No se encontraron registros.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardBody>
+        <div className="flex items-center justify-between border-t border-orange-100 bg-orange-50/40 px-4 py-2 text-xs text-gray-500">
+          <span>{filtered.length.toLocaleString()} de {rows.length.toLocaleString()} registros</span>
+          <span>Ordenado por <strong className="text-brand-accent">{COLS.find(c => c.key === sortCol)?.label ?? sortCol}</strong> ({sortDir === 'asc' ? '↑ ascendente' : '↓ descendente'})</span>
+        </div>
+      </Card>
+
       {/* ─── Evolución mensual del costo (OPEX) y TRM ─────────────────────── */}
       {serieMensualCosto.length >= 2 && (
         <Card className="border-orange-100 mb-6">
@@ -704,37 +826,67 @@ export default function CostoPantallaPage() {
               <CardHeader className="border-indigo-50">
                 <CardTitle>Recargas proyectadas mes a mes</CardTitle>
                 <p className="text-sm text-gray-400 mt-0.5">
-                  Barras: CPs que vencen y packs a comprar (0 = saldo cubre el mes)
-                  {hayCost ? ' · Línea: costo estimado COP (eje derecho)' : ''}
+                  <span className="inline-flex items-center gap-1 mr-2">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-indigo-500" /> Cubierto con saldo
+                  </span>
+                  <span className="inline-flex items-center gap-1 mr-2">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-orange-500" /> Requiere compra
+                  </span>
+                  <span className="inline-flex items-center gap-1 mr-2">
+                    <span className="inline-block w-4 border-t-2 border-red-500 border-dashed" /> Packs 100 Cr
+                  </span>
+                  · Línea verde = saldo de créditos disponible
                 </p>
               </CardHeader>
               <CardBody>
-                <ResponsiveContainer width="100%" height={320}>
-                  <ComposedChart data={proyeccion} margin={{ top: 16, right: hayCost ? 60 : 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#c7d2fe" opacity={0.4} />
-                    <XAxis dataKey="mesLabel" tick={{ fontSize: 11, fill: '#78716c' }} />
+                <ResponsiveContainer width="100%" height={340}>
+                  <ComposedChart data={proyeccion} margin={{ top: 20, right: hayCost ? 64 : 16, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="saldoGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#c7d2fe" opacity={0.35} />
+                    <XAxis dataKey="mesLabel" tick={{ fontSize: 11, fill: '#6b7280' }} />
                     <YAxis yAxisId="left" orientation="left"
-                      tick={{ fontSize: 10, fill: '#78716c' }}
-                      label={{ value: 'Unidades', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: '#9ca3af' }, dy: 40 }}
+                      tick={{ fontSize: 10, fill: '#6b7280' }}
+                      label={{ value: 'CPs / Saldo Cr', angle: -90, position: 'insideLeft', style: { fontSize: 9, fill: '#9ca3af' }, dy: 55 }}
+                      width={44}
                     />
                     {hayCost && (
                       <YAxis yAxisId="right" orientation="right"
-                        tick={{ fontSize: 10, fill: '#ef4444' }}
+                        tick={{ fontSize: 10, fill: '#dc2626' }}
                         tickFormatter={v => v > 0 ? `${(v / 1000).toFixed(0)}k` : '0'}
-                        label={{ value: 'COP (miles)', angle: 90, position: 'insideRight', style: { fontSize: 10, fill: '#ef4444' }, dy: -40 }}
+                        label={{ value: 'COP (miles)', angle: 90, position: 'insideRight', style: { fontSize: 9, fill: '#dc2626' }, dy: -45 }}
+                        width={48}
                       />
                     )}
-                    <Tooltip formatter={(v, name) => name === 'Costo COP' ? [fmtC(v), name] : [v, name]} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar yAxisId="left" dataKey="cuentas" name="CPs que vencen" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={40}>
-                      <LabelList dataKey="labelCuentas" position="top" style={{ fontSize: 9, fill: '#4338ca', fontWeight: 600 }} />
+                    <Tooltip content={<ProyeccionTooltip hayCost={hayCost} fmtC={fmtC} />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" />
+                    <ReferenceLine yAxisId="left" y={SALDO_INICIAL}
+                      stroke="#10b981" strokeDasharray="5 3" strokeWidth={1.5}
+                      label={{ value: `Saldo inicial ${SALDO_INICIAL} Cr`, position: 'insideTopRight', fontSize: 9, fill: '#059669', dy: -4 }}
+                    />
+                    <Bar yAxisId="left" dataKey="cuentas" name="CPs que vencen" radius={[5, 5, 0, 0]} maxBarSize={44}>
+                      {proyeccion.map((m, i) => (
+                        <Cell key={i} fill={m.cuentas === 0 ? '#e0e7ff' : m.packs100 > 0 ? '#f97316' : '#6366f1'} />
+                      ))}
+                      <LabelList dataKey="labelCuentas" position="top"
+                        style={{ fontSize: 10, fill: '#1e293b', fontWeight: 700, stroke: '#fff', strokeWidth: 3, strokeLinejoin: 'round', paintOrder: 'stroke' }} />
                     </Bar>
-                    <Bar yAxisId="left" dataKey="packs100" name="Packs 100 Cr" fill="#f97316" radius={[3, 3, 0, 0]} maxBarSize={40}>
-                      <LabelList dataKey="labelPacks" position="top" style={{ fontSize: 9, fill: '#c2410c', fontWeight: 600 }} />
+                    <Bar yAxisId="left" dataKey="packs100" name="Packs 100 Cr" fill="#ef4444" radius={[5, 5, 0, 0]} maxBarSize={44} opacity={0.85}>
+                      <LabelList dataKey="labelPacks" position="top"
+                        style={{ fontSize: 10, fill: '#7f1d1d', fontWeight: 700, stroke: '#fff', strokeWidth: 3, strokeLinejoin: 'round', paintOrder: 'stroke' }} />
                     </Bar>
+                    <Line yAxisId="left" type="monotone" dataKey="saldoDespues" name="Saldo Cr"
+                      stroke="#10b981" strokeWidth={2.5}
+                      dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                      activeDot={{ r: 7, stroke: '#059669', strokeWidth: 2 }} />
                     {hayCost && (
                       <Line yAxisId="right" type="monotone" dataKey="costoCOP" name="Costo COP"
-                        stroke="#ef4444" strokeWidth={2} dot={{ r: 3, fill: '#ef4444' }} />
+                        stroke="#dc2626" strokeWidth={2} strokeDasharray="5 3"
+                        dot={{ r: 3, fill: '#dc2626', strokeWidth: 0 }} />
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -833,83 +985,6 @@ export default function CostoPantallaPage() {
           </div>
         )
       })()}
-
-      {/* Búsqueda */}
-      <div className="mb-4">
-        <div className="relative max-w-md">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por ID, acción, mes, año, medio pago…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-orange-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition-all"
-          />
-        </div>
-      </div>
-
-      {/* Tabla */}
-      <Card className="shadow-lg border-orange-100 overflow-hidden">
-        <CardBody className="p-0">
-          {loading ? (
-            <div className="p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-3" />
-              <p className="text-gray-500">Cargando costos…</p>
-            </div>
-          ) : error ? (
-            <p className="p-8 text-center text-red-500">{error}</p>
-          ) : (
-            <div className="overflow-auto max-h-[34rem] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-orange-200 hover:[&::-webkit-scrollbar-thumb]:bg-orange-300">
-              <table className="w-full text-sm border-separate border-spacing-0">
-                <thead>
-                  <tr className="text-left text-white">
-                    {COLS.map(col => (
-                      <th
-                        key={col.key}
-                        scope="col"
-                        onClick={() => handleSort(col.key)}
-                        className={`sticky top-0 z-10 bg-orange-600 px-3 py-3 font-semibold whitespace-nowrap transition-colors select-none shadow-[0_1px_0_0_rgba(0,0,0,0.08)] ${col.key !== 'acciones' ? 'cursor-pointer hover:bg-orange-700' : ''}`}
-                      >
-                        {col.key !== 'acciones' ? (
-                          <div className="flex items-center gap-1">
-                            {col.label}
-                            <SortIcon colKey={col.key} sortCol={sortCol} sortDir={sortDir} />
-                          </div>
-                        ) : null}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row, i) => (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-orange-50 hover:bg-orange-50/70 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}`}
-                    >
-                      {COLS.map(col => (
-                        <td key={col.key} className="px-3 py-2 whitespace-nowrap">
-                          {renderCell(row, col.key, openEdit, handleDelete)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  {filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={COLS.length} className="px-4 py-12 text-center text-gray-400">
-                        No se encontraron registros.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardBody>
-        <div className="flex items-center justify-between border-t border-orange-100 bg-orange-50/40 px-4 py-2 text-xs text-gray-500">
-          <span>{filtered.length.toLocaleString()} de {rows.length.toLocaleString()} registros</span>
-          <span>Ordenado por <strong className="text-brand-accent">{COLS.find(c => c.key === sortCol)?.label ?? sortCol}</strong> ({sortDir === 'asc' ? '↑ ascendente' : '↓ descendente'})</span>
-        </div>
-      </Card>
 
       {/* Modal formulario */}
       {showForm && (

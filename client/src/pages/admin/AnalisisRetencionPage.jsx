@@ -4,7 +4,8 @@ import {
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
-  CartesianGrid, Tooltip, ReferenceLine,
+  CartesianGrid, Tooltip, ReferenceLine, ComposedChart,
+  Bar, Cell, LabelList, Legend,
 } from 'recharts'
 import api from '../../config/api'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
@@ -152,53 +153,121 @@ function CohortHeatmap({ cohortes }) {
   )
 }
 
-// ─── Curva promedio ───────────────────────────────────────────────────────────
+// ─── Planes de hito (para anotaciones en la curva) ────────────────────────────
 
-function CurvaRetencionChart({ curvaPromedio }) {
-  const data = curvaPromedio
-    .map((pct, n) => ({ mes: n === 0 ? 'Act.' : `M${n}`, pct }))
-    .filter(d => d.pct !== null)
+const HITOS = [
+  { n: 1,  label: 'M1',  desc: '1ª renovación',           color: '#f59e0b' },
+  { n: 7,  label: 'M7',  desc: 'Fin plan semestral+1',    color: '#10b981' },
+  { n: 14, label: 'M14', desc: 'Fin plan anual+2',        color: '#6366f1' },
+]
+
+// ─── Curva promedio (doble: transaccional + ajustada) ─────────────────────────
+
+function CurvaRetencionChart({ curvaPromedio, curvaPromedioAjustada }) {
+  const data = curvaPromedio.map((pct, n) => {
+    const aj = curvaPromedioAjustada?.[n] ?? null
+    return {
+      mes: n === 0 ? 'Act.' : `M${n}`,
+      n,
+      pct: pct !== null ? pct : undefined,
+      pctAj: aj !== null ? aj : undefined,
+    }
+  })
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null
+    const hito = HITOS.find(h => label === (h.n === 0 ? 'Act.' : `M${h.n}`))
     return (
-      <div className="bg-white border border-orange-100 rounded-lg px-3 py-2 shadow text-xs">
-        <p className="font-semibold text-slate-700">{label}</p>
-        <p className="text-orange-600 font-bold">{payload[0].value}% retención promedio</p>
+      <div className="bg-white border border-violet-100 rounded-xl shadow-lg px-4 py-3 text-xs min-w-[200px]">
+        <p className="font-bold text-slate-700 mb-1.5 border-b border-gray-100 pb-1">{label}{hito ? ` — ${hito.desc}` : ''}</p>
+        {payload.map((p, i) => (
+          <div key={i} className="flex items-center justify-between gap-4 mb-0.5">
+            <span style={{ color: p.color }} className="font-medium">{p.name}</span>
+            <span style={{ color: p.color }} className="font-bold">{p.value}%</span>
+          </div>
+        ))}
+        {payload.length === 2 && payload[0].value != null && payload[1].value != null && (
+          <p className="mt-1.5 pt-1 border-t border-gray-100 text-gray-400">
+            Diferencia: <strong className="text-indigo-600">+{payload[1].value - payload[0].value}pp</strong> por planes multi-mes
+          </p>
+        )}
       </div>
     )
   }
 
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <AreaChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height={280}>
+      <AreaChart data={data} margin={{ top: 16, right: 32, left: 0, bottom: 0 }}>
         <defs>
-          <linearGradient id="retGradPage" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.22} />
+          <linearGradient id="retGradTx" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.2} />
             <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.02} />
+          </linearGradient>
+          <linearGradient id="retGradAj" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#0891b2" stopOpacity={0.18} />
+            <stop offset="95%" stopColor="#0891b2" stopOpacity={0.02} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#ede9fe" />
-        <XAxis dataKey="mes" tick={{ fontSize: 11 }} stroke="#d1d5db" />
-        <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontSize: 11 }} stroke="#d1d5db" />
+        <XAxis dataKey="mes" tick={{ fontSize: 10 }} stroke="#d1d5db" />
+        <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontSize: 10 }} stroke="#d1d5db" width={36} />
         <Tooltip content={<CustomTooltip />} />
-        <ReferenceLine
-          y={50}
-          stroke="#fbbf24"
-          strokeDasharray="4 4"
-          label={{ value: '50%', position: 'right', fontSize: 10, fill: '#d97706' }}
-        />
-        <Area
-          type="monotone"
-          dataKey="pct"
-          stroke="#7c3aed"
-          strokeWidth={2.5}
-          fill="url(#retGradPage)"
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <ReferenceLine y={50} stroke="#fbbf24" strokeDasharray="4 4"
+          label={{ value: '50%', position: 'insideTopRight', fontSize: 9, fill: '#d97706' }} />
+        {HITOS.map(h => (
+          <ReferenceLine key={h.n} x={h.n === 0 ? 'Act.' : `M${h.n}`}
+            stroke={h.color} strokeDasharray="3 3" strokeWidth={1.5}
+            label={{ value: h.label, position: 'top', fontSize: 9, fill: h.color, fontWeight: 700 }} />
+        ))}
+        {curvaPromedioAjustada && (
+          <Area type="monotone" dataKey="pctAj"
+            name="Por servicio activo (ajustado plan)"
+            stroke="#0891b2" strokeWidth={2.5}
+            fill="url(#retGradAj)"
+            dot={{ r: 3, fill: '#0891b2', strokeWidth: 0 }}
+            activeDot={{ r: 5 }}
+            connectNulls />
+        )}
+        <Area type="monotone" dataKey="pct"
+          name="Transaccional (renovaciones)"
+          stroke="#7c3aed" strokeWidth={2.5}
+          fill="url(#retGradTx)"
           dot={{ r: 3, fill: '#7c3aed', strokeWidth: 0 }}
           activeDot={{ r: 5 }}
-          name="Retención %"
-        />
+          connectNulls />
       </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ─── Gráfico de distribución de planes ───────────────────────────────────────
+
+const PLAN_COLORS = { 'Plan Mensual': '#7c3aed', 'Plan Semestral': '#0891b2', 'Plan Anual': '#059669', 'Sin clasificar': '#94a3b8' }
+
+function DistribucionPlanesChart({ distribucionPlanes }) {
+  if (!distribucionPlanes?.length) return null
+  const total = distribucionPlanes.reduce((s, p) => s + p.count, 0)
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(140, distribucionPlanes.length * 42)}>
+      <ComposedChart layout="vertical" data={distribucionPlanes} margin={{ top: 4, right: 56, left: 4, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#ede9fe" opacity={0.4} horizontal={false} />
+        <XAxis type="number" tick={{ fontSize: 10, fill: '#78716c' }} allowDecimals={false} />
+        <YAxis type="category" dataKey="plan" tick={{ fontSize: 11, fill: '#374151' }} width={140} />
+        <Tooltip formatter={(v, name, props) => [`${v} ventas (${props.payload.pct}%)`, 'Cantidad']} />
+        <Bar dataKey="count" name="Ventas" radius={[0, 6, 6, 0]} maxBarSize={32}>
+          {distribucionPlanes.map((p, i) => (
+            <Cell key={i} fill={PLAN_COLORS[p.plan] || '#6366f1'} />
+          ))}
+          <LabelList
+            formatter={(v) => {
+              const p = distribucionPlanes.find(d => d.count === v)
+              return p ? `${v} (${p.pct}%)` : v
+            }}
+            position="right"
+            style={{ fontSize: 11, fontWeight: 700, fill: '#1e293b' }} />
+        </Bar>
+      </ComposedChart>
     </ResponsiveContainer>
   )
 }
@@ -207,7 +276,7 @@ function CurvaRetencionChart({ curvaPromedio }) {
 
 function narrarCohortes(cohortData) {
   if (!cohortData) return null
-  const { resumen, cohortes } = cohortData
+  const { resumen, resumenAjustado, cohortes } = cohortData
   if (!cohortes?.length) return null
 
   const mejorCohorte = cohortes
@@ -219,25 +288,20 @@ function narrarCohortes(cohortData) {
     .sort((a, b) => (a.retencion[3] ?? 100) - (b.retencion[3] ?? 100))[0]
 
   const caida_m0_m1 = resumen.mes1 != null ? 100 - resumen.mes1 : null
-  const estabilidad = resumen.mes3 != null && resumen.mes12 != null
-    ? Math.abs(resumen.mes3 - resumen.mes12)
+  const brechaAjuste = resumenAjustado?.mes6 != null && resumen.mes6 != null
+    ? resumenAjustado.mes6 - resumen.mes6
     : null
 
   return [
-    `En promedio, el **${resumen.mes1 ?? '—'}%** de los clientes registra actividad transaccional en el mes siguiente a su activación`,
-    `— y la retención se estabiliza alrededor del **${resumen.mes6 ?? '—'}–${resumen.mes12 ?? '—'}%** entre los meses 6 y 12.`,
-    caida_m0_m1 != null
-      ? ` Esto implica que **${caida_m0_m1} de cada 100 clientes** activados no generan una segunda transacción en el primer mes — señal de que el mes 1 es el punto de mayor fuga y el primero que conviene atacar con acciones de retención proactiva (recordatorios, descuentos de segunda renovación, contacto directo).`
-      : '',
-    estabilidad != null && estabilidad <= 5
-      ? ` Entre el mes 3 y el mes 12 la curva es **relativamente plana** (${resumen.mes3}% → ${resumen.mes12}%), lo que sugiere que quienes superan el primer mes tienden a quedarse — el churn estructural del negocio ocurre principalmente al inicio.`
-      : estabilidad != null
-      ? ` Entre el mes 3 y el mes 12 hay una **caída adicional de ${estabilidad} puntos** (${resumen.mes3}% → ${resumen.mes12}%), indicando pérdida gradual de clientes incluso en la base establecida.`
+    `La **curva transaccional** (violeta) muestra que el **${resumen.mes1 ?? '—'}%** de los clientes genera una 2ª transacción al mes siguiente. `,
+    `La **curva ajustada por plan** (azul) sube esa cifra a **${resumenAjustado?.mes1 ?? '—'}%** — la diferencia son clientes en planes semestrales o anuales que están activos pero no renovaron ese mes específico. `,
+    brechaAjuste != null && brechaAjuste > 5
+      ? `Al mes 6, la brecha entre ambas curvas es de **${brechaAjuste} puntos porcentuales** (${resumen.mes6}% transaccional vs ${resumenAjustado?.mes6}% ajustado) — eso confirma que una parte importante del "churn aparente" son clientes en plan semestral (6+1 meses) que no renuevan hasta el mes 7. `
       : '',
     mejorCohorte
-      ? ` La cohorte con **mejor retención al mes 3** es **${mejorCohorte.mes}** (${mejorCohorte.retencion[3]}% con ${mejorCohorte.clientesIniciales} clientes)${peorCohorte && peorCohorte.mes !== mejorCohorte.mes ? ` y la de peor desempeño fue **${peorCohorte.mes}** (${peorCohorte.retencion[3]}%)` : ''} — investigar qué condiciones diferenciaron ambas cohortes puede revelar palancas de retención replicables.`
+      ? `La cohorte con **mejor retención a mes 3** es **${mejorCohorte.mes}** (${mejorCohorte.retencion[3]}% con ${mejorCohorte.clientesIniciales} clientes)${peorCohorte && peorCohorte.mes !== mejorCohorte.mes ? ` y la de menor desempeño fue **${peorCohorte.mes}** (${peorCohorte.retencion[3]}%)` : ''}.`
       : '',
-    `\n\n⚠️ **Nota metodológica:** esta métrica mide "actividad de transacciones" (renovaciones/compras) por mes calendario, no "pantalla activa". Clientes en **plan anual** pueden aparecer sin actividad en meses 1–11 aunque estén usando el servicio. La curva subestima la retención real, especialmente en los meses intermedios.`,
+    `\n\n💡 **Las líneas verticales** marcan los hitos clave: **M1** (primera renovación mensual), **M7** (vencimiento plan semestral +1 gratis) y **M14** (vencimiento plan anual +2 gratis). Un "valle" en la curva ajustada justo antes de M7 o M14 es la señal más clara de que clientes en planes largos están cancelando en lugar de renovar.`,
   ].join('')
 }
 
@@ -312,80 +376,106 @@ export default function AnalisisRetencionPage() {
         <>
           <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
-          {/* KPIs de retención */}
+          {/* KPIs de retención — transaccional vs ajustado por plan */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <BiCard
-              icon={Users}
-              variant="light"
-              label="Retención · Mes 1"
-              value={data.resumen.mes1 != null ? `${data.resumen.mes1}%` : '—'}
-              sub="% que genera una 2ª transacción al mes siguiente de activación"
-              tag={tagMes1(data.resumen.mes1)}
-              onClick={() => setExplain({
-                title: 'Retención · Mes 1', value: data.resumen.mes1 != null ? `${data.resumen.mes1}%` : '—', icon: Users,
-                queEs: 'De cada 100 clientes que se activaron, cuántos volvieron a comprar (o renovar) al mes siguiente — la primera prueba de fuego de la relación.',
-                comoSeCalcula: 'Cada cliente se agrupa en la **cohorte** del mes de su primera activación. Se revisa si tuvo alguna transacción en el mes calendario siguiente y se promedia sobre todas las cohortes.',
-                origen: 'Fechas y tipos de pago de las ventas (módulo Pagos), excluyendo cortesías. **Ojo:** los clientes con plan anual no registran actividad mensual aunque estén activos, así que este % subestima la retención real.',
-              })}
-            />
-            <BiCard
-              icon={Repeat}
-              variant="light"
-              label="Retención · Mes 3"
-              value={data.resumen.mes3 != null ? `${data.resumen.mes3}%` : '—'}
-              sub="actividad a los 3 meses de haber entrado"
-              tag={tagMes3(data.resumen.mes3)}
-              onClick={() => setExplain({
-                title: 'Retención · Mes 3', value: data.resumen.mes3 != null ? `${data.resumen.mes3}%` : '—', icon: Repeat,
-                queEs: 'Cuántos clientes siguen comprando 3 meses después de haber entrado — el punto donde se separan los clientes de paso de los recurrentes.',
-                comoSeCalcula: 'Mismo método de cohortes: % de clientes de cada cohorte con al menos una transacción en su tercer mes de vida, promediado.',
-                origen: 'Ventas del módulo Pagos, agrupadas por cohorte de primera activación.',
-              })}
-            />
-            <BiCard
-              icon={TrendingUp}
-              variant="light"
-              label="Retención · Mes 6"
-              value={data.resumen.mes6 != null ? `${data.resumen.mes6}%` : '—'}
-              sub="actividad a los 6 meses — señal de fidelidad"
-              tag={tagMes6(data.resumen.mes6)}
-              onClick={() => setExplain({
-                title: 'Retención · Mes 6', value: data.resumen.mes6 != null ? `${data.resumen.mes6}%` : '—', icon: TrendingUp,
-                queEs: 'Cuántos clientes siguen activos medio año después de entrar — los que llegan aquí suelen quedarse.',
-                comoSeCalcula: 'Mismo método de cohortes, medido en el sexto mes de vida de cada cliente.',
-                origen: 'Ventas del módulo Pagos, agrupadas por cohorte.',
-              })}
-            />
-            <BiCard
-              icon={Trophy}
-              variant="light"
-              label="Retención · Mes 12"
-              value={data.resumen.mes12 != null ? `${data.resumen.mes12}%` : '—'}
-              sub="actividad al año — clientes de largo plazo"
-              tag={tagMes12(data.resumen.mes12)}
-              onClick={() => setExplain({
-                title: 'Retención · Mes 12', value: data.resumen.mes12 != null ? `${data.resumen.mes12}%` : '—', icon: Trophy,
-                queEs: 'Cuántos clientes cumplen un año comprando — el núcleo fiel que sostiene el ingreso recurrente y el LTV alto.',
-                comoSeCalcula: 'Mismo método de cohortes, medido en el mes 12 de vida. Solo cuentan las cohortes con al menos un año de antigüedad.',
-                origen: 'Ventas del módulo Pagos, agrupadas por cohorte. El detalle mes a mes está en el mapa de calor de abajo.',
-              })}
-            />
+            {[
+              { n: 'mes1', Icon: Users,      label: 'Retención · Mes 1',  sub: 'Primera renovación', tag: tagMes1, desc: 'De cada 100 clientes activados, cuántos generan una 2ª transacción al mes siguiente. Clientes en plan semestral/anual pueden aparecer como "no retenidos" aunque estén activos.' },
+              { n: 'mes3', Icon: Repeat,     label: 'Retención · Mes 3',  sub: 'Punto de estabilización', tag: tagMes3, desc: 'Cuántos siguen con actividad a los 3 meses. Separa clientes de paso de los recurrentes.' },
+              { n: 'mes6', Icon: TrendingUp, label: 'Retención · Mes 6',  sub: 'Señal de fidelidad media', tag: tagMes6, desc: 'M7 = fin del plan semestral + 1 gratis. La curva ajustada sube notablemente en este punto.' },
+              { n: 'mes12', Icon: Trophy,    label: 'Retención · Mes 12', sub: 'Núcleo fiel anual', tag: tagMes12, desc: 'M14 = fin del plan anual + 2 gratis. Solo cuentan cohortes con más de un año de antigüedad.' },
+            ].map(({ n, Icon, label, sub, tag, desc }) => {
+              const vTx = data.resumen[n]
+              const vAj = data.resumenAjustado?.[n]
+              const brecha = vAj != null && vTx != null ? vAj - vTx : null
+              return (
+                <div key={n} className="bg-white border-2 border-violet-100 rounded-xl p-4 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 cursor-pointer"
+                  onClick={() => setExplain({ title: label, value: vTx != null ? `${vTx}%` : '—', icon: Icon,
+                    queEs: desc,
+                    comoSeCalcula: 'Cada cliente entra a la cohorte del mes de su primera "Activacion Pantalla". Se mide si tuvo alguna transacción (excl. cortesías) en el mes N. **Ajustado**: los planes semestrales se marcan como activos 7 meses, los anuales 14 meses.',
+                    origen: 'Ventas del módulo Pagos agrupadas por cohorte de primera activación.',
+                  })}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="bg-violet-100 rounded-lg p-1.5"><Icon size={16} className="text-violet-600" /></div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+                  </div>
+                  <div className="flex items-end gap-2 mb-1">
+                    <p className="text-2xl font-bold text-violet-700">{vAj != null ? `${vAj}%` : '—'}</p>
+                    {brecha != null && brecha > 0 && (
+                      <span className="text-xs text-gray-400 mb-0.5">({vTx}% tx)</span>
+                    )}
+                  </div>
+                  {brecha != null && brecha > 0 && (
+                    <SmartTag tone="info">+{brecha}pp ajustado por plan</SmartTag>
+                  )}
+                  {tag && <div className="mt-1.5">{(() => { const t = tag(vTx); return t ? <SmartTag tone={t.tone}>{t.text}</SmartTag> : null })()}</div>}
+                  <p className="text-xs text-gray-400 mt-1.5 leading-snug">{sub}</p>
+                  <p className="text-xs font-semibold text-violet-500 mt-1.5">¿Cómo se calcula?</p>
+                </div>
+              )
+            })}
           </div>
 
-          {/* Curva promedio */}
-          <Card className="border-violet-100">
-            <CardHeader className="border-violet-50">
-              <CardTitle>Curva promedio de retención por mes de vida</CardTitle>
-              <p className="text-sm text-gray-400 mt-0.5">
-                Promedio de todas las cohortes · Línea de referencia al 50% · Datos hasta{' '}
-                <span className="font-semibold text-violet-600">{data.maxMes}</span>
-              </p>
-            </CardHeader>
-            <CardBody>
-              <CurvaRetencionChart curvaPromedio={data.curvaPromedio} />
-              <ChartInsight text={narrarCohortes(data)} />
-            </CardBody>
-          </Card>
+          {/* Distribución de planes */}
+          {data.distribucionPlanes?.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card className="border-violet-100 lg:col-span-2">
+                <CardHeader className="border-violet-50">
+                  <CardTitle>Curva promedio de retención por mes de vida</CardTitle>
+                  <p className="text-sm text-gray-400 mt-0.5">
+                    <span className="text-violet-600 font-semibold">Violeta</span> = transaccional (renovaciones reales) ·{' '}
+                    <span className="text-cyan-600 font-semibold">Azul</span> = servicio activo estimado (ajustado por duración de plan) ·{' '}
+                    datos hasta <span className="font-semibold">{data.maxMes}</span>
+                  </p>
+                </CardHeader>
+                <CardBody>
+                  <CurvaRetencionChart curvaPromedio={data.curvaPromedio} curvaPromedioAjustada={data.curvaPromedioAjustada} />
+                  <ChartInsight text={narrarCohortes(data)} />
+                </CardBody>
+              </Card>
+              <Card className="border-violet-100">
+                <CardHeader className="border-violet-50">
+                  <CardTitle>Distribución por plan</CardTitle>
+                  <p className="text-sm text-gray-400 mt-0.5">
+                    Ventas por tipo de plan · Explica la brecha entre las dos curvas
+                  </p>
+                </CardHeader>
+                <CardBody>
+                  <DistribucionPlanesChart distribucionPlanes={data.distribucionPlanes} />
+                  <div className="mt-3 space-y-1.5 text-xs text-gray-500">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+                      <span><strong>Plan Anual</strong>: 12 meses + 2 gratis = 14 meses servicio activo</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-cyan-600 shrink-0" />
+                      <span><strong>Plan Semestral</strong>: 6 meses + 1 gratis = 7 meses servicio activo</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-violet-600 shrink-0" />
+                      <span><strong>Plan Mensual</strong>: renovación cada mes = tasa real</span>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+            </div>
+          )}
+
+          {/* Curva sin distribución de planes */}
+          {!data.distribucionPlanes?.length && (
+            <Card className="border-violet-100">
+              <CardHeader className="border-violet-50">
+                <CardTitle>Curva promedio de retención por mes de vida</CardTitle>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  Promedio de todas las cohortes · Datos hasta{' '}
+                  <span className="font-semibold text-violet-600">{data.maxMes}</span>
+                </p>
+              </CardHeader>
+              <CardBody>
+                <CurvaRetencionChart curvaPromedio={data.curvaPromedio} curvaPromedioAjustada={data.curvaPromedioAjustada} />
+                <ChartInsight text={narrarCohortes(data)} />
+              </CardBody>
+            </Card>
+          )}
 
           {/* Heatmap */}
           <Card className="border-violet-100">
