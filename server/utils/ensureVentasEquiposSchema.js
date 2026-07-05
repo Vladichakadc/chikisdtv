@@ -14,17 +14,29 @@
 
 const sequelize = require('../config/database');
 const VentaEquipo = require('../models/VentaEquipo');
+const { DataTypes } = require('sequelize');
 
-// Mapa mínimo Sequelize → tipo de columna SQLite (afinidad)
-const TIPO_SQLITE = {
-  STRING: 'VARCHAR(255)',
-  TEXT: 'TEXT',
-  FLOAT: 'FLOAT',
-  INTEGER: 'INTEGER',
-  BOOLEAN: 'TINYINT(1)',
-  DATEONLY: 'DATE',
-  DATE: 'DATETIME',
-};
+// Mapa Sequelize DataTypes → tipo de columna SQLite (afinidad)
+function getSQLiteType(dataType) {
+  if (!dataType) return 'TEXT';
+  
+  const typeKey = dataType.key || dataType.constructor.name;
+  
+  const tipoMap = {
+    'STRING': 'VARCHAR(255)',
+    'VARCHAR': 'VARCHAR(255)',
+    'TEXT': 'TEXT',
+    'FLOAT': 'FLOAT',
+    'DOUBLE': 'FLOAT',
+    'INTEGER': 'INTEGER',
+    'INT': 'INTEGER',
+    'BOOLEAN': 'TINYINT(1)',
+    'DATEONLY': 'DATE',
+    'DATE': 'DATETIME',
+  };
+  
+  return tipoMap[typeKey] || 'TEXT';
+}
 
 async function ensureVentasEquiposSchema() {
   const cols = await sequelize.query('PRAGMA table_info(`ventas_equipos`)', { type: 'SELECT' });
@@ -36,9 +48,14 @@ async function ensureVentasEquiposSchema() {
   for (const [nombre, attr] of Object.entries(VentaEquipo.rawAttributes)) {
     const columna = attr.field || nombre;
     if (existentes.has(columna.toLowerCase())) continue;
-    const tipo = TIPO_SQLITE[attr.type.key] || 'TEXT';
-    await sequelize.query(`ALTER TABLE \`ventas_equipos\` ADD COLUMN \`${columna}\` ${tipo}`);
-    agregadas.push(columna);
+    
+    const tipo = getSQLiteType(attr.type);
+    try {
+      await sequelize.query(`ALTER TABLE \`ventas_equipos\` ADD COLUMN \`${columna}\` ${tipo}`);
+      agregadas.push(columna);
+    } catch (err) {
+      console.warn(`[MIGRACION] No se pudo agregar columna ${columna}:`, err.message);
+    }
   }
 
   if (agregadas.length > 0) {
@@ -48,3 +65,4 @@ async function ensureVentasEquiposSchema() {
 }
 
 module.exports = { ensureVentasEquiposSchema };
+
