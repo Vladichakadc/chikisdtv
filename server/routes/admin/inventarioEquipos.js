@@ -204,6 +204,60 @@ router.post('/inventario-equipos', asyncHandler(async (req, res) => {
   res.status(201).json(item);
 }));
 
+// POST /inventario-equipos/bulk — registra varias unidades físicas de la MISMA
+// referencia en una sola operación: una fila por serie, cantidad=1 cada una
+// (igual al patrón ya existente en el Excel importado: p. ej. in001-in004 son
+// 4 "Watch-onn-china" individuales). Los IDs se asignan consecutivamente en
+// esta misma operación para no colisionar con /next-id si se guardan lotes seguidos.
+const MAX_LOTE = 50;
+
+router.post('/inventario-equipos/bulk', asyncHandler(async (req, res) => {
+  const data = sanitizeInventarioBody(req.body);
+  if (!data.descripcion) return res.status(400).json({ error: 'La descripción es obligatoria' });
+
+  const seriesRaw = Array.isArray(req.body.series) ? req.body.series : [];
+  if (seriesRaw.length === 0) return res.status(400).json({ error: 'Debes ingresar la serie de al menos un equipo' });
+  if (seriesRaw.length > MAX_LOTE) return res.status(400).json({ error: `Máximo ${MAX_LOTE} equipos por lote` });
+
+  const series = seriesRaw.map(s => str(s));
+  if (series.some(s => !s)) return res.status(400).json({ error: 'Todas las series deben estar completas — no puede quedar ninguna en blanco' });
+
+  const vistas = new Set();
+  for (const s of series) {
+    const clave = s.toLowerCase();
+    if (vistas.has(clave)) return res.status(400).json({ error: `La serie "${s}" está repetida en el formulario` });
+    vistas.add(clave);
+  }
+
+  const duplicadas = await InventarioEquipo.findAll({ where: { serie: { [Op.in]: series } }, attributes: ['serie'], raw: true });
+  if (duplicadas.length > 0) {
+    return res.status(409).json({ error: `Ya existe(n) en el inventario la(s) serie(s): ${duplicadas.map(d => d.serie).join(', ')}` });
+  }
+
+  delete data.serie;    // se asigna una distinta por fila más abajo
+  delete data.cantidad; // cada fila representa una única unidad física
+  if (data.costoUniCOP == null) {
+    const auto = costoCOPDesdeUSD(data);
+    if (auto != null) data.costoUniCOP = auto;
+  }
+  if (!data.estado) data.estado = 'En Bodega';
+
+  const rows = await InventarioEquipo.findAll({ attributes: ['idInventario'], raw: true });
+  let max = rows.reduce((m, r) => {
+    const n = parseInt(String(r.idInventario).replace(/^in/i, ''), 10);
+    return Number.isFinite(n) && n > m ? n : m;
+  }, 0);
+
+  const registros = series.map((serie) => {
+    max += 1;
+    const rec = { ...data, cantidad: 1, serie };
+    return { idInventario: `in${String(max).padStart(3, '0')}`, ...rec, ...calcularDerivados(rec) };
+  });
+
+  const creados = await InventarioEquipo.bulkCreate(registros);
+  res.status(201).json({ message: `${creados.length} equipo(s) de "${data.descripcion}" agregados al inventario`, items: creados });
+}));
+
 router.put('/inventario-equipos/:idInventario', asyncHandler(async (req, res) => {
   const item = await InventarioEquipo.findByPk(req.params.idInventario);
   if (!item) return res.status(404).json({ error: 'Equipo no encontrado' });

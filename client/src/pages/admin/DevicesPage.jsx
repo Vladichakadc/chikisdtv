@@ -21,6 +21,11 @@ const REF_COLORS = ['#f97316', '#0ea5e9', '#16a34a', '#8b5cf6', '#ef4444', '#eab
 const fmtPesos = (v) => `$${Number(v || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`
 const fmtEjePesos = (v) => v >= 1_000_000 ? `$${(v / 1_000_000).toLocaleString('es-CO', { maximumFractionDigits: 1 })}M` : `$${Math.round(v / 1000)}K`
 
+// Un lote de "Nuevo Equipo" con Cantidad > 1 genera un campo Serie por unidad
+// — todas comparten la misma Referencia/Descripción. Tope razonable para no
+// romper la UI ni el formulario si alguien teclea un número desproporcionado.
+const MAX_LOTE = 50
+
 // ─── KPI Card ────────────────────────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, sub, variant }) {
   const styles = {
@@ -78,6 +83,7 @@ export default function DevicesPage() {
   const [refCustom, setRefCustom] = useState(false)
   const [trmInfo, setTrmInfo] = useState(null)
   const [loadingTrm, setLoadingTrm] = useState(false)
+  const [invSeries, setInvSeries] = useState([''])
 
   const [filterTipo, setFilterTipo] = useState('todos')
   const [filterActivo, setFilterActivo] = useState('todos')
@@ -223,6 +229,32 @@ export default function DevicesPage() {
     setInvForm(f => (String(f.costoUniCOP) === String(cop) ? f : { ...f, costoUniCOP: String(cop) }))
   }, [showInvForm, usdAuto, usdSubtotal, invForm.trm, invForm.transporteCOP])
 
+  // Cantidad > 1 en "Nuevo Equipo" (no aplica al editar una fila existente):
+  // se genera un campo Serie por unidad, todas bajo la misma Referencia/Descripción.
+  const cantidadNum = Math.min(Math.max(Math.round(Number(invForm.cantidad)) || 1, 1), MAX_LOTE)
+  const esLote = !invEditing && cantidadNum > 1
+  useEffect(() => {
+    if (!showInvForm || invEditing) return
+    setInvSeries(prev => {
+      if (prev.length === cantidadNum) return prev
+      const next = prev.slice(0, cantidadNum)
+      while (next.length < cantidadNum) next.push('')
+      return next
+    })
+  }, [showInvForm, invEditing, cantidadNum])
+
+  // Vista previa del rango de IDs que se asignarán al guardar el lote (los IDs
+  // reales los asigna el servidor de forma atómica al momento de guardar)
+  const idRangoPreview = useMemo(() => {
+    if (!esLote || !invForm.idInventario) return null
+    const m = String(invForm.idInventario).match(/^([a-zA-Z]*)(\d+)$/)
+    if (!m) return null
+    const [, prefijo, digitos] = m
+    const inicio = parseInt(digitos, 10)
+    const fin = inicio + cantidadNum - 1
+    return `${prefijo}${String(inicio).padStart(digitos.length, '0')} – ${prefijo}${String(fin).padStart(digitos.length, '0')}`
+  }, [esLote, invForm.idInventario, cantidadNum])
+
   useEffect(() => { load() }, [])
 
   const handleImportInventario = async () => {
@@ -243,6 +275,7 @@ export default function DevicesPage() {
     setInvEditing(null)
     setShowCostosImport(false)
     setRefCustom(false)
+    setInvSeries([''])
     let nextId = ''
     try {
       nextId = (await api.get('/admin/inventario-equipos/next-id')).data.nextId
@@ -258,6 +291,7 @@ export default function DevicesPage() {
 
   const openEditInv = (r) => {
     setInvEditing(r)
+    setInvSeries([r.serie || ''])
     setRefCustom(Boolean(r.descripcion) && !referencias.some(ref => ref.toLowerCase() === (r.descripcion || '').trim().toLowerCase()))
     const tieneUSD = Boolean(r.costoUnitarioUSD || r.envioUSD || r.impuestosUSD || r.transporteCOP || r.trm)
     setShowCostosImport(tieneUSD)
@@ -283,6 +317,32 @@ export default function DevicesPage() {
 
   const handleInvSubmit = async (e) => {
     e.preventDefault()
+
+    // Lote (Cantidad > 1, solo al crear): un equipo por serie, misma referencia
+    if (esLote) {
+      const series = invSeries.map(s => s.trim())
+      if (series.some(s => !s)) { showToast('Ingresa la serie de cada equipo antes de guardar.', 'error'); return }
+      const vistas = new Set()
+      for (const s of series) {
+        const clave = s.toLowerCase()
+        if (vistas.has(clave)) { showToast(`La serie "${s}" está repetida — cada equipo debe tener una serie única.`, 'error'); return }
+        vistas.add(clave)
+      }
+      setSavingInv(true)
+      try {
+        const { idInventario, cantidad, serie, ...compartido } = invForm
+        const { data } = await api.post('/admin/inventario-equipos/bulk', { ...compartido, series })
+        showToast(data.message, 'success')
+        setShowInvForm(false)
+        await load()
+      } catch (e) {
+        showToast(e.response?.data?.error || e.message, 'error')
+      } finally {
+        setSavingInv(false)
+      }
+      return
+    }
+
     setSavingInv(true)
     try {
       if (invEditing) {
@@ -669,7 +729,8 @@ export default function DevicesPage() {
             <form onSubmit={handleInvSubmit}>
               <CardBody className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Input
-                  label="ID inventario" value={invForm.idInventario} disabled readOnly
+                  label={esLote ? 'IDs inventario (rango)' : 'ID inventario'}
+                  value={idRangoPreview || invForm.idInventario} disabled readOnly
                   className="bg-gray-50 text-gray-400" placeholder="Generado automáticamente"
                 />
                 <Input
@@ -715,16 +776,35 @@ export default function DevicesPage() {
                   onChange={(e) => setInvForm({ ...invForm, proveedor: e.target.value })} placeholder="Amazon / Local"
                 />
 
-                <div className="sm:col-span-2">
-                  <Input
-                    label="Serie" value={invForm.serie}
-                    onChange={(e) => setInvForm({ ...invForm, serie: e.target.value })} placeholder="G4N1CQ…" className="font-mono"
-                  />
-                </div>
                 <Input
-                  label="Cantidad" type="number" min="1" value={invForm.cantidad}
+                  label="Cantidad" type="number" min="1" max={MAX_LOTE} value={invForm.cantidad}
                   onChange={(e) => setInvForm({ ...invForm, cantidad: e.target.value })}
                 />
+                {!esLote && (
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Serie" value={invForm.serie}
+                      onChange={(e) => setInvForm({ ...invForm, serie: e.target.value })} placeholder="G4N1CQ…" className="font-mono"
+                    />
+                  </div>
+                )}
+
+                {esLote && (
+                  <div className="sm:col-span-3">
+                    <p className="text-sm font-medium text-brand-accent mb-1">
+                      Serie de cada equipo <span className="font-normal text-gray-400">— {cantidadNum} unidades de "{invForm.descripcion || 'la referencia seleccionada'}"</span>
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-h-56 overflow-y-auto rounded-lg border border-ui-border bg-ui-background/40 p-3">
+                      {invSeries.map((s, i) => (
+                        <Input
+                          key={i}
+                          label={`Serie #${i + 1}`} value={s} required placeholder="Serie física" className="font-mono"
+                          onChange={(e) => setInvSeries(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <CurrencyInput
@@ -739,7 +819,9 @@ export default function DevicesPage() {
                   onChange={(e) => setInvForm({ ...invForm, precioSugerido: e.target.value })} placeholder="130.000"
                 />
                 <div className="rounded-lg border border-orange-100 bg-orange-50/60 px-3 py-2 self-end">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-orange-600">Cálculo automático</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-orange-600">
+                    Cálculo automático {esLote && `— total del lote (${cantidadNum} equipos)`}
+                  </p>
                   <p className="text-xs text-gray-600 mt-0.5 tabular-nums">
                     Total: <span className="font-semibold">{formatCurrency(invPreview.costoTotal)}</span>
                     {invPreview.ganancia != null && (
@@ -749,6 +831,7 @@ export default function DevicesPage() {
                       </>
                     )}
                   </p>
+                  {esLote && <p className="text-[11px] text-gray-400 mt-0.5">Cada equipo se registra con costo unitario {formatCurrency(Number(invForm.costoUniCOP) || 0)}</p>}
                 </div>
 
                 <div className="sm:col-span-3">
@@ -808,7 +891,9 @@ export default function DevicesPage() {
               </CardBody>
               <div className="p-4 border-t border-ui-border flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => setShowInvForm(false)}>Cancelar</Button>
-                <Button type="submit" disabled={savingInv}>{savingInv ? 'Guardando…' : invEditing ? 'Actualizar equipo' : 'Guardar equipo'}</Button>
+                <Button type="submit" disabled={savingInv}>
+                  {savingInv ? 'Guardando…' : invEditing ? 'Actualizar equipo' : esLote ? `Guardar ${cantidadNum} equipos` : 'Guardar equipo'}
+                </Button>
               </div>
             </form>
           </Card>

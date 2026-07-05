@@ -3,12 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { todayStr } from '../../utils/dateUtils'
 import {
   Monitor, Clock, AlertTriangle, CheckCircle2,
-  Search, Eye, EyeOff, RefreshCw, Tv,
-  Pencil, X, FileSpreadsheet, Save, Trash2,
+  Search, RefreshCw, Tv,
+  X, FileSpreadsheet, Save,
   Link2, Undo2,
   XCircle, Wallet, Gift, DollarSign, Percent,
   Users, Maximize2, Minimize2, KeyRound, Copy, Check,
   Building2, ExternalLink, ChevronDown,
+  Eye, EyeOff, Pencil, Trash2,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import api from '../../config/api'
@@ -17,10 +18,10 @@ import { Badge } from '../../components/ui/Badge'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
+import { PlanificadorTable } from '../../components/ui/PlanificadorTable'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 
 import { StatCard } from './planificador/StatCard'
-import { SortTh, DaysChip } from './planificador/TableBits'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 import { EditModal } from './planificador/EditModal'
 import {
@@ -1126,148 +1127,19 @@ export default function PlanificadorPage() {
         </div>
       )}
 
-      {/* Tabla */}
+      {/* ── Tabla compartida — cualquier cambio en PlanificadorTable.jsx
+              se refleja aquí y en SubscriptionsPage automáticamente ── */}
       <Card className="overflow-hidden">
-        <div className="overflow-auto max-h-[38rem] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-ui-border hover:[&::-webkit-scrollbar-thumb]:bg-brand-light">
-          <table className="w-full text-sm border-collapse">
-            <thead className="sticky top-0 z-20 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.2)]">
-              <tr className="text-center text-white text-xs font-bold">
-                <th colSpan={9} className="py-1.5 bg-blue-700 border-r-2 border-blue-500 tracking-wider">CUENTA</th>
-                <th colSpan={5} className="py-1.5 bg-emerald-700 border-r-2 border-emerald-500 tracking-wider">CLIENTE</th>
-                <th colSpan={8} className="py-1.5 bg-purple-700 tracking-wider">PLAN</th>
-                <th rowSpan={2} className="px-2 py-2 bg-gray-700 w-20 sticky right-0 z-10"></th>
-              </tr>
-              <tr className="bg-gray-100 text-gray-600 text-left border-b-2 border-gray-300">
-                <SortTh colKey="cuentaId"    label="ID"          sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="cuenta"      label="Cuenta"      sortConfig={sortConfig} onSort={onSort} />
-                <th className="px-2 py-2 font-semibold whitespace-nowrap">Contraseña</th>
-                <SortTh colKey="credito"     label="Crédito"     sortConfig={sortConfig} onSort={onSort} className="text-right" />
-                <SortTh colKey="inicio"      label="Inicio"      sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="finalizacion" label="Fin"        sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="dias"        label="Días"        sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="estado"      label="Estado"      sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="alerta"      label="Alerta"      sortConfig={sortConfig} onSort={onSort} className="border-r-2 border-gray-300" />
-                <SortTh colKey="nombre"      label="Nombre"      sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="apellido"    label="Apellido"    sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="idPantalla"  label="Pantalla"    sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="customerId"  label="Customer ID" sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="nickname"    label="Nickname"    sortConfig={sortConfig} onSort={onSort} className="border-r-2 border-gray-300" />
-                <SortTh colKey="pantallas"   label="#"           sortConfig={sortConfig} onSort={onSort} className="text-center" />
-                <SortTh colKey="duracionPlan" label="Duración"   sortConfig={sortConfig} onSort={onSort} className="text-center" />
-                <SortTh colKey="tipoPlan"     label="Tipo Plan"  sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="inicioReal"  label="Ini. Real"   sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="duracionReal" label="Fin Real"   sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="diasReal"    label="Días R."     sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="estadoReal"  label="Estado R."   sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="alertaReal"  label="Alerta R."   sortConfig={sortConfig} onSort={onSort} />
-                <SortTh colKey="debe"        label="Debe"        sortConfig={sortConfig} onSort={onSort} className="text-center" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => {
-                const rv     = getRowVariant(row, stats.diasAlerta)
-                const rowBg  = ROW_BG[rv]
-                const borderTop = row.isGroupStart ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'
-                return (
-                  <tr key={`${row.idPantalla}-${i}`} className={`${rowBg} ${borderTop} transition-colors`}>
-                    {/* CUENTA */}
-                    <td className="px-2 py-1.5 font-bold text-brand-accent whitespace-nowrap">{row.cuentaId}</td>
-                    <td className="px-2 py-1.5 font-mono text-gray-900 whitespace-nowrap">{row.cuenta}</td>
-                    <td className="px-2 py-1.5">
-                      <div className="flex items-center gap-1 whitespace-nowrap">
-                        {!hidePwd[row.cuentaId]
-                          ? <span className="font-mono text-gray-700">{row.password}</span>
-                          : <span className="text-gray-300 tracking-widest">••••••</span>}
-                        <button onClick={() => togglePwd(row.cuentaId)} className="text-gray-300 hover:text-gray-600 flex-shrink-0">
-                          {!hidePwd[row.cuentaId] ? <EyeOff size={11} /> : <Eye size={11} />}
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-2 py-1.5 text-gray-900 text-right whitespace-nowrap">{row.credito ?? '—'}</td>
-                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.inicio ? formatDate(row.inicio) : '—'}</td>
-                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.finalizacion ? formatDate(row.finalizacion) : '—'}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap"><DaysChip dias={calcDias(row.finalizacion) ?? row.diasVencimiento} /></td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">
-                      {row.estado ? <Badge variant={estadoBadgeVariant(row.estado)}>{row.estado}</Badge> : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-2 py-1.5 whitespace-nowrap border-r-2 border-gray-200">
-                      {row.alerta ? <Badge variant={estadoBadgeVariant(row.alerta)}>{row.alerta}</Badge> : <span className="text-gray-300">—</span>}
-                    </td>
-                    {/* CLIENTE */}
-                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.nombre || <span className="text-gray-400 italic">—</span>}</td>
-                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.apellido || <span className="text-gray-400 italic">—</span>}</td>
-                    <td className="px-2 py-1.5 font-mono font-bold text-brand-accent whitespace-nowrap">{row.idPantalla}</td>
-                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.customerId || '—'}</td>
-                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap border-r-2 border-gray-200">{row.nickname || '—'}</td>
-                    {/* PLAN */}
-                    <td className="px-2 py-1.5 text-center text-gray-900">{row.pantallas}</td>
-                    <td className="px-2 py-1.5 text-center text-gray-900 whitespace-nowrap">
-                      {row.duracionPlan != null ? Math.floor(Number(row.duracionPlan)) : '—'}
-                    </td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">
-                      {(() => {
-                        if (row.tipoPlan) return <Badge variant="orange">{row.tipoPlan}</Badge>;
-                        const d = row.duracionPlan != null ? Math.floor(Number(row.duracionPlan)) : null;
-                        if (d === 14) return <Badge variant="success">Plan Anual</Badge>;
-                        if (d === 7) return <Badge variant="warning">Plan Semestral</Badge>;
-                        if (d === 1) return <Badge variant="neutral">Plan Mensual</Badge>;
-                        return d != null ? <Badge variant="error">REVISAR</Badge> : <span className="text-gray-300">—</span>;
-                      })()}
-                    </td>
-                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.inicioReal ? formatDate(row.inicioReal) : '—'}</td>
-                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.duracionReal ? formatDate(row.duracionReal) : '—'}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap"><DaysChip dias={calcDias(row.duracionReal) ?? row.diasVencimientoReal} /></td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">
-                      {row.estadoReal ? <Badge variant={estadoBadgeVariant(row.estadoReal)}>{row.estadoReal}</Badge> : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">
-                      {row.alertaReal ? <Badge variant={estadoBadgeVariant(row.alertaReal)}>{row.alertaReal}</Badge> : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-2 py-1.5 text-center whitespace-nowrap">
-                      {row.debe
-                        ? (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <Badge variant="error">Debe</Badge>
-                            {row.montoDebe != null && row.montoDebe !== '' && (
-                              <span className="text-xs font-semibold text-red-600">{formatCurrency(row.montoDebe)}</span>
-                            )}
-                          </div>
-                        )
-                        : <span className="text-gray-300">—</span>}
-                    </td>
-                    {/* Acciones */}
-                    <td className="px-2 py-1.5 text-center sticky right-0 bg-white z-10 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => { snapshotBeforeChange(); setEditRow(row) }}
-                          className="p-1.5 rounded text-brand-primary hover:bg-brand-primary hover:text-white transition-colors"
-                          title="Editar"
-                        >
-                          <Pencil size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(row)}
-                          className="p-1.5 rounded text-red-400 hover:bg-red-500 hover:text-white transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={23} className="px-4 py-12 text-center text-gray-400">
-                    <Monitor size={28} className="mx-auto mb-2 text-gray-300" />
-                    No se encontraron pantallas con los filtros aplicados.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <PlanificadorTable
+          rows={rows}
+          stats={stats}
+          sortConfig={sortConfig}
+          onSort={onSort}
+          hidePwd={hidePwd}
+          onTogglePwd={togglePwd}
+          onEdit={(row) => { snapshotBeforeChange(); setEditRow(row) }}
+          onDelete={handleDelete}
+        />
       </Card>
     </div>
   )
