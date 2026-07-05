@@ -22,8 +22,6 @@ const CSS = `
   .ret-a3 { animation: ret-fade-up .45s cubic-bezier(.22,1,.36,1) .12s both }
   .ret-orb-1 { animation: ret-orb-1 8s ease-in-out infinite }
   .ret-orb-2 { animation: ret-orb-2 11s ease-in-out infinite }
-  .ret-kpi { transition: transform .25s ease, box-shadow .25s ease }
-  .ret-kpi:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.12) }
   @media (prefers-reduced-motion: reduce) {
     .ret-a1, .ret-a2, .ret-a3, .ret-orb-1, .ret-orb-2 { animation: none !important; transition: none !important }
   }
@@ -46,14 +44,14 @@ function SmartTag({ tone = 'info', icon: Icon = Sparkles, children }) {
   )
 }
 
-// BiCard → KpiCard global (dark Huashu)
-// tag prop se muestra como sub adicional cuando no hay sub
-const BiCard = ({ tag, sub, ...props }) =>
-  <KpiCard
-    {...props}
-    tone="orange"
-    sub={sub || (tag ? tag.text : undefined)}
-  />
+// Helpers para construir el sub-texto enriquecido de cada KpiCard de retención
+function buildRetSub(sub, vTx, vAj, brecha, tagFn) {
+  const parts = []
+  if (brecha != null && brecha > 0) parts.push(`+${brecha}pp ajustado por plan`)
+  if (tagFn) { const t = tagFn(vTx); if (t) parts.push(t.text) }
+  if (sub) parts.push(sub)
+  return parts.join(' · ') || undefined
+}
 
 function ChartInsight({ text }) {
   if (!text) return null
@@ -376,45 +374,33 @@ export default function AnalisisRetencionPage() {
           {/* KPIs de retención — transaccional vs ajustado por plan */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 ret-a2">
             {[
-              { n: 'mes1', Icon: Users,      label: 'Retención · Mes 1',  sub: 'Primera renovación', tag: tagMes1, desc: 'De cada 100 clientes activados, cuántos generan una 2ª transacción al mes siguiente. Clientes en plan semestral/anual pueden aparecer como "no retenidos" aunque estén activos.' },
-              { n: 'mes3', Icon: Repeat,     label: 'Retención · Mes 3',  sub: 'Punto de estabilización', tag: tagMes3, desc: 'Cuántos siguen con actividad a los 3 meses. Separa clientes de paso de los recurrentes.' },
-              { n: 'mes6', Icon: TrendingUp, label: 'Retención · Mes 6',  sub: 'Señal de fidelidad media', tag: tagMes6, desc: 'M7 = fin del plan semestral + 1 gratis. La curva ajustada sube notablemente en este punto.' },
-              { n: 'mes12', Icon: Trophy,    label: 'Retención · Mes 12', sub: 'Núcleo fiel anual', tag: tagMes12, desc: 'M14 = fin del plan anual + 2 gratis. Solo cuentan cohortes con más de un año de antigüedad.' },
-            ].map(({ n, Icon, label, sub, tag, desc }) => {
+              { n: 'mes1',  Icon: Users,      label: 'Retención · Mes 1',  sub: 'Primera renovación',       tag: tagMes1,  desc: 'De cada 100 clientes activados, cuántos generan una 2ª transacción al mes siguiente. Clientes en plan semestral/anual pueden aparecer como "no retenidos" aunque estén activos.' },
+              { n: 'mes3',  Icon: Repeat,     label: 'Retención · Mes 3',  sub: 'Punto de estabilización', tag: tagMes3,  desc: 'Cuántos siguen con actividad a los 3 meses. Separa clientes de paso de los recurrentes.' },
+              { n: 'mes6',  Icon: TrendingUp, label: 'Retención · Mes 6',  sub: 'Señal de fidelidad media', tag: tagMes6,  desc: 'M7 = fin del plan semestral + 1 gratis. La curva ajustada sube notablemente en este punto.' },
+              { n: 'mes12', Icon: Trophy,     label: 'Retención · Mes 12', sub: 'Núcleo fiel anual',        tag: tagMes12, desc: 'M14 = fin del plan anual + 2 gratis. Solo cuentan cohortes con más de un año de antigüedad.' },
+            ].map(({ n, Icon, label, sub, tag, desc }, idx) => {
               const vTx = data.resumen[n]
               const vAj = data.resumenAjustado?.[n]
               const brecha = vAj != null && vTx != null ? vAj - vTx : null
+              const displayValue = vAj != null ? `${vAj}%` : (vTx != null ? `${vTx}%` : '—')
               return (
-                <div key={n} className="relative bg-white rounded-2xl border border-slate-200 overflow-hidden select-none cursor-pointer ret-kpi"
-                  onClick={() => setExplain({ title: label, value: vTx != null ? `${vTx}%` : '—', icon: Icon,
+                <KpiCard
+                  key={n}
+                  icon={Icon}
+                  label={label}
+                  value={displayValue}
+                  tone="violet"
+                  delay={idx + 2}
+                  sub={buildRetSub(sub, vTx, vAj, brecha, tag)}
+                  onClick={() => setExplain({
+                    title: label,
+                    value: vTx != null ? `${vTx}%` : '—',
+                    icon: Icon,
                     queEs: desc,
                     comoSeCalcula: 'Cada cliente entra a la cohorte del mes de su primera "Activacion Pantalla". Se mide si tuvo alguna transacción (excl. cortesías) en el mes N. **Ajustado**: los planes semestrales se marcan como activos 7 meses, los anuales 14 meses.',
                     origen: 'Ventas del módulo Pagos agrupadas por cohorte de primera activación.',
-                  })}>
-                  <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: 'linear-gradient(135deg, #a855f7, #7e22ce)' }} />
-                  <div className="p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="bg-violet-500/10 rounded-lg p-2"><Icon size={18} className="text-violet-600" /></div>
-                      <p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-400">{label}</p>
-                    </div>
-                    <div className="flex items-end gap-2 mb-1.5">
-                      <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none">{vAj != null ? `${vAj}%` : '—'}</p>
-                      {brecha != null && brecha > 0 && (
-                        <span className="text-xs text-slate-400 font-medium">({vTx}% tx)</span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {brecha != null && brecha > 0 && (
-                        <SmartTag tone="info">+{brecha}pp ajustado por plan</SmartTag>
-                      )}
-                      {tag && <div>{(() => { const t = tag(vTx); return t ? <SmartTag tone={t.tone}>{t.text}</SmartTag> : null })()}</div>}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-3 leading-relaxed">{sub}</p>
-                    <p className="text-[11px] font-bold text-violet-500 mt-3 inline-flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity">
-                      <Lightbulb size={12} /> ¿Cómo se calcula?
-                    </p>
-                  </div>
-                </div>
+                  })}
+                />
               )
             })}
           </div>
