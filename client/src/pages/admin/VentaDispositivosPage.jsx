@@ -789,11 +789,11 @@ export default function VentaDispositivosPage() {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/25 mb-4">
                 <Activity size={12} className="text-indigo-400" />
-                <span className="text-indigo-400 text-xs font-semibold tracking-widest uppercase">Inventario</span>
+                <span className="text-indigo-400 text-xs font-semibold tracking-widest uppercase">Ventas</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight"
                   style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
-                Inventario Equipos
+                Venta de Equipos
               </h1>
               <p className="text-slate-400 text-sm mt-2">
                 Historial de dispositivos físicos vendidos

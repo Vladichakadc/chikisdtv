@@ -48,9 +48,11 @@ export function PlanificadorTable({
         {/* ── Column group headers (CUENTA / CLIENTE / PLAN) ── */}
         <thead className="sticky top-0 z-20 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.2)]">
           <tr className="text-center text-white text-xs font-bold">
-            <th colSpan={9} className="py-1.5 bg-blue-700 border-r-2 border-blue-500 tracking-wider">
-              CUENTA
-            </th>
+            {!readOnly && (
+              <th colSpan={9} className="py-1.5 bg-blue-700 border-r-2 border-blue-500 tracking-wider">
+                CUENTA
+              </th>
+            )}
             <th colSpan={5} className="py-1.5 bg-emerald-700 border-r-2 border-emerald-500 tracking-wider">
               CLIENTE
             </th>
@@ -62,15 +64,19 @@ export function PlanificadorTable({
             )}
           </tr>
           <tr className="bg-gray-100 text-gray-600 text-left border-b-2 border-gray-300">
-            <SortTh colKey="cuentaId"    label="ID"         sortConfig={sortConfig} onSort={onSort} />
-            <SortTh colKey="cuenta"      label="Cuenta"     sortConfig={sortConfig} onSort={onSort} />
-            <th className="px-2 py-2 font-semibold whitespace-nowrap">Contraseña</th>
-            <SortTh colKey="credito"     label="Crédito"    sortConfig={sortConfig} onSort={onSort} className="text-right" />
-            <SortTh colKey="inicio"      label="Inicio"     sortConfig={sortConfig} onSort={onSort} />
-            <SortTh colKey="finalizacion" label="Fin"       sortConfig={sortConfig} onSort={onSort} />
-            <SortTh colKey="dias"        label="Días"       sortConfig={sortConfig} onSort={onSort} />
-            <SortTh colKey="estado"      label="Estado"     sortConfig={sortConfig} onSort={onSort} />
-            <SortTh colKey="alerta"      label="Alerta"     sortConfig={sortConfig} onSort={onSort} className="border-r-2 border-gray-300" />
+            {!readOnly && (
+              <>
+                <SortTh colKey="cuentaId"    label="ID"         sortConfig={sortConfig} onSort={onSort} />
+                <SortTh colKey="cuenta"      label="Cuenta"     sortConfig={sortConfig} onSort={onSort} />
+                <th className="px-2 py-2 font-semibold whitespace-nowrap">Contraseña</th>
+                <SortTh colKey="credito"     label="Crédito"    sortConfig={sortConfig} onSort={onSort} className="text-right" />
+                <SortTh colKey="inicio"      label="Inicio"     sortConfig={sortConfig} onSort={onSort} />
+                <SortTh colKey="finalizacion" label="Fin"       sortConfig={sortConfig} onSort={onSort} />
+                <SortTh colKey="dias"        label="Días"       sortConfig={sortConfig} onSort={onSort} />
+                <SortTh colKey="estado"      label="Estado"     sortConfig={sortConfig} onSort={onSort} />
+                <SortTh colKey="alerta"      label="Alerta"     sortConfig={sortConfig} onSort={onSort} className="border-r-2 border-gray-300" />
+              </>
+            )}
             <SortTh colKey="nombre"      label="Nombre"     sortConfig={sortConfig} onSort={onSort} />
             <SortTh colKey="apellido"    label="Apellido"   sortConfig={sortConfig} onSort={onSort} />
             <SortTh colKey="idPantalla"  label="Pantalla"   sortConfig={sortConfig} onSort={onSort} />
@@ -112,39 +118,43 @@ export function PlanificadorTable({
                 className={`${rowBg} ${borderTop} transition-colors`}
               >
                 {/* CUENTA */}
-                <td className="px-2 py-1.5 font-bold text-brand-accent whitespace-nowrap">{row.cuentaId}</td>
-                <td className="px-2 py-1.5 font-mono text-gray-900 whitespace-nowrap">{row.cuenta}</td>
-                <td className="px-2 py-1.5">
-                  <div className="flex items-center gap-1 whitespace-nowrap">
-                    {!hidePwd[row.cuentaId]
-                      ? <span className="font-mono text-gray-700">{row.password}</span>
-                      : <span className="text-gray-300 tracking-widest">••••••</span>}
-                    {onTogglePwd && (
-                      <button
-                        onClick={() => onTogglePwd(row.cuentaId)}
-                        className="text-gray-300 hover:text-gray-600 flex-shrink-0"
-                      >
-                        {!hidePwd[row.cuentaId] ? <EyeOff size={11} /> : <Eye size={11} />}
-                      </button>
-                    )}
-                  </div>
-                </td>
-                <td className="px-2 py-1.5 text-gray-900 text-right whitespace-nowrap">{row.credito ?? '—'}</td>
-                <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.inicio ? formatDate(row.inicio) : '—'}</td>
-                <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.finalizacion ? formatDate(row.finalizacion) : '—'}</td>
-                <td className="px-2 py-1.5 whitespace-nowrap">
-                  <DaysChip dias={calcDias(row.finalizacion) ?? row.diasVencimiento} />
-                </td>
-                <td className="px-2 py-1.5 whitespace-nowrap">
-                  {row.estado
-                    ? <Badge variant={estadoBadgeVariant(row.estado)}>{row.estado}</Badge>
-                    : <span className="text-gray-300">—</span>}
-                </td>
-                <td className="px-2 py-1.5 whitespace-nowrap border-r-2 border-gray-200">
-                  {row.alerta
-                    ? <Badge variant={estadoBadgeVariant(row.alerta)}>{row.alerta}</Badge>
-                    : <span className="text-gray-300">—</span>}
-                </td>
+                {!readOnly && (
+                  <>
+                    <td className="px-2 py-1.5 font-bold text-brand-accent whitespace-nowrap">{row.cuentaId}</td>
+                    <td className="px-2 py-1.5 font-mono text-gray-900 whitespace-nowrap">{row.cuenta}</td>
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-1 whitespace-nowrap">
+                        {!hidePwd[row.cuentaId]
+                          ? <span className="font-mono text-gray-700">{row.password}</span>
+                          : <span className="text-gray-300 tracking-widest">••••••</span>}
+                        {onTogglePwd && (
+                          <button
+                            onClick={() => onTogglePwd(row.cuentaId)}
+                            className="text-gray-300 hover:text-gray-600 flex-shrink-0"
+                          >
+                            {!hidePwd[row.cuentaId] ? <EyeOff size={11} /> : <Eye size={11} />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-2 py-1.5 text-gray-900 text-right whitespace-nowrap">{row.credito ?? '—'}</td>
+                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.inicio ? formatDate(row.inicio) : '—'}</td>
+                    <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.finalizacion ? formatDate(row.finalizacion) : '—'}</td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">
+                      <DaysChip dias={calcDias(row.finalizacion) ?? row.diasVencimiento} />
+                    </td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">
+                      {row.estado
+                        ? <Badge variant={estadoBadgeVariant(row.estado)}>{row.estado}</Badge>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-2 py-1.5 whitespace-nowrap border-r-2 border-gray-200">
+                      {row.alerta
+                        ? <Badge variant={estadoBadgeVariant(row.alerta)}>{row.alerta}</Badge>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                  </>
+                )}
 
                 {/* CLIENTE */}
                 <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.nombre || <span className="text-gray-400 italic">—</span>}</td>

@@ -27,8 +27,40 @@ import { EditModal } from './planificador/EditModal'
 import {
   calcDias, getRowVariant, ROW_BG, estadoBadgeVariant, getPlanSortVal,
 } from './planificador/rowHelpers'
+import { DaysChip } from './planificador/TableBits'
 
 const DIAS_ALERTA_CP = 30
+
+const CSS = `
+  @keyframes pl-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes pl-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes pl-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  @keyframes pl-fade-in { from { opacity:0 } to { opacity:1 } }
+  @keyframes pl-scale-in { from { opacity:0; transform:scale(.94) translateY(10px) } to { opacity:1; transform:scale(1) translateY(0) } }
+
+  .pl-a1 { animation: pl-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .pl-a2 { animation: pl-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  
+  .pl-orb-1 { animation: pl-orb-1 8s ease-in-out infinite }
+  .pl-orb-2 { animation: pl-orb-2 11s ease-in-out infinite }
+  
+  .pl-cta {
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    box-shadow: 0 4px 18px rgba(168,85,247,.4);
+    transition: all .22s ease; border: none;
+  }
+  .pl-cta:hover { box-shadow: 0 7px 24px rgba(168,85,247,.55); transform: translateY(-2px) }
+  
+  .pl-btn-ghost { transition: all .2s ease; border: 1px solid rgba(255,255,255,.2); background: transparent; }
+  .pl-btn-ghost:hover { background: rgba(255,255,255,.1) }
+
+  .pl-overlay { animation: pl-fade-in .2s ease both }
+  .pl-confirm { animation: pl-scale-in .22s cubic-bezier(.22,1,.36,1) both }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pl-a1, .pl-a2, .pl-orb-1, .pl-orb-2, .pl-overlay, .pl-confirm { animation: none !important; transition: none !important }
+  }
+`
 
 // ─── Labels de campo para el diff de sincronización ──────────────────────────
 
@@ -65,8 +97,8 @@ function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
     : [...actualizadas, ...sinCambio]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div className="pl-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4" onClick={onClose}>
+      <div className="pl-confirm bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl px-6 py-4 flex items-center justify-between flex-shrink-0">
@@ -250,8 +282,8 @@ function CuentasPadreAlertPanel({ cuentas, titulo, variante, onClose, navigate }
   const isVencidas = variante === 'vencida'
   const headerGrad = isVencidas ? 'from-red-600 to-red-700' : 'from-amber-500 to-amber-600'
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+    <div className="pl-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4" onClick={onClose}>
+      <div className="pl-confirm bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className={`bg-gradient-to-r ${headerGrad} rounded-t-2xl px-6 py-4 flex items-center justify-between flex-shrink-0`}>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Building2 size={20} /> {titulo}
@@ -662,6 +694,7 @@ export default function PlanificadorPage() {
 
   return (
     <div>
+      <style>{CSS}</style>
       {/* Modal informe comparativo de sincronización */}
       {showSyncDiff && syncDiffData.length > 0 && (
         <SyncDiffModal
@@ -706,50 +739,47 @@ export default function PlanificadorPage() {
         />
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-brand-accent">Planificador</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Control de cuentas y asignación de pantallas IPTV · {stats.total} pantallas en {stats.cuentas} cuentas · Alerta: ≤{stats.diasAlerta} días
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {prevPantallas && (
-            <Button
-              onClick={handleUndo} variant="secondary" disabled={undoing}
-              className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400"
-            >
-              <Undo2 size={15} /> {undoing ? 'Deshaciendo…' : 'Deshacer último cambio'}
-            </Button>
-          )}
-          <Button
-            onClick={handleSync} variant="secondary" disabled={syncing}
-            className="relative border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
-          >
-            <Link2 size={15} /> {syncing ? 'Sincronizando…' : 'Sincronizar Cuentas Padre'}
-            {syncPendiente && !syncing && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500" />
-              </span>
+      {/* ── HERO HEADER ── */}
+      <div className="pl-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#4a044e 0%,#2e1065 100%)' }}>
+        <div className="pl-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#c026d3,transparent 70%)' }} />
+        <div className="pl-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.15] pointer-events-none" style={{ background: 'radial-gradient(circle,#9333ea,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/25 mb-4">
+              <Tv size={12} className="text-fuchsia-300" />
+              <span className="text-fuchsia-300 text-xs font-semibold tracking-widest uppercase">Operación Core</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Planificador
+            </h1>
+            <p className="text-fuchsia-100/70 text-sm mt-2">
+              Control de cuentas y asignación de pantallas IPTV {!loading && <span className="text-fuchsia-300/50">· {stats.total} pantallas en {stats.cuentas} cuentas · Alerta: ≤{stats.diasAlerta} días</span>}
+            </p>
+          </div>
+          <div className="flex gap-2 flex-wrap items-center">
+            {prevPantallas && (
+              <button onClick={handleUndo} disabled={undoing} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
+                <Undo2 size={15} /> {undoing ? 'Deshaciendo…' : 'Deshacer'}
+              </button>
             )}
-          </Button>
-          <Button
-            onClick={handleExport} variant="secondary" disabled={exporting}
-            className="border-brand-light text-brand-dark hover:bg-brand-light/40 hover:border-brand-primary"
-          >
-            <FileSpreadsheet size={15} /> {exporting ? 'Exportando…' : 'Exportar a Excel'}
-          </Button>
-          <Button
-            onClick={handleGuardar} variant="secondary" disabled={saving}
-            className="border-state-success/30 text-state-success hover:bg-state-success hover:text-white hover:border-state-success"
-          >
-            <Save size={15} /> {saving ? 'Guardando…' : 'Guardar'}
-          </Button>
-          <Button onClick={load} variant="primary" className="shadow-md">
-            <RefreshCw size={15} /> Actualizar
-          </Button>
+            <button onClick={handleSync} disabled={syncing} className="pl-btn-ghost relative px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
+              <Link2 size={15} /> {syncing ? 'Sincronizando…' : 'Sincronizar CP'}
+              {syncPendiente && !syncing && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" /><span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500" /></span>
+              )}
+            </button>
+            <button onClick={handleExport} disabled={exporting} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
+              <FileSpreadsheet size={15} /> Exportar Excel
+            </button>
+            <button onClick={handleGuardar} disabled={saving} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
+              <Save size={15} /> {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button onClick={load} className="pl-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
+              <RefreshCw size={15} /> Actualizar
+            </button>
+          </div>
         </div>
       </div>
 

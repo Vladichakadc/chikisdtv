@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useUi } from '../../context/UiContext'
 import { Plus, Pencil, Trash2, X, Search, UserX, Tv, ArrowDownCircle, BarChart3, Calendar, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
-import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList, Legend } from 'recharts'
-import { ModuleStatCard as StatCard, ChartInsight, narrarBajasPorAnio, LABEL_STYLE } from './dashboard/biShared'
+
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
@@ -23,7 +22,70 @@ const EMPTY = {
   tipoPlan: '', tipoPantalla: '', cuentaDedicada: '', motivo: '', observaciones: ''
 }
 
-// Tarjeta KPI — compartida (naranja corporativo, con modal explicativo al clic)
+const CSS = `
+  @keyframes bj-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes bj-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes bj-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  @keyframes bj-drawer-in { from { transform:translateX(100%) } to { transform:translateX(0) } }
+  @keyframes bj-fade-in { from { opacity:0 } to { opacity:1 } }
+  .bj-a1 { animation: bj-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .bj-a2 { animation: bj-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .bj-orb-1 { animation: bj-orb-1 8s ease-in-out infinite }
+  .bj-orb-2 { animation: bj-orb-2 11s ease-in-out infinite }
+  .bj-cta {
+    background: linear-gradient(135deg, #e11d48, #be123c);
+    box-shadow: 0 4px 18px rgba(225,29,72,.4);
+    transition: all .22s ease; border: none;
+  }
+  .bj-cta:hover { box-shadow: 0 7px 24px rgba(225,29,72,.55); transform: translateY(-2px) }
+  .bj-overlay { animation: bj-fade-in .2s ease both }
+  .bj-drawer { animation: bj-drawer-in .3s cubic-bezier(.22,1,.36,1) both }
+  @media (prefers-reduced-motion: reduce) {
+    .bj-a1, .bj-a2, .bj-orb-1, .bj-orb-2, .bj-overlay, .bj-drawer { animation: none !important; transition: none !important }
+  }
+`
+
+function BajaCard({ icon: Icon, label, value, sub, variant, onClick }) {
+  const isSolid = variant === 'solid'
+  const isOutline = variant === 'outline'
+  
+  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
+    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? 'bg-rose-50 border border-rose-200' : 'border border-slate-200 shadow-sm'}
+    ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50' : ''}`
+
+  const topBorder = isSolid 
+    ? 'linear-gradient(90deg, #f43f5e, #e11d48)'
+    : 'linear-gradient(90deg, #fb718580, #f43f5e80)'
+
+  return (
+    <div className={containerClass} onClick={onClick}>
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
+      <div className="p-5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? 'text-rose-500' : 'text-slate-400'}`}>
+            {label}
+          </p>
+          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
+            {value}
+          </p>
+          {sub && (
+            <p className={`text-xs mt-2 font-medium ${isOutline ? 'text-rose-500' : 'text-slate-500'}`}>
+              {sub}
+            </p>
+          )}
+          {onClick && (
+            <div className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors">
+              <span>¿Cómo se calcula?</span>
+            </div>
+          )}
+        </div>
+        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? 'bg-rose-50 text-rose-500' : 'bg-rose-50 text-rose-500'}`}>
+          <Icon size={22} />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Columnas de la tabla
 const TABLE_COLUMNS = [
@@ -57,23 +119,7 @@ function SortIcon({ sortKey, sortCol, sortDir }) {
 export default function BajasPage() {
   const { showToast } = useUi()
   const { data: bajas, loading, reload: load } = useApiResource('/admin/bajas')
-  const [bajasPorAnio, setBajasPorAnio] = useState([])
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState(EMPTY)
-  const [search, setSearch] = useState('')
-  const [sortCol, setSortCol] = useState('fechaBaja')
-  const [sortDir, setSortDir] = useState('desc')
-  const [nicknames, setNicknames] = useState([])
-  const [nicknameEditMode, setNicknameEditMode] = useState(false)
-  const [explain, setExplain] = useState(null)
 
-  // Comparativo año a año (agregado del dashboard-bi, movido desde el Dashboard)
-  useEffect(() => {
-    api.get('/admin/dashboard-bi')
-      .then(r => setBajasPorAnio(r.data.bajasPorAnioDetalle || []))
-      .catch(() => {})
-  }, [])
 
   const openNew = async () => {
     setEditing(null)
@@ -168,44 +214,7 @@ export default function BajasPage() {
     return { total, devueltos, cortesias, mesMasAlto, anioActual }
   }, [bajas])
 
-  // Filtrar
-  // ── Análisis por mes ─────────────────────────────────────────────────────────
 
-  // Estacionalidad: cuántas bajas por mes del calendario (suma histórica)
-  const bajasPorMesCalendario = useMemo(() => {
-    const counts = {}
-    bajas.forEach(b => { if (b.mes) counts[b.mes] = (counts[b.mes] || 0) + 1 })
-    const max = Math.max(...Object.values(counts), 1)
-    return MESES.map(m => ({ mes: m.slice(0, 3), mesNombre: m, total: counts[m] || 0, max }))
-  }, [bajas])
-
-  // Tendencia reciente: 2025 vs 2026 por mes del calendario
-  const bajasMensualReciente = useMemo(() => {
-    const mesIdx = Object.fromEntries(MESES.map((m, i) => [m, i]))
-    const map = {}
-    bajas.forEach(b => {
-      const anio = Number(b.anio)
-      if (!b.mes || anio < 2025) return
-      const idx = mesIdx[b.mes] ?? -1
-      if (idx < 0) return
-      if (!map[idx]) map[idx] = { mesNum: idx, mes: MESES[idx].slice(0, 3), '2025': 0, '2026': 0 }
-      map[idx][String(anio)] = (map[idx][String(anio)] || 0) + 1
-    })
-    return MESES.map((_, i) => map[i] || { mesNum: i, mes: MESES[i].slice(0, 3), '2025': 0, '2026': 0 })
-  }, [bajas])
-
-  // Distribución por motivo de baja (top 8)
-  const bajasPorMotivo = useMemo(() => {
-    const counts = {}
-    bajas.forEach(b => {
-      const m = (b.motivo || '').trim() || 'Sin especificar'
-      counts[m] = (counts[m] || 0) + 1
-    })
-    return Object.entries(counts)
-      .map(([motivo, total]) => ({ motivo: motivo.length > 30 ? motivo.slice(0, 28) + '…' : motivo, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 8)
-  }, [bajas])
 
   const filtered = useMemo(() => {
     let result = bajas
@@ -276,48 +285,66 @@ export default function BajasPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-brand-accent">Bajas</h1>
-          <p className="text-gray-500">Registro de cancelaciones y bajas de servicio</p>
+      <style>{CSS}</style>
+
+      {/* ── HERO HEADER ── */}
+      <div className="bj-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#701a75 0%,#4c0519 100%)' }}>
+        <div className="bj-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#f43f5e,transparent 70%)' }} />
+        <div className="bj-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.15] pointer-events-none" style={{ background: 'radial-gradient(circle,#be123c,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/25 mb-4">
+              <UserX size={12} className="text-rose-300" />
+              <span className="text-rose-300 text-xs font-semibold tracking-widest uppercase">Operación Core</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Bajas
+            </h1>
+            <p className="text-rose-100/70 text-sm mt-2">
+              Registro de cancelaciones y bajas de servicio
+            </p>
+          </div>
+          <button onClick={openNew} className="bj-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
+            <Plus size={18} /> Nueva Baja
+          </button>
         </div>
-        <Button onClick={openNew}><Plus size={18} /> Nueva Baja</Button>
       </div>
 
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
-      {/* KPI Cards — naranja corporativo */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard icon={UserX} label="Total Bajas" value={stats.total} variant="solid" sub="Histórico completo"
+        <BajaCard icon={UserX} label="Total Bajas" value={stats.total} variant="solid" sub="Histórico completo"
           onClick={() => setExplain({
             title: 'Total Bajas', value: stats.total, icon: UserX,
             queEs: 'Cuántas cancelaciones de servicio se han registrado en toda la historia del negocio — la otra cara del crecimiento.',
             comoSeCalcula: 'Conteo simple de los registros de este módulo. Es la misma cifra que el Dashboard usaba como "bajas históricas".',
             origen: 'Tabla de bajas de este módulo (importada del Excel original y alimentada con cada baja nueva).',
           })} />
-        <StatCard icon={Calendar} label="Bajas 2026" value={stats.anioActual} variant="light" sub="Año en curso"
+        <BajaCard icon={Calendar} label="Bajas 2026" value={stats.anioActual} variant="light" sub="Año en curso"
           onClick={() => setExplain({
             title: 'Bajas 2026', value: stats.anioActual, icon: Calendar,
             queEs: 'Cancelaciones registradas en lo corrido del año actual — el pulso reciente del churn.',
             comoSeCalcula: 'Se cuentan los registros cuyo campo **Año** es el año en curso. Compárala contra el mismo punto del año pasado (no contra el año completo) para saber si el churn mejora o empeora.',
             origen: 'Campo Año de cada registro de este módulo.',
           })} />
-        <StatCard icon={ArrowDownCircle} label="Devueltos" value={stats.devueltos} variant="outline" sub={`${stats.total ? Math.round(stats.devueltos/stats.total*100) : 0}% del total`}
+        <BajaCard icon={ArrowDownCircle} label="Devueltos" value={stats.devueltos} variant="outline" sub={`${stats.total ? Math.round(stats.devueltos/stats.total*100) : 0}% del total`}
           onClick={() => setExplain({
             title: 'Devueltos', value: stats.devueltos, icon: ArrowDownCircle,
             queEs: 'De las bajas registradas, cuántas devolvieron el equipo físico. Recuperar el equipo permite revenderlo y recuperar parte del costo.',
             comoSeCalcula: 'Se cuentan los registros con el campo **Devolución = SÍ**.',
             origen: 'Campo Devolución de cada baja de este módulo.',
           })} />
-        <StatCard icon={Tv} label="Cortesías" value={stats.cortesias} variant="light" sub="Servicio gratuito"
+        <BajaCard icon={Tv} label="Cortesías" value={stats.cortesias} variant="light" sub="Servicio gratuito"
           onClick={() => setExplain({
             title: 'Cortesías', value: stats.cortesias, icon: Tv,
             queEs: 'Bajas de clientes que tenían el servicio de cortesía (gratis) — su cancelación no afecta el ingreso, pero libera capacidad.',
             comoSeCalcula: 'Se cuentan los registros con el campo **Cortesía = SÍ**.',
             origen: 'Campo Cortesía de cada baja de este módulo.',
           })} />
-        <StatCard icon={BarChart3} label="Mes pico" value={stats.mesMasAlto ? stats.mesMasAlto[0] : '—'} variant="solid" sub={stats.mesMasAlto ? `${stats.mesMasAlto[1]} bajas` : ''}
+        <BajaCard icon={BarChart3} label="Mes pico" value={stats.mesMasAlto ? stats.mesMasAlto[0] : '—'} variant="solid" sub={stats.mesMasAlto ? `${stats.mesMasAlto[1]} bajas` : ''}
           onClick={() => setExplain({
             title: 'Mes pico', value: stats.mesMasAlto ? `${stats.mesMasAlto[0]} (${stats.mesMasAlto[1]} bajas)` : '—', icon: BarChart3,
             queEs: 'El mes del calendario con más cancelaciones acumuladas en el histórico — señala la estacionalidad del churn.',
@@ -326,154 +353,7 @@ export default function BajasPage() {
           })} />
       </div>
 
-      {/* Comparativo año a año (movido desde el Dashboard) */}
-      {bajasPorAnio.length > 0 && (
-        <Card className="border-orange-100 mb-6">
-          <CardHeader className="border-orange-50">
-            <CardTitle>Bajas — comparativo año a año</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Cancelaciones registradas por año — la otra cara de la moneda del crecimiento de la cartera</p>
-          </CardHeader>
-          <CardBody>
-            <ResponsiveContainer width="100%" height={240}>
-              <ComposedChart data={bajasPorAnio} margin={{ top: 22, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#78716c' }} allowDecimals={false} />
-                <Tooltip
-                  formatter={(v, name) => [v, name === 'total' ? 'Bajas' : name]}
-                  labelFormatter={(v, payload) => {
-                    const d = payload?.[0]?.payload
-                    return d?.variacionPct != null ? `Año ${v} · ${d.variacionPct >= 0 ? '+' : ''}${d.variacionPct}% vs. año anterior` : `Año ${v}`
-                  }}
-                />
-                <Bar dataKey="total" name="Bajas" radius={[6, 6, 0, 0]} barSize={36}>
-                  {bajasPorAnio.map((_, i) => <Cell key={i} fill="#f43f5e" />)}
-                  <LabelList dataKey="total" position="top" formatter={(v) => v.toLocaleString('es-CO')} style={{ ...LABEL_STYLE, fontSize: 12 }} />
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-            <ChartInsight text={narrarBajasPorAnio(bajasPorAnio)} />
-          </CardBody>
-        </Card>
-      )}
 
-      {/* ─── Estacionalidad mensual ───────────────────────────────────────────── */}
-      {bajas.length > 0 && (
-        <Card className="border-orange-100 mb-6">
-          <CardHeader className="border-orange-50">
-            <CardTitle>Estacionalidad de bajas por mes</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Suma histórica de cancelaciones por mes del calendario · Revela cuándo se concentra el churn</p>
-          </CardHeader>
-          <CardBody>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={bajasPorMesCalendario} margin={{ top: 22, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#78716c' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#78716c' }} allowDecimals={false} width={32} />
-                <Tooltip formatter={(v) => [v, 'Bajas']} />
-                <Bar dataKey="total" name="Bajas" radius={[5, 5, 0, 0]} maxBarSize={44}>
-                  {bajasPorMesCalendario.map((d, i) => (
-                    <Cell key={i} fill={
-                      d.total === d.max ? '#e11d48'
-                      : d.total >= d.max * 0.7 ? '#f43f5e'
-                      : d.total >= d.max * 0.4 ? '#fb923c'
-                      : '#fca5a5'
-                    } />
-                  ))}
-                  <LabelList dataKey="total" position="top"
-                    style={{ fontSize: 11, fontWeight: 700, fill: '#1e293b', stroke: '#fff', strokeWidth: 3, strokeLinejoin: 'round', paintOrder: 'stroke' }} />
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-            <ChartInsight text={(() => {
-              const total = bajasPorMesCalendario.reduce((s, m) => s + m.total, 0)
-              if (!total) return null
-              const pico = bajasPorMesCalendario.reduce((a, b) => b.total > a.total ? b : a)
-              const q1 = bajasPorMesCalendario.slice(0, 3).reduce((s, m) => s + m.total, 0)
-              const pctQ1 = Math.round(q1 / total * 100)
-              const picoIdx = bajasPorMesCalendario.findIndex(m => m.mes === pico.mes)
-              return `El mes con más cancelaciones históricas es **${MESES[picoIdx]} (${pico.total} bajas)**${pico.total === 0 ? '.' : `, con ${Math.round(pico.total / total * 100)}% del total histórico. `}${pctQ1 > 35 ? `El primer trimestre (Ene–Mar) concentra el **${pctQ1}% del churn anual** — señal de estacionalidad post-renovación de año que conviene anticipar con acciones de retención en diciembre.` : 'La distribución es relativamente uniforme, sin un pico estacional dominante — el churn ocurre todo el año.'}`
-            })()} />
-          </CardBody>
-        </Card>
-      )}
-
-      {/* ─── Tendencia reciente 2025 vs 2026 ─────────────────────────────────── */}
-      {bajas.some(b => Number(b.anio) >= 2025) && (
-        <Card className="border-orange-100 mb-6">
-          <CardHeader className="border-orange-50">
-            <CardTitle>Bajas mensuales — 2025 vs 2026</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Comparación mes a mes entre el año anterior y el año en curso · Detecta si el churn mejora o empeora</p>
-          </CardHeader>
-          <CardBody>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={bajasMensualReciente} margin={{ top: 22, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#78716c' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#78716c' }} allowDecimals={false} width={32} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="2025" name="2025" fill="#94a3b8" radius={[3, 3, 0, 0]} maxBarSize={22}>
-                  <LabelList dataKey="2025" position="top"
-                    formatter={v => v > 0 ? v : ''}
-                    style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
-                </Bar>
-                <Bar dataKey="2026" name="2026" fill="#f43f5e" radius={[3, 3, 0, 0]} maxBarSize={22}>
-                  <LabelList dataKey="2026" position="top"
-                    formatter={v => v > 0 ? v : ''}
-                    style={{ fontSize: 10, fontWeight: 700, fill: '#be123c' }} />
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-            <ChartInsight text={(() => {
-              const total25 = bajasMensualReciente.reduce((s, m) => s + (m['2025'] || 0), 0)
-              const total26 = bajasMensualReciente.reduce((s, m) => s + (m['2026'] || 0), 0)
-              if (!total25 && !total26) return null
-              const meses26 = bajasMensualReciente.filter(m => m['2026'] > 0).length
-              const ritmo = meses26 > 0 ? (total26 / meses26).toFixed(1) : 0
-              const proyAnual = meses26 > 0 ? Math.round(total26 / meses26 * 12) : 0
-              const varPct = total25 > 0 ? ((total26 - total25) / total25 * 100).toFixed(1) : null
-              return `En **2025** se registraron **${total25} bajas** en el año completo. En lo corrido de **2026** van **${total26} bajas** (${meses26} mes${meses26 !== 1 ? 'es' : ''}, ritmo: ${ritmo}/mes → proyección anual ~${proyAnual}).${varPct ? ` Al ritmo actual el año cerraría con un **${Number(varPct) >= 0 ? '+' : ''}${varPct}% vs 2025** — ${Number(varPct) > 10 ? 'tendencia preocupante que requiere acciones de retención.' : Number(varPct) < -10 ? 'tendencia positiva, el churn está mejorando.' : 'variación dentro de rangos normales.'}` : ''}`
-            })()} />
-          </CardBody>
-        </Card>
-      )}
-
-      {/* ─── Motivos de baja ─────────────────────────────────────────────────── */}
-      {bajasPorMotivo.filter(m => m.motivo !== 'Sin especificar').length > 0 && (
-        <Card className="border-orange-100 mb-6">
-          <CardHeader className="border-orange-50">
-            <CardTitle>Motivos de cancelación (top {bajasPorMotivo.length})</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Razones declaradas al registrar la baja · Útil para priorizar mejoras de retención</p>
-          </CardHeader>
-          <CardBody>
-            <ResponsiveContainer width="100%" height={Math.max(200, bajasPorMotivo.length * 34)}>
-              <ComposedChart layout="vertical" data={bajasPorMotivo} margin={{ top: 4, right: 48, left: 4, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.3} horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10, fill: '#78716c' }} allowDecimals={false} />
-                <YAxis type="category" dataKey="motivo" tick={{ fontSize: 10, fill: '#4b5563' }} width={170} />
-                <Tooltip formatter={(v) => [v, 'Bajas']} />
-                <Bar dataKey="total" name="Bajas" radius={[0, 5, 5, 0]} maxBarSize={28}>
-                  {bajasPorMotivo.map((_, i) => (
-                    <Cell key={i} fill={i === 0 ? '#e11d48' : i < 3 ? '#f97316' : '#fbbf24'} />
-                  ))}
-                  <LabelList dataKey="total" position="right"
-                    style={{ fontSize: 11, fontWeight: 700, fill: '#1e293b' }} />
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-            <ChartInsight text={(() => {
-              const conMotivo = bajasPorMotivo.filter(m => m.motivo !== 'Sin especificar')
-              if (!conMotivo.length) return null
-              const total = bajasPorMotivo.reduce((s, m) => s + m.total, 0)
-              const top1 = conMotivo[0]
-              const top3 = conMotivo.slice(0, 3).reduce((s, m) => s + m.total, 0)
-              const pct3 = Math.round(top3 / total * 100)
-              return `El motivo más frecuente es **"${top1.motivo}" (${top1.total} bajas)**. Los **3 primeros motivos concentran el ${pct3}%** del total con causa declarada — atacar esas raíces es lo que más impacto tiene sobre la tasa de churn.`
-            })()} />
-          </CardBody>
-        </Card>
-      )}
 
       {/* Search */}
       <div className="mb-4">
@@ -545,152 +425,187 @@ export default function BajasPage() {
         </div>
       </Card>
 
-      {/* Form Modal */}
+      {/* Form Drawer (PRO MAX Drawer) */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto shadow-2xl">
-            <CardHeader className="flex items-center justify-between bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-xl">
-              <CardTitle className="text-white">{editing ? 'Editar Baja' : 'Nueva Baja'}</CardTitle>
-              <button onClick={closeForm} className="hover:bg-white/20 p-1 rounded"><X size={20} /></button>
-            </CardHeader>
-            <form onSubmit={handleSubmit}>
-              <CardBody className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                <div className="sm:col-span-3 lg:col-span-4 text-sm font-semibold text-orange-700 border-b border-orange-200 pb-1">📋 Identificación</div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Baja (Auto)</label>
-                  <input value={form.idBaja || 'Generando...'} readOnly disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 font-mono font-bold cursor-not-allowed" />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700">Nickname *</label>
-                    {editing && (
-                      <button
-                        type="button"
-                        onClick={() => setNicknameEditMode(m => !m)}
-                        className="text-orange-600 hover:text-orange-700 text-xs font-semibold flex items-center gap-1"
-                        title={nicknameEditMode ? 'Volver a la lista de cuentas activas' : 'Editar nickname manualmente'}
-                      >
-                        <Pencil size={12} /> {nicknameEditMode ? 'Usar lista' : 'Editar nickname'}
-                      </button>
+        <>
+          <div className="bj-overlay fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" onClick={closeForm} />
+          <div className="bj-drawer fixed inset-y-0 right-0 z-50 w-full md:w-[600px] bg-white shadow-2xl flex flex-col border-l border-slate-100">
+            {/* Header del Drawer */}
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">{editing ? 'Editar Baja' : 'Nueva Baja'}</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  {editing ? 'Modifica los datos del registro' : 'Registra una nueva cancelación'}
+                </p>
+              </div>
+              <button onClick={closeForm} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Cuerpo del Formulario */}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 text-sm font-semibold text-rose-700 border-b border-rose-100 pb-1 flex items-center gap-2">
+                    <span>📋 Identificación</span>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ID Baja (Auto)</label>
+                    <input value={form.idBaja || 'Generando...'} readOnly disabled className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 font-mono font-bold cursor-not-allowed" />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">Nickname *</label>
+                      {editing && (
+                        <button
+                          type="button"
+                          onClick={() => setNicknameEditMode(m => !m)}
+                          className="text-rose-600 hover:text-rose-700 text-xs font-semibold flex items-center gap-1"
+                          title={nicknameEditMode ? 'Volver a la lista de cuentas activas' : 'Editar nickname manualmente'}
+                        >
+                          <Pencil size={12} /> {nicknameEditMode ? 'Usar lista' : 'Editar nickname'}
+                        </button>
+                      )}
+                    </div>
+                    {nicknameEditMode ? (
+                      <input
+                        value={form.nickname || ''}
+                        onChange={(e) => setForm(f => ({ ...f, nickname: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-rose-400 focus:border-rose-400 outline-none"
+                        required
+                      />
+                    ) : (
+                      <>
+                        <select
+                          value={form.nickname || ''}
+                          onChange={(e) => handleNicknameSelect(e.target.value)}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-rose-400 focus:border-rose-400 outline-none"
+                          required
+                        >
+                          <option value="">-- Seleccionar nickname --</option>
+                          {form.nickname && !nicknames.some(n => n.nickname === form.nickname) && (
+                            <option value={form.nickname}>{form.nickname}</option>
+                          )}
+                          {nicknames.map(n => (
+                            <option key={n.nickname} value={n.nickname}>
+                              {n.nickname}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-semibold">Al seleccionar se llenan los campos asociados</p>
+                      </>
                     )}
                   </div>
-                  {nicknameEditMode ? (
-                    <input
-                      value={form.nickname || ''}
-                      onChange={(e) => setForm(f => ({ ...f, nickname: e.target.value }))}
-                      className="w-full px-3 py-2 border border-orange-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
-                      required
-                    />
-                  ) : (
-                    <>
-                      <select
-                        value={form.nickname || ''}
-                        onChange={(e) => handleNicknameSelect(e.target.value)}
-                        className="w-full px-3 py-2 border border-orange-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
-                        required
-                      >
-                        <option value="">-- Seleccionar nickname --</option>
-                        {form.nickname && !nicknames.some(n => n.nickname === form.nickname) && (
-                          <option value={form.nickname}>{form.nickname}</option>
-                        )}
-                        {nicknames.map(n => (
-                          <option key={n.nickname} value={n.nickname}>
-                            {n.nickname}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-400 mt-0.5">Al seleccionar se llenan los campos asociados</p>
-                    </>
-                  )}
+                  <Input label="ID Cliente" value={form.customerId || ''} onChange={(e) => setForm({ ...form, customerId: e.target.value })} />
+                  <Input label="Nombre *" value={form.nombre || ''} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />
+                  <Input label="Apellido" value={form.apellido || ''} onChange={(e) => setForm({ ...form, apellido: e.target.value })} />
                 </div>
-                <Input label="ID Cliente" value={form.customerId || ''} onChange={(e) => setForm({ ...form, customerId: e.target.value })} />
-                <Input label="Nombre *" value={form.nombre || ''} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />
 
-                <div className="sm:col-span-3 lg:col-span-4 text-sm font-semibold text-orange-700 border-b border-orange-200 pb-1 mt-2">📺 Dispositivo</div>
-                <Input label="Apellido" value={form.apellido || ''} onChange={(e) => setForm({ ...form, apellido: e.target.value })} />
-                <Input label="SKU" value={form.sku || ''} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-                <Input label="Tipo Fire TV" value={form.tipoFire || ''} onChange={(e) => setForm({ ...form, tipoFire: e.target.value })} />
-                <Select label="Devolución" value={form.devolucion || ''} onChange={(e) => setForm({ ...form, devolucion: e.target.value })}>
-                  <option value="">--</option>
-                  <option value="SI">SI</option>
-                  <option value="NO">NO</option>
-                </Select>
-
-                <div className="sm:col-span-3 lg:col-span-4 text-sm font-semibold text-orange-700 border-b border-orange-200 pb-1 mt-2">⚙️ Estado y Plan</div>
-                <Select label="Estado" value={form.estado || 'Desactivado'} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
-                  <option value="Desactivado">Desactivado</option>
-                  <option value="Baja">Baja</option>
-                  <option value="Activo">Activo</option>
-                  <option value="Cortesía">Cortesía</option>
-                </Select>
-                <Select label="Cortesía" value={form.cortesia || ''} onChange={(e) => setForm({ ...form, cortesia: e.target.value })}>
-                  <option value="">--</option>
-                  <option value="SI">SI</option>
-                  <option value="NO">NO</option>
-                </Select>
-                <Input label="Pantallas" type="number" value={form.pantallas || 1} onChange={(e) => setForm({ ...form, pantallas: e.target.value })} min="1" />
-                <Input label="Cantidad" type="number" value={form.itemQuantity || 1} onChange={(e) => setForm({ ...form, itemQuantity: e.target.value })} min="1" />
-                <Input label="Tipo de Plan" value={form.tipoPlan || ''} onChange={(e) => setForm({ ...form, tipoPlan: e.target.value })} placeholder="Plan Mensual, Semestral..." />
-                <Input label="Tipo Pantalla" value={form.tipoPantalla || ''} onChange={(e) => setForm({ ...form, tipoPantalla: e.target.value })} placeholder="Individual, Revendedor..." />
-                <Select label="Cuenta Dedicada" value={form.cuentaDedicada || ''} onChange={(e) => setForm({ ...form, cuentaDedicada: e.target.value })}>
-                  <option value="">--</option>
-                  <option value="SI">SI</option>
-                  <option value="NO">NO</option>
-                </Select>
-
-                <div className="sm:col-span-3 lg:col-span-4 text-sm font-semibold text-orange-700 border-b border-orange-200 pb-1 mt-2">📅 Fechas</div>
-                <Input label="Fecha de Baja" type="date" value={form.fechaBaja || ''} onChange={(e) => setForm({ ...form, fechaBaja: e.target.value })} />
-                <Input label="Fecha" type="date" value={form.fecha || ''} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-                <Input label="Año" type="number" value={form.anio || ''} onChange={(e) => setForm({ ...form, anio: e.target.value })} />
-                <Select label="Mes" value={form.mes || ''} onChange={(e) => setForm({ ...form, mes: e.target.value })}>
-                  <option value="">-- Seleccionar mes --</option>
-                  <option value="Enero">Enero</option>
-                  <option value="Febrero">Febrero</option>
-                  <option value="Marzo">Marzo</option>
-                  <option value="Abril">Abril</option>
-                  <option value="Mayo">Mayo</option>
-                  <option value="Junio">Junio</option>
-                  <option value="Julio">Julio</option>
-                  <option value="Agosto">Agosto</option>
-                  <option value="Septiembre">Septiembre</option>
-                  <option value="Octubre">Octubre</option>
-                  <option value="Noviembre">Noviembre</option>
-                  <option value="Diciembre">Diciembre</option>
-                </Select>
-
-                <div className="sm:col-span-3 lg:col-span-4 text-sm font-semibold text-orange-700 border-b border-orange-200 pb-1 mt-2">📝 Notas</div>
-                <div className="sm:col-span-2">
-                  <Select label="Motivo de la baja" value={form.motivo || ''} onChange={(e) => setForm({ ...form, motivo: e.target.value })}>
-                    <option value="">-- Seleccionar motivo --</option>
-                    <option value="Precio elevado">Precio elevado / No puede pagar</option>
-                    <option value="Problemas de señal">Problemas de señal / Buffering</option>
-                    <option value="Cambio de proveedor">Cambio a otro proveedor IPTV</option>
-                    <option value="No usa el servicio">No usa el servicio / Poco interés</option>
-                    <option value="Problemas con el dispositivo">Problemas con el dispositivo Fire TV</option>
-                    <option value="Mala calidad de contenido">Mala calidad de contenido / Canales caídos</option>
-                    <option value="Viaje o mudanza">Viaje, mudanza o cambio de residencia</option>
-                    <option value="Problemas económicos">Problemas económicos del cliente</option>
-                    <option value="Insatisfacción con el soporte">Insatisfacción con el soporte técnico</option>
-                    <option value="Prefiere streaming legal">Prefiere plataformas de streaming legales</option>
-                    <option value="Dispositivo dañado o perdido">Dispositivo dañado o perdido</option>
-                    <option value="Problemas de compatibilidad">Problemas de compatibilidad con su TV/Internet</option>
-                    <option value="Cliente moroso">Cliente moroso / No paga a tiempo</option>
-                    <option value="Cancelación temporal">Cancelación temporal (planea volver)</option>
-                    <option value="Fallecimiento">Fallecimiento del titular</option>
-                    <option value="Otro">Otro motivo</option>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 text-sm font-semibold text-rose-700 border-b border-rose-100 pb-1 flex items-center gap-2">
+                    <span>📺 Dispositivo</span>
+                  </div>
+                  <Input label="SKU" value={form.sku || ''} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+                  <Input label="Tipo Fire TV" value={form.tipoFire || ''} onChange={(e) => setForm({ ...form, tipoFire: e.target.value })} />
+                  <Select label="Devolución" value={form.devolucion || ''} onChange={(e) => setForm({ ...form, devolucion: e.target.value })}>
+                    <option value="">--</option>
+                    <option value="SI">SI</option>
+                    <option value="NO">NO</option>
                   </Select>
                 </div>
-                <div className="sm:col-span-2">
-                  <Textarea label="Observaciones" rows={2} value={form.observaciones || ''} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} placeholder="Detalles adicionales..." />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 text-sm font-semibold text-rose-700 border-b border-rose-100 pb-1 flex items-center gap-2">
+                    <span>⚙️ Estado y Plan</span>
+                  </div>
+                  <Select label="Estado" value={form.estado || 'Desactivado'} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
+                    <option value="Desactivado">Desactivado</option>
+                    <option value="Baja">Baja</option>
+                    <option value="Activo">Activo</option>
+                    <option value="Cortesía">Cortesía</option>
+                  </Select>
+                  <Select label="Cortesía" value={form.cortesia || ''} onChange={(e) => setForm({ ...form, cortesia: e.target.value })}>
+                    <option value="">--</option>
+                    <option value="SI">SI</option>
+                    <option value="NO">NO</option>
+                  </Select>
+                  <Input label="Pantallas" type="number" value={form.pantallas || 1} onChange={(e) => setForm({ ...form, pantallas: e.target.value })} min="1" />
+                  <Input label="Cantidad" type="number" value={form.itemQuantity || 1} onChange={(e) => setForm({ ...form, itemQuantity: e.target.value })} min="1" />
+                  <Input label="Tipo de Plan" value={form.tipoPlan || ''} onChange={(e) => setForm({ ...form, tipoPlan: e.target.value })} placeholder="Plan Mensual, Semestral..." />
+                  <Input label="Tipo Pantalla" value={form.tipoPantalla || ''} onChange={(e) => setForm({ ...form, tipoPantalla: e.target.value })} placeholder="Individual, Revendedor..." />
+                  <Select label="Cuenta Dedicada" value={form.cuentaDedicada || ''} onChange={(e) => setForm({ ...form, cuentaDedicada: e.target.value })}>
+                    <option value="">--</option>
+                    <option value="SI">SI</option>
+                    <option value="NO">NO</option>
+                  </Select>
                 </div>
-              </CardBody>
-              <div className="p-4 border-t border-orange-100 flex justify-end gap-2 bg-orange-50/50">
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 text-sm font-semibold text-rose-700 border-b border-rose-100 pb-1 flex items-center gap-2">
+                    <span>📅 Fechas</span>
+                  </div>
+                  <Input label="Fecha de Baja" type="date" value={form.fechaBaja || ''} onChange={(e) => setForm({ ...form, fechaBaja: e.target.value })} />
+                  <Input label="Fecha Inicial" type="date" value={form.fecha || ''} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+                  <Input label="Año" type="number" value={form.anio || ''} onChange={(e) => setForm({ ...form, anio: e.target.value })} />
+                  <Select label="Mes" value={form.mes || ''} onChange={(e) => setForm({ ...form, mes: e.target.value })}>
+                    <option value="">-- Seleccionar mes --</option>
+                    <option value="Enero">Enero</option>
+                    <option value="Febrero">Febrero</option>
+                    <option value="Marzo">Marzo</option>
+                    <option value="Abril">Abril</option>
+                    <option value="Mayo">Mayo</option>
+                    <option value="Junio">Junio</option>
+                    <option value="Julio">Julio</option>
+                    <option value="Agosto">Agosto</option>
+                    <option value="Septiembre">Septiembre</option>
+                    <option value="Octubre">Octubre</option>
+                    <option value="Noviembre">Noviembre</option>
+                    <option value="Diciembre">Diciembre</option>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 text-sm font-semibold text-rose-700 border-b border-rose-100 pb-1 flex items-center gap-2">
+                    <span>📝 Notas</span>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Select label="Motivo de la baja" value={form.motivo || ''} onChange={(e) => setForm({ ...form, motivo: e.target.value })}>
+                      <option value="">-- Seleccionar motivo --</option>
+                      <option value="Precio elevado">Precio elevado / No puede pagar</option>
+                      <option value="Problemas de señal">Problemas de señal / Buffering</option>
+                      <option value="Cambio de proveedor">Cambio a otro proveedor IPTV</option>
+                      <option value="No usa el servicio">No usa el servicio / Poco interés</option>
+                      <option value="Problemas con el dispositivo">Problemas con el dispositivo Fire TV</option>
+                      <option value="Mala calidad de contenido">Mala calidad de contenido / Canales caídos</option>
+                      <option value="Viaje o mudanza">Viaje, mudanza o cambio de residencia</option>
+                      <option value="Problemas económicos">Problemas económicos del cliente</option>
+                      <option value="Insatisfacción con el soporte">Insatisfacción con el soporte técnico</option>
+                      <option value="Prefiere streaming legal">Prefiere plataformas de streaming legales</option>
+                      <option value="Dispositivo dañado o perdido">Dispositivo dañado o perdido</option>
+                      <option value="Problemas de compatibilidad">Problemas de compatibilidad con su TV/Internet</option>
+                      <option value="Cliente moroso">Cliente moroso / No paga a tiempo</option>
+                      <option value="Cancelación temporal">Cancelación temporal (planea volver)</option>
+                      <option value="Fallecimiento">Fallecimiento del titular</option>
+                      <option value="Otro">Otro motivo</option>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Textarea label="Observaciones" rows={2} value={form.observaciones || ''} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} placeholder="Detalles adicionales..." />
+                  </div>
+                </div>
+
+              </div>
+              <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
                 <Button type="button" variant="secondary" onClick={closeForm}>Cancelar</Button>
-                <Button type="submit">{editing ? 'Actualizar' : 'Registrar Baja'}</Button>
+                <button type="submit" className="bj-cta px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md hover:shadow-lg">
+                  {editing ? 'Actualizar Baja' : 'Registrar Baja'}
+                </button>
               </div>
             </form>
-          </Card>
-        </div>
+          </div>
+        </>
       )}
     </div>
   )

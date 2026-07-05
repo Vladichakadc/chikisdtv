@@ -585,59 +585,7 @@ export default function SubscriptionsPage() {
             </div>
           </div>
         </div>
-
-        {/* ── SECCIÓN 1: KPI SUSCRIPCIONES ── */}
-        <div>
-          <SectionLabel>Resumen de suscripciones</SectionLabel>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard icon={Users}        label="Total"      value={subStats.total}      loading={loadingSubs} gradFrom="#64748b" gradTo="#94a3b8" delay={2} />
-            <KpiCard icon={CheckCircle2} label="Activas"    value={subStats.activos}    loading={loadingSubs} gradFrom="#10b981" gradTo="#34d399" delay={3} />
-            <KpiCard icon={Clock}        label="Vencidas"   value={subStats.vencidos}   loading={loadingSubs} gradFrom="#ef4444" gradTo="#f87171" delay={4} />
-            <KpiCard icon={TrendingUp}   label="Canceladas" value={subStats.cancelados} loading={loadingSubs} gradFrom="#8b5cf6" gradTo="#a78bfa" delay={5} />
-          </div>
-        </div>
-
-        {/* ── SECCIÓN 2: TARJETAS INTELIGENTES DEL PLANIFICADOR ── */}
-        <div className="sp-a3">
-          <SectionLabel>Tarjetas inteligentes — planificador</SectionLabel>
-
-          {/* Fila 1: métricas generales */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {loadingPlan ? (
-              [...Array(4)].map((_, i) => <div key={i} className="sp-skeleton h-28 rounded-xl" />)
-            ) : (
-              <>
-                <StatCard icon={Tv}           label="Cuentas totales"  value={planStats.cuentas ?? '—'}       variant="solid"   sub={`${planStats.total ?? 0} pantallas`} />
-                <StatCard icon={CheckCircle2} label="Pantallas activas" value={planStats.activas ?? '—'}       variant="light" />
-                <StatCard icon={Clock}        label="Próx. a vencer"   value={planStats.proximaVencer ?? '—'} variant="outline" sub={`≤ ${planStats.diasAlerta ?? 7} días`}
-                  onClick={() => setActivePanel('alerta')} />
-                <StatCard icon={Monitor}      label="Sin asignar"       value={planStats.libres ?? '—'}        variant="light"   sub="Pantallas libres"
-                  onClick={() => setActivePanel('libre')} />
-              </>
-            )}
-          </div>
-
-          {/* Fila 2: indicadores de negocio */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            {loadingPlan ? (
-              [...Array(5)].map((_, i) => <div key={i} className="sp-skeleton h-28 rounded-xl" />)
-            ) : (
-              <>
-                <StatCard icon={XCircle}    label="Vencidas"           value={planStats.vencidas ?? '—'}                    variant="outline" tone="red"     sub="Requieren acción inmediata"
-                  onClick={() => setActivePanel('vencido')} />
-                <StatCard icon={Wallet}     label="Cuentas que deben"  value={planStats.deudores ?? '—'}                    variant="outline" tone="amber"   sub="Pendientes de cobro"
-                  onClick={() => setActivePanel('debe')} />
-                <StatCard icon={Gift}       label="Cortesías activas"  value={planStats.cortesias ?? '—'}                   variant="outline" tone="purple"  sub="Sin generar ingreso"
-                  onClick={() => setActivePanel('cortesia')} />
-                <StatCard icon={DollarSign} label="Crédito en cartera" value={formatCurrency(planStats.creditoTotal ?? 0)} variant="light"   tone="emerald" sub="Saldo acumulado de cuentas"
-                  onClick={() => setActivePanel('credito')} />
-                <StatCard icon={Percent}    label="Ocupación"          value={`${planStats.ocupacion ?? 0}%`}               variant="light"   tone="orange"  sub={`${planStats.asignadas ?? 0} de ${planStats.total ?? 0} pantallas`} />
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* ── SECCIÓN 3: FILTROS + TABLA ── */}
+        {/* ── FILTROS + TABLA ── */}
         <div className="sp-a4">
           <SectionLabel>Vista de pantallas — sincronizada con Planificador</SectionLabel>
 

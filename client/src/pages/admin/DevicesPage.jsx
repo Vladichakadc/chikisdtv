@@ -1,8 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Plus, Pencil, Trash2, X, Search, Tv, CheckCircle, XCircle, Package, RefreshCw, Wallet, TrendingUp, ChevronDown } from 'lucide-react'
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, LabelList,
-} from 'recharts'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
 import { Button } from '../../components/ui/Button'
@@ -26,28 +23,60 @@ const fmtEjePesos = (v) => v >= 1_000_000 ? `$${(v / 1_000_000).toLocaleString('
 // romper la UI ni el formulario si alguien teclea un número desproporcionado.
 const MAX_LOTE = 50
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, sub, variant }) {
-  const styles = {
-    solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
-    light:   'bg-white border-2 border-orange-200 text-orange-700',
-    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
+const CSS = `
+  @keyframes dev-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes dev-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes dev-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  @keyframes dev-drawer-in { from { transform:translateX(100%) } to { transform:translateX(0) } }
+  @keyframes dev-fade-in { from { opacity:0 } to { opacity:1 } }
+  .dev-a1 { animation: dev-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .dev-a2 { animation: dev-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .dev-orb-1 { animation: dev-orb-1 8s ease-in-out infinite }
+  .dev-orb-2 { animation: dev-orb-2 11s ease-in-out infinite }
+  .dev-cta {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    box-shadow: 0 4px 18px rgba(99,102,241,.4);
+    transition: all .22s ease; border: none;
   }
-  const iconBg = {
-    solid:   'bg-white/20',
-    light:   'bg-orange-100',
-    outline: 'bg-orange-200/60',
+  .dev-cta:hover { box-shadow: 0 7px 24px rgba(99,102,241,.55); transform: translateY(-2px) }
+  .dev-overlay { animation: dev-fade-in .2s ease both }
+  .dev-drawer { animation: dev-drawer-in .3s cubic-bezier(.22,1,.36,1) both }
+  @media (prefers-reduced-motion: reduce) {
+    .dev-a1, .dev-a2, .dev-orb-1, .dev-orb-2, .dev-overlay, .dev-drawer { animation: none !important; transition: none !important }
   }
+`
+
+function DeviceCard({ icon: Icon, label, value, sub, variant }) {
+  const isSolid = variant === 'solid'
+  const isOutline = variant === 'outline'
+  
+  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
+    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? 'bg-indigo-50 border border-indigo-200' : 'border border-slate-200 shadow-sm'}
+    hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50`
+
+  const topBorder = isSolid 
+    ? 'linear-gradient(90deg, #6366f1, #4f46e5)'
+    : 'linear-gradient(90deg, #818cf880, #6366f180)'
+
   return (
-    <div className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
-          <p className="text-3xl font-bold mt-1">{value}</p>
-          {sub && <p className={`text-xs mt-1 ${variant === 'solid' ? 'opacity-75' : 'text-orange-500'}`}>{sub}</p>}
+    <div className={containerClass}>
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
+      <div className="p-5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? 'text-indigo-600' : 'text-slate-400'}`}>
+            {label}
+          </p>
+          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
+            {value}
+          </p>
+          {sub && (
+            <p className={`text-xs mt-2 font-medium ${isOutline ? 'text-indigo-600' : 'text-slate-500'}`}>
+              {sub}
+            </p>
+          )}
         </div>
-        <div className={`${iconBg[variant]} rounded-lg p-3`}>
-          <Icon size={24} />
+        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? 'bg-indigo-50 text-indigo-600' : 'bg-indigo-50 text-indigo-600'}`}>
+          <Icon size={22} />
         </div>
       </div>
     </div>
@@ -116,29 +145,14 @@ export default function DevicesPage() {
     [inventario]
   )
 
-  // Agregación por referencia (descripción): alimenta las dos gráficas y el
-  // mapa de colores compartido con la tabla. Métrica: costo total COP (inversión)
-  // y ganancia potencial a precio sugerido — mismas definiciones que las tarjetas.
-  const porReferencia = useMemo(() => {
-    const acc = {}
-    for (const r of inventario) {
-      const ref = (r.descripcion || 'Sin referencia').trim()
-      if (!acc[ref]) acc[ref] = { referencia: ref, unidades: 0, inversion: 0, ganancia: 0, margenSum: 0, margenN: 0 }
-      acc[ref].unidades += Number(r.cantidad) || 0
-      acc[ref].inversion += Number(r.costoTotalCOP) || 0
-      acc[ref].ganancia += Number(r.ganancia) || 0
-      if (r.utilidadPct != null) { acc[ref].margenSum += Number(r.utilidadPct); acc[ref].margenN += 1 }
-    }
-    return Object.values(acc)
-      .map(x => ({ ...x, margenPct: x.margenN > 0 ? Number((x.margenSum / x.margenN).toFixed(1)) : 0 }))
-      .sort((a, b) => b.inversion - a.inversion)
+  const refColor = useMemo(() => {
+    const refs = [...new Set(inventario.map(r => (r.descripcion || 'Sin referencia').trim()))].sort()
+    const map = {}
+    refs.forEach((ref, i) => { map[ref] = REF_COLORS[i % REF_COLORS.length] })
+    return map
   }, [inventario])
 
-  const refColor = useMemo(() => {
-    const map = {}
-    porReferencia.forEach((r, i) => { map[r.referencia] = REF_COLORS[i % REF_COLORS.length] })
-    return map
-  }, [porReferencia])
+  const totalReferencias = useMemo(() => Object.keys(refColor).length, [refColor])
 
   // Vista previa financiera en vivo del formulario (misma aritmética del backend)
   const invPreview = useMemo(() => {
@@ -499,132 +513,100 @@ export default function DevicesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-brand-accent">Inventario Equipos</h1>
-          <p className="text-gray-500">
-            {tab === 'inventario'
-              ? 'Inventario físico de compra 2026 — costos, precios sugeridos y estado de cada unidad'
-              : 'Gestión de dispositivos físicos por cliente'}
-          </p>
-        </div>
-        {tab === 'inventario'
-          ? (
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={handleImportInventario} disabled={importing}>
-                <RefreshCw size={18} className={importing ? 'animate-spin' : ''} />
-                {importing ? 'Importando…' : 'Recargar desde Excel'}
-              </Button>
-              <Button onClick={openNewInv}><Plus size={18} /> Nuevo Equipo</Button>
+      <style>{CSS}</style>
+
+      {/* ── HERO HEADER ── */}
+      <div className="dev-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#1e1b4b 0%,#0f172a 100%)' }}>
+        <div className="dev-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.25] pointer-events-none" style={{ background: 'radial-gradient(circle,#6366f1,transparent 70%)' }} />
+        <div className="dev-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#818cf8,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/25 mb-4">
+              <Package size={12} className="text-indigo-300" />
+              <span className="text-indigo-300 text-xs font-semibold tracking-widest uppercase">Stock & Hardware</span>
             </div>
-          )
-          : <Button onClick={openNew}><Plus size={18} /> Nuevo Dispositivo</Button>}
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Inventario Equipos
+            </h1>
+            <p className="text-indigo-100/70 text-sm mt-2">
+              {tab === 'inventario'
+                ? 'Inventario físico de compra 2026 — costos, precios sugeridos y estado de cada unidad'
+                : 'Gestión de dispositivos físicos por cliente'}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            {tab === 'inventario' ? (
+              <>
+                <button onClick={handleImportInventario} disabled={importing} className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2">
+                  <RefreshCw size={16} className={importing ? 'animate-spin' : ''} />
+                  {importing ? 'Importando…' : 'Recargar Excel'}
+                </button>
+                <button onClick={openNewInv} className="dev-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
+                  <Plus size={18} /> Nuevo Equipo
+                </button>
+              </>
+            ) : (
+              <button onClick={openNew} className="dev-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
+                <Plus size={18} /> Nuevo Dispositivo
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1.5 mb-6 w-fit dev-a2">
         <button
           onClick={() => setTab('inventario')}
-          className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${tab === 'inventario' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'inventario' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
         >
-          <span className="flex items-center gap-1.5"><Package size={15} /> Inventario 2026</span>
+          <span className="flex items-center gap-2"><Package size={16} /> Inventario 2026</span>
         </button>
         <button
           onClick={() => setTab('clientes')}
-          className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${tab === 'clientes' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'clientes' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
         >
-          <span className="flex items-center gap-1.5"><Tv size={15} /> Equipos por cliente</span>
+          <span className="flex items-center gap-2"><Tv size={16} /> Equipos por cliente</span>
         </button>
       </div>
 
       {tab === 'inventario' ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard icon={Package} label="Unidades" value={invStats.unidades} variant="solid" sub={`${porReferencia.length} referencias del lote 2026`} />
-            <StatCard icon={CheckCircle} label="En Bodega" value={invStats.enBodega} variant="light" sub={`${invStats.vendidos} vendidas`} />
-            <StatCard icon={Wallet} label="Inversión Total" value={formatCurrency(invStats.inversion)} variant="outline" sub="Costo total COP del lote" />
-            <StatCard icon={TrendingUp} label="Ganancia Potencial" value={formatCurrency(invStats.gananciaPotencial)} variant="light" sub="Si se vende la bodega a precio sugerido" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 dev-a2">
+            <DeviceCard icon={Package} label="Unidades" value={invStats.unidades} variant="solid" sub={`${totalReferencias} referencias del lote 2026`} />
+            <DeviceCard icon={CheckCircle} label="En Bodega" value={invStats.enBodega} variant="light" sub={`${invStats.vendidos} vendidas`} />
+            <DeviceCard icon={Wallet} label="Inversión Total" value={formatCurrency(invStats.inversion)} variant="outline" sub="Costo total COP del lote" />
+            <DeviceCard icon={TrendingUp} label="Ganancia Potencial" value={formatCurrency(invStats.gananciaPotencial)} variant="light" sub="A precio sugerido" />
           </div>
 
-          {porReferencia.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Inversión y ganancia potencial por referencia</CardTitle>
-                  <p className="text-xs text-gray-400 mt-0.5">Pesos COP del lote 2026 — costo de compra vs. utilidad esperada a precio sugerido</p>
-                </CardHeader>
-                <CardBody>
-                  <ResponsiveContainer width="100%" height={Math.max(220, porReferencia.length * 52)}>
-                    <BarChart data={porReferencia} layout="vertical" margin={{ top: 0, right: 16, left: 8, bottom: 0 }} barCategoryGap="25%">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                      <XAxis type="number" tickFormatter={fmtEjePesos} tick={{ fontSize: 11, fill: '#64748b' }} domain={[0, 'auto']} />
-                      <YAxis type="category" dataKey="referencia" width={118} tick={{ fontSize: 11, fill: '#334155' }} />
-                      <Tooltip
-                        formatter={(v, name) => [fmtPesos(v), name]}
-                        labelStyle={{ fontWeight: 600, color: '#1e293b' }}
-                        contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Bar dataKey="inversion" name="Inversión" fill="#334155" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="ganancia" name="Ganancia potencial" fill="#16a34a" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardBody>
-              </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Margen de utilidad por referencia</CardTitle>
-                  <p className="text-xs text-gray-400 mt-0.5">Utilidad promedio sobre el costo (%) — identifica qué referencia conviene priorizar</p>
-                </CardHeader>
-                <CardBody>
-                  <ResponsiveContainer width="100%" height={Math.max(220, porReferencia.length * 52)}>
-                    <BarChart data={[...porReferencia].sort((a, b) => b.margenPct - a.margenPct)} layout="vertical" margin={{ top: 0, right: 44, left: 8, bottom: 0 }} barCategoryGap="30%">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                      <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#64748b' }} domain={[0, 'auto']} />
-                      <YAxis type="category" dataKey="referencia" width={118} tick={{ fontSize: 11, fill: '#334155' }} />
-                      <Tooltip
-                        formatter={(v) => [`${Number(v).toFixed(1)}%`, 'Margen promedio']}
-                        labelStyle={{ fontWeight: 600, color: '#1e293b' }}
-                        contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
-                      />
-                      <Bar dataKey="margenPct" name="Margen %" radius={[0, 4, 4, 0]}>
-                        {[...porReferencia].sort((a, b) => b.margenPct - a.margenPct).map((r) => (
-                          <Cell key={r.referencia} fill={refColor[r.referencia]} />
-                        ))}
-                        <LabelList dataKey="margenPct" position="right" formatter={(v) => `${Number(v).toFixed(1)}%`} style={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardBody>
-              </Card>
-            </div>
-          )}
         </>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard icon={Tv} label="Total Equipos" value={stats.total} variant="solid" sub="Registrados en inventario" />
-          <StatCard icon={CheckCircle} label="Equipos Activos" value={stats.activos} variant="light" sub="En funcionamiento" />
-          <StatCard icon={XCircle} label="Equipos Inactivos" value={stats.inactivos} variant="outline" sub="Desactivados / Baja" />
-          <StatCard icon={Tv} label="Smart TV / TV Box" value={stats.firetv} variant="light" sub="Dispositivos principales" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 dev-a2">
+          <DeviceCard icon={Tv} label="Total Equipos" value={stats.total} variant="solid" sub="Registrados en sistema" />
+          <DeviceCard icon={CheckCircle} label="Equipos Activos" value={stats.activos} variant="light" sub="En funcionamiento" />
+          <DeviceCard icon={XCircle} label="Equipos Inactivos" value={stats.inactivos} variant="outline" sub="Desactivados / Baja" />
+          <DeviceCard icon={Tv} label="Smart TV / TV Box" value={stats.firetv} variant="light" sub="Dispositivos principales" />
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-4">
+      <div className="flex flex-col sm:flex-row gap-4 mb-4 dev-a2">
         <div className="relative flex-1 max-w-md">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder={tab === 'inventario' ? 'Buscar por descripción, serie o proveedor...' : 'Buscar por cliente, dispositivo o MAC...'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-400 outline-none transition-all shadow-sm"
           />
         </div>
         {tab === 'inventario' ? (
           <select
             value={filterEstadoInv}
             onChange={(e) => setFilterEstadoInv(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+            className="border border-slate-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-indigo-400 bg-white transition-all shadow-sm"
           >
             <option value="todos">Todos los estados</option>
             {estadosInv.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -634,7 +616,7 @@ export default function DevicesPage() {
             <select
               value={filterTipo}
               onChange={(e) => setFilterTipo(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="border border-slate-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-indigo-400 bg-white transition-all shadow-sm"
             >
               <option value="todos">Todos los tipos</option>
               <option value="Smart TV">Smart TV</option>
@@ -646,7 +628,7 @@ export default function DevicesPage() {
             <select
               value={filterActivo}
               onChange={(e) => setFilterActivo(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="border border-slate-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-indigo-400 bg-white transition-all shadow-sm"
             >
               <option value="todos">Todos los estados</option>
               <option value="true">Activos</option>
@@ -670,234 +652,239 @@ export default function DevicesPage() {
       </Card>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-xl">
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle>{editing ? 'Editar Dispositivo' : 'Nuevo Dispositivo'}</CardTitle>
-              <button onClick={() => setShowForm(false)}><X size={20} /></button>
-            </CardHeader>
-            <form onSubmit={handleSubmit}>
-              <CardBody className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
+        <>
+          <div className="dev-overlay fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" onClick={() => setShowForm(false)} />
+          <div className="dev-drawer fixed inset-y-0 right-0 z-50 w-full md:w-[500px] bg-white shadow-2xl flex flex-col border-l border-slate-100">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">{editing ? 'Editar Dispositivo' : 'Nuevo Dispositivo'}</h2>
+                <p className="text-sm text-slate-500 mt-1">Gestión de dispositivos por cliente</p>
+              </div>
+              <button onClick={() => setShowForm(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 overflow-y-auto flex-1 space-y-5">
+                <div className="space-y-4">
                   <Select label="Cliente *" value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value, subscriptionId: '' })} required>
                     <option value="">— Selecciona —</option>
                     {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </Select>
-                </div>
-                <div className="sm:col-span-2">
                   <Select label="Suscripción (opcional)" value={form.subscriptionId || ''} onChange={(e) => setForm({ ...form, subscriptionId: e.target.value })}>
                     <option value="">— Sin asignar —</option>
                     {clientSubs.map((s) => <option key={s.id} value={s.id}>{s.plan?.nombre}</option>)}
                   </Select>
+                  <Input label="Nombre *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required placeholder="TV Sala" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <Select label="Tipo" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+                      <option value="Smart TV">Smart TV</option>
+                      <option value="PC">PC</option>
+                      <option value="Celular">Celular</option>
+                      <option value="Tablet">Tablet</option>
+                      <option value="Otro">Otro</option>
+                    </Select>
+                    <Select label="Activo" value={form.activo ? 'true' : 'false'} onChange={(e) => setForm({ ...form, activo: e.target.value === 'true' })}>
+                      <option value="true">Sí</option>
+                      <option value="false">No</option>
+                    </Select>
+                  </div>
+                  <Input label="MAC / ID dispositivo" value={form.mac || ''} onChange={(e) => setForm({ ...form, mac: e.target.value })} />
+                  <Textarea label="Observaciones" rows={3} value={form.observaciones || ''} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
                 </div>
-                <Input label="Nombre *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required placeholder="TV Sala" />
-                <Select label="Tipo" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
-                  <option value="Smart TV">Smart TV</option>
-                  <option value="PC">PC</option>
-                  <option value="Celular">Celular</option>
-                  <option value="Tablet">Tablet</option>
-                  <option value="Otro">Otro</option>
-                </Select>
-                <Input label="MAC / ID dispositivo" value={form.mac || ''} onChange={(e) => setForm({ ...form, mac: e.target.value })} />
-                <Select label="Activo" value={form.activo ? 'true' : 'false'} onChange={(e) => setForm({ ...form, activo: e.target.value === 'true' })}>
-                  <option value="true">Sí</option>
-                  <option value="false">No</option>
-                </Select>
-                <div className="sm:col-span-2">
-                  <Textarea label="Observaciones" rows={2} value={form.observaciones || ''} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
-                </div>
-              </CardBody>
-              <div className="p-4 border-t border-ui-border flex justify-end gap-2">
-                <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-                <Button type="submit">{editing ? 'Actualizar' : 'Crear'}</Button>
+              </div>
+              <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
+                <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 text-sm font-bold transition-colors">Cancelar</button>
+                <button type="submit" className="dev-cta px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md">{editing ? 'Actualizar' : 'Crear'}</button>
               </div>
             </form>
-          </Card>
-        </div>
+          </div>
+        </>
       )}
 
       {showInvForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-2xl max-h-[92vh] overflow-y-auto">
-            <CardHeader className="flex items-center justify-between">
+        <>
+          <div className="dev-overlay fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" onClick={() => setShowInvForm(false)} />
+          <div className="dev-drawer fixed inset-y-0 right-0 z-50 w-full md:w-[700px] bg-white shadow-2xl flex flex-col border-l border-slate-100">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
               <div>
-                <CardTitle>{invEditing ? `Editar equipo ${invEditing.idInventario}` : 'Nuevo equipo de inventario'}</CardTitle>
-                <p className="text-xs text-gray-400 mt-0.5">Se guarda directamente en la base de datos (tabla inventario_equipos)</p>
+                <h2 className="text-xl font-bold text-slate-800">{invEditing ? `Editar equipo ${invEditing.idInventario}` : 'Nuevo equipo de inventario'}</h2>
+                <p className="text-sm text-slate-500 mt-1">Se guarda directamente en la base de datos (tabla inventario_equipos)</p>
               </div>
-              <button onClick={() => setShowInvForm(false)} aria-label="Cerrar"><X size={20} /></button>
-            </CardHeader>
-            <form onSubmit={handleInvSubmit}>
-              <CardBody className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Input
-                  label={esLote ? 'IDs inventario (rango)' : 'ID inventario'}
-                  value={idRangoPreview || invForm.idInventario} disabled readOnly
-                  className="bg-gray-50 text-gray-400" placeholder="Generado automáticamente"
-                />
-                <Input
-                  label="Fecha de compra" type="date" value={invForm.fechaCompra || ''}
-                  onChange={(e) => setInvForm({ ...invForm, fechaCompra: e.target.value })}
-                />
-                <Select label="Estado" value={invForm.estado} onChange={(e) => setInvForm({ ...invForm, estado: e.target.value })}>
-                  <option value="En Bodega">En Bodega</option>
-                  <option value="Vendido">Vendido</option>
-                  <option value="Averiado">Averiado</option>
-                  <option value="En Garantía">En Garantía</option>
-                </Select>
-
-                <div className="sm:col-span-2">
-                  {refCustom || referencias.length === 0 ? (
-                    <>
-                      <Input
-                        label="Referencia / Descripción *" value={invForm.descripcion} required
-                        onChange={(e) => setInvForm({ ...invForm, descripcion: e.target.value })} placeholder="Escribe la referencia nueva"
-                      />
-                      {referencias.length > 0 && (
-                        <button type="button" onClick={() => { setRefCustom(false); setInvForm({ ...invForm, descripcion: '' }) }} className="mt-1 text-xs text-brand-primary hover:underline">
-                          ← Elegir de la lista de referencias
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <Select
-                      label="Referencia / Descripción *" value={invForm.descripcion} required
-                      onChange={(e) => {
-                        if (e.target.value === '__otra__') { setRefCustom(true); setInvForm({ ...invForm, descripcion: '' }) }
-                        else setInvForm({ ...invForm, descripcion: e.target.value })
-                      }}
-                    >
-                      <option value="">— Selecciona una referencia —</option>
-                      {referencias.map((ref) => <option key={ref} value={ref}>{ref}</option>)}
-                      <option value="__otra__">➕ Otra referencia…</option>
-                    </Select>
-                  )}
-                </div>
-                <Input
-                  label="Proveedor" value={invForm.proveedor}
-                  onChange={(e) => setInvForm({ ...invForm, proveedor: e.target.value })} placeholder="Amazon / Local"
-                />
-
-                <Input
-                  label="Cantidad" type="number" min="1" max={MAX_LOTE} value={invForm.cantidad}
-                  onChange={(e) => setInvForm({ ...invForm, cantidad: e.target.value })}
-                />
-                {!esLote && (
-                  <div className="sm:col-span-2">
-                    <Input
-                      label="Serie" value={invForm.serie}
-                      onChange={(e) => setInvForm({ ...invForm, serie: e.target.value })} placeholder="G4N1CQ…" className="font-mono"
-                    />
-                  </div>
-                )}
-
-                {esLote && (
-                  <div className="sm:col-span-3">
-                    <p className="text-sm font-medium text-brand-accent mb-1">
-                      Serie de cada equipo <span className="font-normal text-gray-400">— {cantidadNum} unidades de "{invForm.descripcion || 'la referencia seleccionada'}"</span>
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-h-56 overflow-y-auto rounded-lg border border-ui-border bg-ui-background/40 p-3">
-                      {invSeries.map((s, i) => (
-                        <Input
-                          key={i}
-                          label={`Serie #${i + 1}`} value={s} required placeholder="Serie física" className="font-mono"
-                          onChange={(e) => setInvSeries(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <CurrencyInput
-                    label="Costo unitario (COP) *" value={invForm.costoUniCOP} required
-                    onChange={(e) => setInvForm({ ...invForm, costoUniCOP: e.target.value })} placeholder="110.000"
-                    disabled={usdAuto} className={usdAuto ? 'bg-amber-50 text-amber-800 font-semibold' : ''}
+              <button onClick={() => setShowInvForm(false)} aria-label="Cerrar" className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleInvSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <Input
+                    label={esLote ? 'IDs inventario (rango)' : 'ID inventario'}
+                    value={idRangoPreview || invForm.idInventario} disabled readOnly
+                    className="bg-slate-50 text-slate-500 font-mono" placeholder="Generado automáticamente"
                   />
-                  {usdAuto && <p className="text-[11px] text-amber-600 mt-1">Calculado desde USD × TRM (bloqueado)</p>}
-                </div>
-                <CurrencyInput
-                  label="Precio sugerido (COP)" value={invForm.precioSugerido}
-                  onChange={(e) => setInvForm({ ...invForm, precioSugerido: e.target.value })} placeholder="130.000"
-                />
-                <div className="rounded-lg border border-orange-100 bg-orange-50/60 px-3 py-2 self-end">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-orange-600">
-                    Cálculo automático {esLote && `— total del lote (${cantidadNum} equipos)`}
-                  </p>
-                  <p className="text-xs text-gray-600 mt-0.5 tabular-nums">
-                    Total: <span className="font-semibold">{formatCurrency(invPreview.costoTotal)}</span>
-                    {invPreview.ganancia != null && (
+                  <Input
+                    label="Fecha de compra" type="date" value={invForm.fechaCompra || ''}
+                    onChange={(e) => setInvForm({ ...invForm, fechaCompra: e.target.value })}
+                  />
+                  <Select label="Estado" value={invForm.estado} onChange={(e) => setInvForm({ ...invForm, estado: e.target.value })}>
+                    <option value="En Bodega">En Bodega</option>
+                    <option value="Vendido">Vendido</option>
+                    <option value="Averiado">Averiado</option>
+                    <option value="En Garantía">En Garantía</option>
+                  </Select>
+  
+                  <div className="sm:col-span-2">
+                    {refCustom || referencias.length === 0 ? (
                       <>
-                        {' · '}Ganancia: <span className="font-semibold text-green-700">{formatCurrency(invPreview.ganancia)}</span>
-                        {' · '}<span className="font-semibold">{invPreview.utilidadPct.toFixed(1)}%</span>
+                        <Input
+                          label="Referencia / Descripción *" value={invForm.descripcion} required
+                          onChange={(e) => setInvForm({ ...invForm, descripcion: e.target.value })} placeholder="Escribe la referencia nueva"
+                        />
+                        {referencias.length > 0 && (
+                          <button type="button" onClick={() => { setRefCustom(false); setInvForm({ ...invForm, descripcion: '' }) }} className="mt-1.5 text-xs font-bold text-indigo-600 hover:underline">
+                            ← Elegir de la lista de referencias
+                          </button>
+                        )}
                       </>
+                    ) : (
+                      <Select
+                        label="Referencia / Descripción *" value={invForm.descripcion} required
+                        onChange={(e) => {
+                          if (e.target.value === '__otra__') { setRefCustom(true); setInvForm({ ...invForm, descripcion: '' }) }
+                          else setInvForm({ ...invForm, descripcion: e.target.value })
+                        }}
+                      >
+                        <option value="">— Selecciona una referencia —</option>
+                        {referencias.map((ref) => <option key={ref} value={ref}>{ref}</option>)}
+                        <option value="__otra__">➕ Otra referencia…</option>
+                      </Select>
                     )}
-                  </p>
-                  {esLote && <p className="text-[11px] text-gray-400 mt-0.5">Cada equipo se registra con costo unitario {formatCurrency(Number(invForm.costoUniCOP) || 0)}</p>}
-                </div>
-
-                <div className="sm:col-span-3">
-                  <button
-                    type="button"
-                    onClick={toggleCostosImport}
-                    className="flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-orange-600"
-                  >
-                    <ChevronDown size={16} className={cn('transition-transform', showCostosImport && 'rotate-180')} />
-                    Costos de importación en USD (convierte a COP automáticamente)
-                  </button>
-                  {showCostosImport && (
-                    <div className="mt-3 rounded-lg border border-ui-border bg-ui-background/50 p-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <CurrencyInput
-                          label="Costo unitario (USD)" prefix="US$" decimals={2} value={invForm.costoUnitarioUSD}
-                          onChange={(e) => setInvForm({ ...invForm, costoUnitarioUSD: e.target.value })}
-                        />
-                        <CurrencyInput
-                          label="Envío (USD)" prefix="US$" decimals={2} value={invForm.envioUSD}
-                          onChange={(e) => setInvForm({ ...invForm, envioUSD: e.target.value })}
-                        />
-                        <CurrencyInput
-                          label="Impuestos (USD)" prefix="US$" decimals={2} value={invForm.impuestosUSD}
-                          onChange={(e) => setInvForm({ ...invForm, impuestosUSD: e.target.value })}
-                        />
-                        <CurrencyInput
-                          label="Transporte (COP)" value={invForm.transporteCOP}
-                          onChange={(e) => setInvForm({ ...invForm, transporteCOP: e.target.value })}
-                        />
-                        <div>
-                          <CurrencyInput
-                            label="TRM del día" decimals={2} value={invForm.trm}
-                            onChange={(e) => setInvForm({ ...invForm, trm: e.target.value })}
-                            placeholder={loadingTrm ? 'Consultando…' : ''}
+                  </div>
+                  <Input
+                    label="Proveedor" value={invForm.proveedor}
+                    onChange={(e) => setInvForm({ ...invForm, proveedor: e.target.value })} placeholder="Amazon / Local"
+                  />
+  
+                  <Input
+                    label="Cantidad" type="number" min="1" max={MAX_LOTE} value={invForm.cantidad}
+                    onChange={(e) => setInvForm({ ...invForm, cantidad: e.target.value })}
+                  />
+                  {!esLote && (
+                    <div className="sm:col-span-2">
+                      <Input
+                        label="Serie" value={invForm.serie}
+                        onChange={(e) => setInvForm({ ...invForm, serie: e.target.value })} placeholder="G4N1CQ…" className="font-mono uppercase"
+                      />
+                    </div>
+                  )}
+  
+                  {esLote && (
+                    <div className="sm:col-span-3">
+                      <p className="text-sm font-semibold text-indigo-700 mb-2">
+                        Serie de cada equipo <span className="font-normal text-slate-500">— {cantidadNum} unidades de "{invForm.descripcion || 'la referencia seleccionada'}"</span>
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        {invSeries.map((s, i) => (
+                          <Input
+                            key={i}
+                            label={`Serie #${i + 1}`} value={s} required placeholder="Serie física" className="font-mono uppercase text-sm"
+                            onChange={(e) => setInvSeries(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}
                           />
-                          <p className="text-[11px] text-gray-400 mt-1">
-                            {loadingTrm
-                              ? 'Consultando TRM del día…'
-                              : trmInfo?.trm
-                                ? `Fuente: ${trmInfo.fuente} · vigente ${trmInfo.vigencia}`
-                                : 'Escribe la TRM manualmente si no hay conexión'}
-                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+  
+                  <div>
+                    <CurrencyInput
+                      label="Costo unitario (COP) *" value={invForm.costoUniCOP} required
+                      onChange={(e) => setInvForm({ ...invForm, costoUniCOP: e.target.value })} placeholder="110.000"
+                      disabled={usdAuto} className={usdAuto ? 'bg-amber-50 text-amber-800 font-bold border-amber-200' : ''}
+                    />
+                    {usdAuto && <p className="text-[11px] font-semibold text-amber-600 mt-1">Calculado desde USD (bloqueado)</p>}
+                  </div>
+                  <CurrencyInput
+                    label="Precio sugerido (COP)" value={invForm.precioSugerido}
+                    onChange={(e) => setInvForm({ ...invForm, precioSugerido: e.target.value })} placeholder="130.000"
+                  />
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 self-end">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-1">
+                      Cálculo automático {esLote && `— lote (${cantidadNum})`}
+                    </p>
+                    <p className="text-xs text-slate-600 tabular-nums">
+                      Total: <span className="font-extrabold text-slate-800">{formatCurrency(invPreview.costoTotal)}</span>
+                      {invPreview.ganancia != null && (
+                        <>
+                          <br/><span className="text-emerald-700 font-bold">+{formatCurrency(invPreview.ganancia)}</span> 
+                          <span className="text-slate-400 font-medium ml-1">({invPreview.utilidadPct.toFixed(1)}%)</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+  
+                  <div className="sm:col-span-3">
+                    <button
+                      type="button"
+                      onClick={toggleCostosImport}
+                      className="flex items-center gap-1.5 text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg transition-colors w-fit"
+                    >
+                      <ChevronDown size={16} className={cn('transition-transform', showCostosImport && 'rotate-180')} />
+                      Costos de importación (USD → COP)
+                    </button>
+                    {showCostosImport && (
+                      <div className="mt-3 rounded-xl border border-indigo-100 bg-white p-5 shadow-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <CurrencyInput
+                            label="Costo unitario (USD)" prefix="US$" decimals={2} value={invForm.costoUnitarioUSD}
+                            onChange={(e) => setInvForm({ ...invForm, costoUnitarioUSD: e.target.value })}
+                          />
+                          <CurrencyInput
+                            label="Envío (USD)" prefix="US$" decimals={2} value={invForm.envioUSD}
+                            onChange={(e) => setInvForm({ ...invForm, envioUSD: e.target.value })}
+                          />
+                          <CurrencyInput
+                            label="Impuestos (USD)" prefix="US$" decimals={2} value={invForm.impuestosUSD}
+                            onChange={(e) => setInvForm({ ...invForm, impuestosUSD: e.target.value })}
+                          />
+                          <CurrencyInput
+                            label="Transporte (COP)" value={invForm.transporteCOP}
+                            onChange={(e) => setInvForm({ ...invForm, transporteCOP: e.target.value })}
+                          />
+                          <div>
+                            <CurrencyInput
+                              label="TRM del día" decimals={2} value={invForm.trm}
+                              onChange={(e) => setInvForm({ ...invForm, trm: e.target.value })}
+                              placeholder={loadingTrm ? 'Consultando…' : ''}
+                            />
+                            <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                              {loadingTrm
+                                ? 'Consultando TRM...'
+                                : trmInfo?.trm
+                                  ? `Fuente: ${trmInfo.fuente}`
+                                  : 'Sin conexión, ingresa manual'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-4 rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-3 text-xs text-indigo-800">
+                          <p className="font-bold mb-1 flex items-center gap-1.5"><TrendingUp size={14} /> Fórmula de conversión:</p>
+                          <p>Costo COP = (USD unitario + envío + impuestos) × TRM + transporte COP</p>
+                          {usdAuto && (
+                            <p className="mt-1.5 font-bold tabular-nums text-indigo-900 bg-white inline-block px-2 py-1 rounded">
+                              = (US${usdSubtotal.toLocaleString('es-CO', { maximumFractionDigits: 2 })} × {Number(invForm.trm).toLocaleString('es-CO', { maximumFractionDigits: 2 })}) + {formatCurrency(Number(invForm.transporteCOP) || 0)} = {formatCurrency(Number(invForm.costoUniCOP) || 0)}
+                            </p>
+                          )}
                         </div>
                       </div>
-                      <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                        <span className="font-semibold">Fórmula:</span> Costo unitario COP = (USD unitario + envío + impuestos) × TRM + transporte COP
-                        {usdAuto && (
-                          <span className="ml-1 font-semibold tabular-nums">
-                            = (US${usdSubtotal.toLocaleString('es-CO', { maximumFractionDigits: 2 })} × {Number(invForm.trm).toLocaleString('es-CO', { maximumFractionDigits: 2 })}) + {formatCurrency(Number(invForm.transporteCOP) || 0)} = {formatCurrency(Number(invForm.costoUniCOP) || 0)}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </CardBody>
-              <div className="p-4 border-t border-ui-border flex justify-end gap-2">
-                <Button type="button" variant="secondary" onClick={() => setShowInvForm(false)}>Cancelar</Button>
-                <Button type="submit" disabled={savingInv}>
+              </div>
+              <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
+                <button type="button" onClick={() => setShowInvForm(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 text-sm font-bold transition-colors">Cancelar</button>
+                <button type="submit" disabled={savingInv} className="dev-cta px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md">
                   {savingInv ? 'Guardando…' : invEditing ? 'Actualizar equipo' : esLote ? `Guardar ${cantidadNum} equipos` : 'Guardar equipo'}
-                </Button>
+                </button>
               </div>
             </form>
-          </Card>
-        </div>
+          </div>
+        </>
       )}
     </div>
   )
