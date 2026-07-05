@@ -6,7 +6,7 @@ import {
   Search, RefreshCw, Tv,
   X, FileSpreadsheet, Save,
   Link2, Undo2,
-  XCircle, Wallet, Gift, DollarSign, Percent,
+  XCircle, Wallet, Gift, DollarSign, Percent, Package,
   Users, Maximize2, Minimize2, KeyRound, Copy, Check,
   Building2, ExternalLink, ChevronDown,
   Eye, EyeOff, Pencil, Trash2,
