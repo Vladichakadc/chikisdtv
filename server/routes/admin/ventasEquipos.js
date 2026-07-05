@@ -201,24 +201,38 @@ router.post('/payments/ventas-equipos', asyncHandler(async (req, res) => {
   if (!data.idVM) return res.status(400).json({ error: 'El ID de Venta (idVM) es obligatorio' });
   const venta = await VentaEquipo.create(data);
 
-  if (data.customerId) {
-    const client = await Client.findOne({ where: { customerId: data.customerId } });
-    if (client) {
-      const macOId = data.idPantalla || data.nickname || `UNKNOWN-${Date.now()}`;
-      await Device.findOrCreate({
-        where: { mac: macOId },
-        defaults: {
-          clientId: client.id,
-          nombre: data.nickname || data.idPantalla || 'Dispositivo Nuevo',
-          tipo: mapTipoFireToDeviceType(data.tipoFire),
-          mac: macOId,
-          activo: data.estado !== 'Desactivado' && data.estado !== 'Baja'
-        }
-      });
-    }
-  }
-
+  // ── Responder INMEDIATAMENTE para no bloquear al cliente ──────────────────
+  // Device.findOrCreate corre bajo WAL (SQLite) y necesita su propio write-lock.
+  // Si lo await-amos en la misma cadena que VentaEquipo.create, el segundo lock
+  // no puede adquirirse mientras el primero no libera → deadlock → UI congelada.
+  // Solución: enviamos la respuesta primero y registramos el Device como efecto
+  // secundario no-bloqueante usando setImmediate (corre tras soltar el event loop).
   res.status(201).json(venta);
+
+  // Solo registrar Device si hay un identificador real (idPantalla o nickname).
+  // Antes se creaba un UNKNOWN-<timestamp> inútil cuando ambos estaban vacíos.
+  const macOId = data.idPantalla || data.nickname;
+  if (data.customerId && macOId) {
+    setImmediate(async () => {
+      try {
+        const client = await Client.findOne({ where: { customerId: data.customerId } });
+        if (client) {
+          await Device.findOrCreate({
+            where: { mac: macOId },
+            defaults: {
+              clientId: client.id,
+              nombre: data.nickname || data.idPantalla || 'Dispositivo Nuevo',
+              tipo: mapTipoFireToDeviceType(data.tipoFire),
+              mac: macOId,
+              activo: data.estado !== 'Desactivado' && data.estado !== 'Baja'
+            }
+          });
+        }
+      } catch (e) {
+        console.error('[POST ventas-equipos] Error registrando Device (no-bloqueante):', e.message);
+      }
+    });
+  }
 }));
 
 router.put('/payments/ventas-equipos/:idVM', asyncHandler(async (req, res) => {

@@ -25,3 +25,18 @@ export function DaysChip({ dias }) {
   const cls = dias <= 0 ? 'text-red-600 font-bold' : dias <= 8 ? 'text-amber-600 font-semibold' : 'text-green-700'
   return <span className={cls}>{dias}d</span>
 }
+
+// MonthsChip — muestra en meses cuando quedan ≥30 días, en días cuando queda
+// menos de 1 mes. Así se mantiene la precisión cuando el vencimiento es próximo.
+// Ejemplos: 45 días → "1.5m" (verde) | 15 días → "15d" (ámbar) | -2 días → "-2d" (rojo)
+export function MonthsChip({ dias }) {
+  if (dias == null) return <span className="text-gray-400">—</span>
+  if (dias < 30) {
+    // Menos de 1 mes: mostrar en días para mayor precisión
+    const cls = dias <= 0 ? 'text-red-600 font-bold' : dias <= 8 ? 'text-amber-600 font-semibold' : 'text-amber-500 font-semibold'
+    return <span className={cls}>{dias}d</span>
+  }
+  // 1 mes o más: mostrar en meses con 1 decimal
+  const meses = +(dias / 30).toFixed(1)
+  return <span className="text-green-700">{meses}m</span>
+}

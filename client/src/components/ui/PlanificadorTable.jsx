@@ -19,7 +19,7 @@
 
 import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
 import { Badge } from './Badge'
-import { SortTh, DaysChip } from '../../pages/admin/planificador/TableBits'
+import { SortTh, DaysChip, MonthsChip } from '../../pages/admin/planificador/TableBits'
 import {
   calcDias, getRowVariant, ROW_BG, estadoBadgeVariant,
 } from '../../pages/admin/planificador/rowHelpers'
@@ -87,7 +87,7 @@ export function PlanificadorTable({
             <SortTh colKey="tipoPlan"    label="Tipo Plan"  sortConfig={sortConfig} onSort={onSort} />
             <SortTh colKey="inicioReal"  label="Ini. Real"  sortConfig={sortConfig} onSort={onSort} />
             <SortTh colKey="duracionReal" label="Fin Real"  sortConfig={sortConfig} onSort={onSort} />
-            <SortTh colKey="diasReal"    label="Días R."    sortConfig={sortConfig} onSort={onSort} />
+            <SortTh colKey="diasReal"    label="Mes R."     sortConfig={sortConfig} onSort={onSort} />
             <SortTh colKey="estadoReal"  label="Estado R."  sortConfig={sortConfig} onSort={onSort} />
             <SortTh colKey="alertaReal"  label="Alerta R."  sortConfig={sortConfig} onSort={onSort} />
             <SortTh colKey="debe"        label="Debe"       sortConfig={sortConfig} onSort={onSort} className="text-center" />
@@ -172,7 +172,7 @@ export function PlanificadorTable({
                 <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.inicioReal ? formatDate(row.inicioReal) : '—'}</td>
                 <td className="px-2 py-1.5 text-gray-900 whitespace-nowrap">{row.duracionReal ? formatDate(row.duracionReal) : '—'}</td>
                 <td className="px-2 py-1.5 whitespace-nowrap">
-                  <DaysChip dias={calcDias(row.duracionReal) ?? row.diasVencimientoReal} />
+                  <MonthsChip dias={calcDias(row.duracionReal) ?? row.diasVencimientoReal} />
                 </td>
                 <td className="px-2 py-1.5 whitespace-nowrap">
                   {row.estadoReal
