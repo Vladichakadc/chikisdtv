@@ -1,0 +1,124 @@
+- generic [ref=f5e3]:
+  - complementary [ref=f5e4]:
+    - generic [ref=f5e5]:
+      - img [ref=f5e7]
+      - generic [ref=f5e10]:
+        - generic [ref=f5e11]: ChikisdTV
+        - generic [ref=f5e12]: Panel Administrador
+      - button "Colapsar menú" [ref=f5e13] [cursor=pointer]:
+        - img [ref=f5e14]
+    - navigation [ref=f5e18]:
+      - generic [ref=f5e19]:
+        - paragraph [ref=f5e20]: Principal
+        - generic [ref=f5e22]:
+          - generic [ref=f5e23]:
+            - link "Dashboard" [ref=f5e24] [cursor=pointer]:
+              - /url: /admin
+              - img [ref=f5e25]
+              - generic [ref=f5e30]: Dashboard
+            - button "Expandir Dashboard" [ref=f5e31] [cursor=pointer]:
+              - img [ref=f5e32]
+          - generic [ref=f5e34]:
+            - link "Análisis Financiero" [ref=f5e35] [cursor=pointer]:
+              - /url: /admin/analisis-financiero
+              - img [ref=f5e37]
+              - generic [ref=f5e39]: Análisis Financiero
+            - link "Análisis Retención" [ref=f5e40] [cursor=pointer]:
+              - /url: /admin/retencion
+              - img [ref=f5e42]
+              - generic [ref=f5e46]: Análisis Retención
+      - generic [ref=f5e47]:
+        - paragraph [ref=f5e48]: Operación
+        - generic [ref=f5e49]:
+          - link "Planificador" [ref=f5e52] [cursor=pointer]:
+            - /url: /admin/planificador
+            - img [ref=f5e53]
+            - generic [ref=f5e57]: Planificador
+          - link "Cuentas Padre" [ref=f5e60] [cursor=pointer]:
+            - /url: /admin/cuentas-padre
+            - img [ref=f5e61]
+            - generic [ref=f5e64]: Cuentas Padre
+          - generic [ref=f5e65]:
+            - generic [ref=f5e66]:
+              - link "Clientes" [ref=f5e67] [cursor=pointer]:
+                - /url: /admin/clients
+                - img [ref=f5e68]
+                - generic [ref=f5e73]: Clientes
+              - button "Expandir Clientes" [ref=f5e74] [cursor=pointer]:
+                - img [ref=f5e75]
+            - link "Análisis Demográfico" [ref=f5e78] [cursor=pointer]:
+              - /url: /admin/analisis-clientes
+              - img [ref=f5e80]
+              - generic [ref=f5e83]: Análisis Demográfico
+          - link "Planes" [ref=f5e86] [cursor=pointer]:
+            - /url: /admin/plans
+            - img [ref=f5e87]
+            - generic [ref=f5e91]: Planes
+          - link "Suscripciones" [ref=f5e94] [cursor=pointer]:
+            - /url: /admin/subscriptions
+            - img [ref=f5e95]
+            - generic [ref=f5e98]: Suscripciones
+          - generic [ref=f5e99]:
+            - generic [ref=f5e100]:
+              - link "Pagos" [ref=f5e101] [cursor=pointer]:
+                - /url: /admin/payments
+                - img [ref=f5e102]
+                - generic [ref=f5e104]: Pagos
+              - button "Expandir Pagos" [ref=f5e105] [cursor=pointer]:
+                - img [ref=f5e106]
+            - link "Análisis de Pagos" [ref=f5e109] [cursor=pointer]:
+              - /url: /admin/analisis-pagos
+              - img [ref=f5e111]
+              - generic [ref=f5e113]: Análisis de Pagos
+          - generic [ref=f5e114]:
+            - generic [ref=f5e115]:
+              - link "Bajas" [ref=f5e116] [cursor=pointer]:
+                - /url: /admin/bajas
+                - img [ref=f5e117]
+                - generic [ref=f5e122]: Bajas
+              - button "Expandir Bajas" [ref=f5e123] [cursor=pointer]:
+                - img [ref=f5e124]
+            - link "Análisis de Bajas" [ref=f5e127] [cursor=pointer]:
+              - /url: /admin/analisis-bajas
+              - img [ref=f5e129]
+              - generic [ref=f5e132]: Análisis de Bajas
+      - generic [ref=f5e133]:
+        - paragraph [ref=f5e134]: Equipos
+        - generic [ref=f5e135]:
+          - link "Costo Pantalla" [ref=f5e138] [cursor=pointer]:
+            - /url: /admin/costo-pantalla
+            - img [ref=f5e139]
+            - generic [ref=f5e141]: Costo Pantalla
+          - generic [ref=f5e142]:
+            - generic [ref=f5e143]:
+              - link "Venta Dispositivos" [ref=f5e144] [cursor=pointer]:
+                - /url: /admin/ventas-dispositivos
+                - img [ref=f5e145]
+                - generic [ref=f5e148]: Venta Dispositivos
+              - button "Expandir Venta Dispositivos" [ref=f5e149] [cursor=pointer]:
+                - img [ref=f5e150]
+            - link "Análisis Dispositivos" [ref=f5e153] [cursor=pointer]:
+              - /url: /admin/analisis-dispositivos
+              - img [ref=f5e155]
+              - generic [ref=f5e158]: Análisis Dispositivos
+          - generic [ref=f5e159]:
+            - generic [ref=f5e160]:
+              - link "Inventario Equipos" [ref=f5e161] [cursor=pointer]:
+                - /url: /admin/devices
+                - img [ref=f5e162]
+                - generic [ref=f5e172]: Inventario Equipos
+              - button "Expandir Inventario Equipos" [ref=f5e173] [cursor=pointer]:
+                - img [ref=f5e174]
+            - link "Análisis Inventario" [ref=f5e177] [cursor=pointer]:
+              - /url: /admin/analisis-inventario
+              - img [ref=f5e179]
+              - generic [ref=f5e181]: Análisis Inventario
+    - generic [ref=f5e183]:
+      - generic [ref=f5e184]: A
+      - generic [ref=f5e185]:
+        - paragraph [ref=f5e186]: Administrador
+        - paragraph [ref=f5e187]: admin@chikisdtv.com
+      - button "Cerrar sesión" [ref=f5e189] [cursor=pointer]:
+        - img [ref=f5e190]
+  - main [ref=f5e194]:
+    - paragraph [ref=f5e198]: Cargando…
