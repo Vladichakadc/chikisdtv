@@ -9,6 +9,7 @@ import { DataTable } from '../../components/ui/DataTable'
 import { Badge } from '../../components/ui/Badge'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
+import { KpiCard } from '../../components/ui/KpiCard'
 
 // Paleta fija por referencia: el mismo color identifica a la referencia en las
 // gráficas y en el punto de color de la tabla (mapeo consistente en toda la vista)
@@ -45,96 +46,9 @@ const CSS = `
   }
 `
 
-// Cada KPI tiene su propia identidad de color (no es decorativo: el color
-// codifica el significado — verde = salud de stock, ámbar = dinero invertido,
-// fucsia = oportunidad/ganancia, rosa = alerta/inactivo — así el usuario lee
-// la fila de un vistazo sin tener que leer las etiquetas primero).
-const CARD_TONES = {
-  violet: {
-    iconBg: 'linear-gradient(135deg,#a5b4fc,#6366f1)',
-    glow: 'rgba(99,102,241,.5)',
-    blob: 'radial-gradient(circle,#6366f1,transparent 72%)',
-    label: 'text-indigo-300',
-    bar: '#818cf8',
-  },
-  emerald: {
-    iconBg: 'linear-gradient(135deg,#6ee7b7,#059669)',
-    glow: 'rgba(16,185,129,.5)',
-    blob: 'radial-gradient(circle,#10b981,transparent 72%)',
-    label: 'text-emerald-300',
-    bar: '#34d399',
-  },
-  amber: {
-    iconBg: 'linear-gradient(135deg,#fcd34d,#d97706)',
-    glow: 'rgba(245,158,11,.5)',
-    blob: 'radial-gradient(circle,#f59e0b,transparent 72%)',
-    label: 'text-amber-300',
-    bar: '#fbbf24',
-  },
-  fuchsia: {
-    iconBg: 'linear-gradient(135deg,#f9a8d4,#db2777)',
-    glow: 'rgba(219,39,119,.5)',
-    blob: 'radial-gradient(circle,#ec4899,transparent 72%)',
-    label: 'text-fuchsia-300',
-    bar: '#f472b6',
-  },
-  rose: {
-    iconBg: 'linear-gradient(135deg,#fda4af,#e11d48)',
-    glow: 'rgba(225,29,72,.5)',
-    blob: 'radial-gradient(circle,#f43f5e,transparent 72%)',
-    label: 'text-rose-300',
-    bar: '#fb7185',
-  },
-  cyan: {
-    iconBg: 'linear-gradient(135deg,#67e8f9,#0891b2)',
-    glow: 'rgba(6,182,212,.5)',
-    blob: 'radial-gradient(circle,#06b6d4,transparent 72%)',
-    label: 'text-cyan-300',
-    bar: '#22d3ee',
-  },
-}
-
-// Tarjeta KPI "instrumento de control": vidrio oscuro + resplandor de color
-// propio por métrica, coherente con el hero (mismo lenguaje visual, no un
-// bloque blanco desconectado debajo de un header oscuro).
-function DeviceCard({ icon: Icon, label, value, sub, tone = 'violet', delay = 0 }) {
-  const t = CARD_TONES[tone] || CARD_TONES.violet
-  return (
-    <div
-      className="dev-card group relative rounded-3xl overflow-hidden select-none bg-gradient-to-b from-slate-800/80 to-slate-900/90 border border-white/[.06] transition-all duration-300 hover:-translate-y-1.5"
-      style={{ animationDelay: `${delay}ms`, boxShadow: '0 1px 0 0 rgba(255,255,255,.06) inset, 0 8px 24px -12px rgba(0,0,0,.5)' }}
-    >
-      <div
-        className="absolute -top-10 -right-10 w-36 h-36 rounded-full opacity-40 blur-2xl pointer-events-none transition-opacity duration-300 group-hover:opacity-70"
-        style={{ background: t.blob }}
-      />
-      <div
-        className="absolute inset-0 opacity-[.05] pointer-events-none"
-        style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '18px 18px' }}
-      />
-      <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: t.bar, boxShadow: `0 0 14px 1px ${t.glow}` }} />
-
-      <div className="relative p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={cn('text-[10px] font-bold tracking-[.16em] uppercase mb-2', t.label)}>{label}</p>
-          <p
-            className="dev-card-num text-3xl font-extrabold text-white leading-none"
-            style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", textShadow: `0 0 26px ${t.glow}` }}
-          >
-            {value}
-          </p>
-          {sub && <p className="text-xs mt-2 font-medium text-slate-400">{sub}</p>}
-        </div>
-        <div
-          className="p-2.5 rounded-2xl shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3"
-          style={{ background: t.iconBg, boxShadow: `0 6px 18px -3px ${t.glow}` }}
-        >
-          <Icon size={20} className="text-white" strokeWidth={2.25} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// DeviceCard → KpiCard global (dark Huashu)
+// tone map: violet→indigo, fuchsia→pink, demás 1:1
+const DEV_TONE_MAP = { violet: 'indigo', fuchsia: 'pink' }
 
 const EMPTY = { clientId: '', subscriptionId: '', nombre: '', tipo: 'Smart TV', mac: '', activo: true, observaciones: '' }
 
@@ -627,20 +541,20 @@ export default function DevicesPage() {
       {tab === 'inventario' ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <DeviceCard icon={Package} label="Unidades" value={invStats.unidades} tone="violet" delay={0} sub={`${totalReferencias} referencias del lote 2026`} />
-            <DeviceCard icon={CheckCircle} label="En Bodega" value={invStats.enBodega} tone="emerald" delay={70} sub={`${invStats.vendidos} vendidas`} />
-            <DeviceCard icon={Wallet} label="Inversión Total" value={formatCurrency(invStats.inversion)} tone="amber" delay={140} sub="Costo total COP del lote" />
-            <DeviceCard icon={TrendingUp} label="Ganancia Potencial" value={formatCurrency(invStats.gananciaPotencial)} tone="fuchsia" delay={210} sub="A precio sugerido" />
+            <KpiCard icon={Package}    label="Unidades"          value={invStats.unidades}                         loading={loading} tone={DEV_TONE_MAP['violet']   || 'indigo'}  delay={2} sub={`${totalReferencias} referencias del lote 2026`} />
+            <KpiCard icon={CheckCircle} label="En Bodega"        value={invStats.enBodega}                         loading={loading} tone="emerald" delay={3} sub={`${invStats.vendidos} vendidas`} />
+            <KpiCard icon={Wallet}      label="Inversión Total"   value={formatCurrency(invStats.inversion)}        loading={loading} tone="amber"   delay={4} sub="Costo total COP del lote" />
+            <KpiCard icon={TrendingUp}  label="Ganancia Potencial" value={formatCurrency(invStats.gananciaPotencial)} loading={loading} tone={DEV_TONE_MAP['fuchsia'] || 'pink'}   delay={5} sub="A precio sugerido" />
           </div>
 
 
         </>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <DeviceCard icon={Tv} label="Total Equipos" value={stats.total} tone="violet" delay={0} sub="Registrados en sistema" />
-          <DeviceCard icon={CheckCircle} label="Equipos Activos" value={stats.activos} tone="emerald" delay={70} sub="En funcionamiento" />
-          <DeviceCard icon={XCircle} label="Equipos Inactivos" value={stats.inactivos} tone="rose" delay={140} sub="Desactivados / Baja" />
-          <DeviceCard icon={Tv} label="Smart TV / TV Box" value={stats.firetv} tone="cyan" delay={210} sub="Dispositivos principales" />
+          <KpiCard icon={Tv}          label="Total Equipos"     value={stats.total}     loading={loading} tone="indigo"  delay={2} sub="Registrados en sistema" />
+          <KpiCard icon={CheckCircle} label="Equipos Activos"   value={stats.activos}   loading={loading} tone="emerald" delay={3} sub="En funcionamiento" />
+          <KpiCard icon={XCircle}     label="Equipos Inactivos" value={stats.inactivos} loading={loading} tone="rose"    delay={4} sub="Desactivados / Baja" />
+          <KpiCard icon={Tv}          label="Smart TV / TV Box" value={stats.firetv}    loading={loading} tone="cyan"    delay={5} sub="Dispositivos principales" />
         </div>
       )}
 
