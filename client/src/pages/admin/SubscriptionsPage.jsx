@@ -2,44 +2,47 @@
  * SubscriptionsPage — Professional redesign
  * Skills applied: ui-ux-pro-max · huashu-design · taste-skill
  *
- * La tabla de datos es el mismo componente compartido PlanificadorTable
- * que usa PlanificadorPage. Cualquier cambio en ese componente se refleja
- * automáticamente aquí también — siempre son una copia exacta.
+ * Tabla = PlanificadorTable (componente compartido con PlanificadorPage)
+ * Tarjetas inteligentes = mismas StatCard + CategoryPanel del Planificador
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { todayStr } from '../../utils/dateUtils'
 import {
-  Plus, Pencil, Trash2, X, CheckCircle2, Clock, XCircle,
+  Plus, X, CheckCircle2, Clock, XCircle,
   AlertTriangle, Search, SlidersHorizontal,
   Users, TrendingUp, Activity, RefreshCw, Monitor,
+  Tv, Wallet, Gift, DollarSign, Percent,
 } from 'lucide-react'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
 import { Input, Select, Textarea } from '../../components/ui/Input'
-import { Badge } from '../../components/ui/Badge'
 import { Card } from '../../components/ui/Card'
 import { PlanificadorTable } from '../../components/ui/PlanificadorTable'
-import { formatDate } from '../../utils/excelUtils'
-import { getRowVariant, getPlanSortVal } from './planificador/rowHelpers'
+import { formatCurrency } from '../../utils/excelUtils'
+import { StatCard } from './planificador/StatCard'
+import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
+import { calcDias, getRowVariant, getPlanSortVal } from './planificador/rowHelpers'
 
 /* ══════════════════════════════════════════════════════════════
-   DESIGN TOKENS  (Huashu system — scoped to this page)
+   DESIGN TOKENS
 ══════════════════════════════════════════════════════════════ */
 const CSS = `
-  @keyframes sp-fade-up   { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
-  @keyframes sp-fade-in   { from { opacity:0 }  to { opacity:1 } }
-  @keyframes sp-scale-in  { from { opacity:0; transform:scale(.94) translateY(10px) } to { opacity:1; transform:scale(1) translateY(0) } }
-  @keyframes sp-slide-in  { from { opacity:0; transform:translateX(100%) } to { opacity:1; transform:translateX(0) } }
-  @keyframes sp-shimmer   { from { background-position:-200% 0 } to { background-position:200% 0 } }
-  @keyframes sp-orb-1     { 0%,100% { transform:translate(0,0) scale(1) }  50% { transform:translate(30px,-20px) scale(1.08) } }
-  @keyframes sp-orb-2     { 0%,100% { transform:translate(0,0) scale(1) }  50% { transform:translate(-25px,15px) scale(1.05) } }
+  @keyframes sp-fade-up  { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes sp-fade-in  { from { opacity:0 }  to { opacity:1 } }
+  @keyframes sp-scale-in { from { opacity:0; transform:scale(.94) translateY(10px) } to { opacity:1; transform:scale(1) translateY(0) } }
+  @keyframes sp-slide-in { from { opacity:0; transform:translateX(100%) } to { opacity:1; transform:translateX(0) } }
+  @keyframes sp-shimmer  { from { background-position:-200% 0 } to { background-position:200% 0 } }
+  @keyframes sp-orb-1    { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes sp-orb-2    { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
 
-  .sp-a1  { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) both }
-  .sp-a2  { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .08s both }
-  .sp-a3  { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .16s both }
-  .sp-a4  { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .24s both }
-  .sp-a5  { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .32s both }
+  .sp-a1 { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .sp-a2 { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .sp-a3 { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .12s both }
+  .sp-a4 { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .18s both }
+  .sp-a5 { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .24s both }
+  .sp-a6 { animation: sp-fade-up .45s cubic-bezier(.22,1,.36,1) .30s both }
 
   .sp-skeleton {
     background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
@@ -47,7 +50,6 @@ const CSS = `
     animation: sp-shimmer 1.6s infinite;
     border-radius: 6px;
   }
-
   .sp-drawer  { animation: sp-slide-in .3s cubic-bezier(.22,1,.36,1) both }
   .sp-overlay { animation: sp-fade-in .2s ease both }
   .sp-confirm { animation: sp-scale-in .22s cubic-bezier(.22,1,.36,1) both }
@@ -63,7 +65,7 @@ const CSS = `
     box-shadow: 0 4px 18px rgba(249,115,22,.35);
     transition: all .22s ease;
   }
-  .sp-cta:hover { box-shadow: 0 7px 24px rgba(249,115,22,.5); transform: translateY(-2px) }
+  .sp-cta:hover  { box-shadow: 0 7px 24px rgba(249,115,22,.5); transform: translateY(-2px) }
   .sp-cta:active { transform: translateY(0) }
 
   .sp-btn-danger {
@@ -78,7 +80,7 @@ const CSS = `
   .sp-search:focus { outline: none; box-shadow: 0 0 0 3px rgba(249,115,22,.18) }
 
   @media (prefers-reduced-motion: reduce) {
-    .sp-a1,.sp-a2,.sp-a3,.sp-a4,.sp-a5,
+    .sp-a1,.sp-a2,.sp-a3,.sp-a4,.sp-a5,.sp-a6,
     .sp-drawer,.sp-overlay,.sp-confirm,
     .sp-orb-1,.sp-orb-2,.sp-skeleton { animation: none !important; transition: none !important }
   }
@@ -88,52 +90,53 @@ const CSS = `
    CONSTANTS
 ══════════════════════════════════════════════════════════════ */
 const EMPTY = {
-  clientId: '', planId: '', fechaInicio: '', fechaVencimiento: '',
-  estado: 'Activo', observaciones: ''
+  clientId: '', planId: '', fechaInicio: '',
+  fechaVencimiento: '', estado: 'Activo', observaciones: '',
 }
-
 const ESTADO = {
   Activo:    { icon: CheckCircle2, pill: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', dot: 'bg-emerald-500' },
-  Vencido:   { icon: Clock,        pill: 'bg-red-50    text-red-600    ring-1 ring-red-200',       dot: 'bg-red-500'     },
-  Cancelado: { icon: XCircle,      pill: 'bg-slate-100 text-slate-500  ring-1 ring-slate-200',     dot: 'bg-slate-400'   },
+  Vencido:   { icon: Clock,        pill: 'bg-red-50 text-red-600 ring-1 ring-red-200',             dot: 'bg-red-500'     },
+  Cancelado: { icon: XCircle,      pill: 'bg-slate-100 text-slate-500 ring-1 ring-slate-200',      dot: 'bg-slate-400'   },
 }
-
-const AVATAR_COLORS = [
-  'from-orange-400 to-amber-300', 'from-violet-500 to-purple-400',
-  'from-cyan-500 to-sky-400',     'from-emerald-500 to-teal-400',
-  'from-rose-500 to-pink-400',
-]
-const avatarColor = (name = '') =>
-  AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length]
 
 /* ══════════════════════════════════════════════════════════════
    SUB-COMPONENTS
 ══════════════════════════════════════════════════════════════ */
 
+/** KPI card — summary from /subscriptions */
 function KpiCard({ icon: Icon, label, value, loading, gradFrom, gradTo, delay }) {
   return (
     <div className={`sp-kpi sp-a${delay} relative bg-white rounded-2xl border border-slate-200 overflow-hidden cursor-default select-none`}>
       <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl"
            style={{ background: `linear-gradient(90deg,${gradFrom},${gradTo})` }} />
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{label}</p>
-            {loading
-              ? <div className="sp-skeleton h-8 w-14 mt-1" />
-              : <p className="text-3xl font-bold text-slate-800 tabular-nums leading-none">{value}</p>
-            }
-          </div>
-          <div className="p-2.5 rounded-xl shrink-0"
-               style={{ background: `linear-gradient(135deg,${gradFrom}20,${gradTo}30)` }}>
-            <Icon size={20} style={{ color: gradFrom }} />
-          </div>
+      <div className="p-5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{label}</p>
+          {loading
+            ? <div className="sp-skeleton h-8 w-14 mt-1" />
+            : <p className="text-3xl font-bold text-slate-800 tabular-nums leading-none">{value}</p>
+          }
+        </div>
+        <div className="p-2.5 rounded-xl shrink-0"
+             style={{ background: `linear-gradient(135deg,${gradFrom}20,${gradTo}30)` }}>
+          <Icon size={20} style={{ color: gradFrom }} />
         </div>
       </div>
     </div>
   )
 }
 
+/** Section label divider */
+function SectionLabel({ children }) {
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <span className="text-[10px] font-bold tracking-[.15em] uppercase text-slate-400">{children}</span>
+      <div className="flex-1 h-px bg-slate-200" />
+    </div>
+  )
+}
+
+/** Skeleton rows */
 function SkeletonTable() {
   return (
     <div className="divide-y divide-slate-100">
@@ -146,47 +149,38 @@ function SkeletonTable() {
           </div>
           <div className="sp-skeleton h-3.5 rounded w-24 hidden sm:block" />
           <div className="sp-skeleton h-6 rounded-full w-20" />
-          <div className="sp-skeleton h-7 rounded-lg w-16" />
         </div>
       ))}
     </div>
   )
 }
 
+/** Empty state */
 function EmptyState({ hasFilters, onNew, onClear }) {
   return (
     <div className="py-20 flex flex-col items-center gap-5 text-center px-4">
       <div className="relative">
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-100 to-amber-50
-                        flex items-center justify-center shadow-inner">
+        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center shadow-inner">
           <Monitor size={36} className="text-orange-400" />
         </div>
-        <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-orange-500
-                        flex items-center justify-center shadow-md">
+        <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center shadow-md">
           <Plus size={14} className="text-white" />
         </div>
       </div>
       <div className="max-w-xs">
-        <p className="text-lg font-semibold text-slate-700">
-          {hasFilters ? 'Sin resultados' : 'Sin datos del planificador'}
-        </p>
+        <p className="text-lg font-semibold text-slate-700">{hasFilters ? 'Sin resultados' : 'Sin datos del planificador'}</p>
         <p className="text-slate-400 text-sm mt-1.5 leading-relaxed">
-          {hasFilters
-            ? 'Ningún registro coincide con los filtros actuales.'
-            : 'No hay pantallas en el planificador todavía.'}
+          {hasFilters ? 'Ningún registro coincide con los filtros actuales.' : 'No hay pantallas en el planificador todavía.'}
         </p>
       </div>
       <div className="flex gap-3 flex-wrap justify-center">
         {hasFilters && (
-          <button onClick={onClear}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600
-                       border border-slate-200 hover:bg-slate-50 transition-colors">
+          <button onClick={onClear} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors">
             Limpiar filtros
           </button>
         )}
         <button onClick={onNew} data-testid="empty-new-btn"
-          className="sp-cta px-4 py-2 rounded-xl text-sm font-semibold text-white
-                     flex items-center gap-1.5">
+          className="sp-cta px-4 py-2 rounded-xl text-sm font-semibold text-white flex items-center gap-1.5">
           <Plus size={15} /> Nueva suscripción
         </button>
       </div>
@@ -194,12 +188,11 @@ function EmptyState({ hasFilters, onNew, onClear }) {
   )
 }
 
+/** Confirm delete dialog */
 function ConfirmDialog({ name, onConfirm, onCancel }) {
   return (
-    <div className="sp-overlay fixed inset-0 bg-black/50 backdrop-blur-[3px] flex items-center
-                    justify-center z-[70] p-4" onClick={onCancel}>
-      <div className="sp-confirm bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden"
-           onClick={e => e.stopPropagation()}>
+    <div className="sp-overlay fixed inset-0 bg-black/50 backdrop-blur-[3px] flex items-center justify-center z-[70] p-4" onClick={onCancel}>
+      <div className="sp-confirm bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="p-6">
           <div className="flex gap-4 items-start mb-4">
             <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center shrink-0">
@@ -213,21 +206,15 @@ function ConfirmDialog({ name, onConfirm, onCancel }) {
           </div>
         </div>
         <div className="px-6 pb-5 flex justify-end gap-3">
-          <button onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200
-                       rounded-xl hover:bg-slate-50 transition-colors">
-            Cancelar
-          </button>
-          <button onClick={onConfirm} data-testid="confirm-delete-btn"
-            className="sp-btn-danger px-4 py-2 text-sm font-semibold text-white rounded-xl">
-            Sí, eliminar
-          </button>
+          <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">Cancelar</button>
+          <button onClick={onConfirm} data-testid="confirm-delete-btn" className="sp-btn-danger px-4 py-2 text-sm font-semibold text-white rounded-xl">Sí, eliminar</button>
         </div>
       </div>
     </div>
   )
 }
 
+/** Slide-in drawer form */
 function SubscriptionDrawer({ editing, form, setForm, clients, plans, onSubmit, onClose }) {
   const [saving, setSaving] = useState(false)
   const submit = async (e) => { e.preventDefault(); setSaving(true); await onSubmit(e); setSaving(false) }
@@ -235,8 +222,8 @@ function SubscriptionDrawer({ editing, form, setForm, clients, plans, onSubmit, 
   return (
     <>
       <div className="sp-overlay fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" onClick={onClose} />
-      <div className="sp-drawer fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl
-                      flex flex-col overflow-hidden">
+      <div className="sp-drawer fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col overflow-hidden">
+        {/* Header */}
         <div className="relative px-6 py-5 border-b border-slate-100 flex-shrink-0">
           <div className="absolute top-0 left-0 right-0 h-[3px]"
                style={{ background: 'linear-gradient(90deg,#f97316,#fb923c,#fbbf24)' }} />
@@ -245,8 +232,7 @@ function SubscriptionDrawer({ editing, form, setForm, clients, plans, onSubmit, 
               <p className="text-[10px] font-bold tracking-[.14em] uppercase text-orange-500 mb-0.5">
                 {editing ? 'Editar registro' : 'Nuevo registro'}
               </p>
-              <h2 className="text-xl font-bold text-slate-800"
-                  style={{ fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+              <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
                 {editing ? 'Editar Suscripción' : 'Nueva Suscripción'}
               </h2>
               <p className="text-slate-400 text-xs mt-0.5">
@@ -262,25 +248,20 @@ function SubscriptionDrawer({ editing, form, setForm, clients, plans, onSubmit, 
 
         <form onSubmit={submit} className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
             <div>
               <p className="text-[10px] font-bold tracking-[.12em] uppercase text-slate-400 mb-3 flex items-center gap-2">
-                <span className="w-4 h-[1px] bg-slate-300 inline-block" />Cliente
-                <span className="flex-1 h-[1px] bg-slate-100 inline-block" />
+                <span className="w-4 h-[1px] bg-slate-300 inline-block" />Cliente<span className="flex-1 h-[1px] bg-slate-100 inline-block" />
               </p>
-              <Select label="Cliente *" value={form.clientId}
-                onChange={e => setForm({ ...form, clientId: e.target.value })} required>
+              <Select label="Cliente *" value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })} required>
                 <option value="">— Selecciona un cliente —</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name} — {c.email}</option>)}
               </Select>
             </div>
-
             <div>
               <p className="text-[10px] font-bold tracking-[.12em] uppercase text-slate-400 mb-3 flex items-center gap-2">
-                <span className="w-4 h-[1px] bg-slate-300 inline-block" />Plan
-                <span className="flex-1 h-[1px] bg-slate-100 inline-block" />
+                <span className="w-4 h-[1px] bg-slate-300 inline-block" />Plan<span className="flex-1 h-[1px] bg-slate-100 inline-block" />
               </p>
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid gap-3">
                 {plans.map(p => (
                   <label key={p.id}
                     className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-200
@@ -293,18 +274,14 @@ function SubscriptionDrawer({ editing, form, setForm, clients, plans, onSubmit, 
                       <p className="font-semibold text-slate-700 text-sm">{p.nombre}</p>
                       {p.descripcion && <p className="text-xs text-slate-400 truncate">{p.descripcion}</p>}
                     </div>
-                    {p.precio != null && (
-                      <span className="text-sm font-bold text-orange-600 shrink-0">${p.precio.toLocaleString()}</span>
-                    )}
+                    {p.precio != null && <span className="text-sm font-bold text-orange-600 shrink-0">${p.precio.toLocaleString()}</span>}
                   </label>
                 ))}
               </div>
             </div>
-
             <div>
               <p className="text-[10px] font-bold tracking-[.12em] uppercase text-slate-400 mb-3 flex items-center gap-2">
-                <span className="w-4 h-[1px] bg-slate-300 inline-block" />Periodo y estado
-                <span className="flex-1 h-[1px] bg-slate-100 inline-block" />
+                <span className="w-4 h-[1px] bg-slate-300 inline-block" />Periodo y estado<span className="flex-1 h-[1px] bg-slate-100 inline-block" />
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Fecha de inicio *" type="date" value={form.fechaInicio}
@@ -318,8 +295,7 @@ function SubscriptionDrawer({ editing, form, setForm, clients, plans, onSubmit, 
                   {Object.entries(ESTADO).map(([key, val]) => {
                     const Icon = val.icon
                     return (
-                      <button key={key} type="button"
-                        onClick={() => setForm({ ...form, estado: key })}
+                      <button key={key} type="button" onClick={() => setForm({ ...form, estado: key })}
                         className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border-2 transition-all duration-200
                           ${form.estado === key ? val.pill + ' border-current' : 'border-slate-200 text-slate-400 hover:border-slate-300'}`}>
                         <Icon size={13} />{key}
@@ -329,27 +305,21 @@ function SubscriptionDrawer({ editing, form, setForm, clients, plans, onSubmit, 
                 </div>
               </div>
             </div>
-
             <div>
               <p className="text-[10px] font-bold tracking-[.12em] uppercase text-slate-400 mb-3 flex items-center gap-2">
-                <span className="w-4 h-[1px] bg-slate-300 inline-block" />Observaciones
-                <span className="flex-1 h-[1px] bg-slate-100 inline-block" />
+                <span className="w-4 h-[1px] bg-slate-300 inline-block" />Observaciones<span className="flex-1 h-[1px] bg-slate-100 inline-block" />
               </p>
               <Textarea rows={3} placeholder="Notas internas…"
-                value={form.observaciones || ''}
-                onChange={e => setForm({ ...form, observaciones: e.target.value })} />
+                value={form.observaciones || ''} onChange={e => setForm({ ...form, observaciones: e.target.value })} />
             </div>
           </div>
-
           <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex gap-3 flex-shrink-0">
             <button type="button" onClick={onClose} disabled={saving}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600
-                         border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-50">
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-50">
               Cancelar
             </button>
             <button type="submit" disabled={saving} data-testid="drawer-submit-btn"
-              className="sp-cta flex-1 py-2.5 rounded-xl text-sm font-semibold text-white
-                         flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+              className="sp-cta flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
               {saving
                 ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando…</>
                 : editing ? 'Guardar cambios' : <><Plus size={15} />Crear suscripción</>
@@ -367,28 +337,30 @@ function SubscriptionDrawer({ editing, form, setForm, clients, plans, onSubmit, 
 ══════════════════════════════════════════════════════════════ */
 export default function SubscriptionsPage() {
   const { showToast } = useUi()
+  const navigate      = useNavigate()
 
-  // ── Suscripciones (para el drawer y las KPI cards) ──
+  // ── Suscripciones (KPI cards + drawer) ──
   const [subs, setSubs]         = useState([])
   const [clients, setClients]   = useState([])
   const [plans, setPlans]       = useState([])
   const [loadingSubs, setLoadingSubs] = useState(true)
 
-  // ── Datos del Planificador (misma tabla que PlanificadorPage) ──
-  const [planData, setPlanData]   = useState(null)
+  // ── Planificador (tabla + tarjetas inteligentes) ──
+  const [planData, setPlanData]       = useState(null)
   const [loadingPlan, setLoadingPlan] = useState(true)
+  const [activePanel, setActivePanel] = useState(null)   // key del CategoryPanel abierto
 
-  // ── UI state ──
-  const [showDrawer, setShowDrawer]       = useState(false)
-  const [editing, setEditing]             = useState(null)
-  const [form, setForm]                   = useState(EMPTY)
-  const [deleteTarget, setDeleteTarget]   = useState(null)
-  const [search, setSearch]               = useState('')
-  const [filterEstado, setFilterEstado]   = useState('Todos')
-  const [sortConfig, setSortConfig]       = useState({ key: 'cuentaId', dir: 'asc' })
-  const [hidePwd, setHidePwd]             = useState({})
+  // ── UI ──
+  const [showDrawer, setShowDrawer]     = useState(false)
+  const [editing, setEditing]           = useState(null)
+  const [form, setForm]                 = useState(EMPTY)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [search, setSearch]             = useState('')
+  const [filterEstado, setFilterEstado] = useState('Todos')
+  const [sortConfig, setSortConfig]     = useState({ key: 'cuentaId', dir: 'asc' })
+  const [hidePwd, setHidePwd]           = useState({})
 
-  /* ── Load suscripciones ── */
+  /* ── Loaders ── */
   const loadSubs = useCallback(async () => {
     setLoadingSubs(true)
     try {
@@ -400,39 +372,29 @@ export default function SubscriptionsPage() {
       setSubs(s.data)
       setClients(c.data.filter(x => x.role === 'user'))
       setPlans(p.data.filter(x => x.activo))
-    } catch {
-      showToast('Error al cargar suscripciones.', 'error')
-    } finally {
-      setLoadingSubs(false)
-    }
+    } catch { showToast('Error al cargar suscripciones.', 'error') }
+    finally   { setLoadingSubs(false) }
   }, [showToast])
 
-  /* ── Load planificador ── */
   const loadPlan = useCallback(async () => {
     setLoadingPlan(true)
     try {
       const r = await api.get('/admin/planificador')
       setPlanData(r.data)
-    } catch {
-      showToast('Error al cargar el planificador.', 'error')
-    } finally {
-      setLoadingPlan(false)
-    }
+    } catch { showToast('Error al cargar el planificador.', 'error') }
+    finally   { setLoadingPlan(false) }
   }, [showToast])
 
   useEffect(() => { loadSubs(); loadPlan() }, [loadSubs, loadPlan])
 
-  /* ── Sort handler (same logic as PlanificadorPage) ── */
-  const onSort = (key) => setSortConfig(prev =>
+  /* ── Handlers ── */
+  const onSort    = (key) => setSortConfig(prev =>
     prev.key === key
       ? prev.dir === 'asc' ? { key, dir: 'desc' } : { key: null, dir: 'asc' }
       : { key, dir: 'asc' }
   )
   const togglePwd = (id) => setHidePwd(p => ({ ...p, [id]: !p[id] }))
-
-  /* ── CRUD ── */
-  const openNew  = () => { setEditing(null); setForm({ ...EMPTY, fechaInicio: todayStr() }); setShowDrawer(true) }
-  const openEdit = (s) => { setEditing(s); setForm({ ...s }); setShowDrawer(true) }
+  const openNew   = () => { setEditing(null); setForm({ ...EMPTY, fechaInicio: todayStr() }); setShowDrawer(true) }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -446,11 +408,8 @@ export default function SubscriptionsPage() {
         await api.post('/admin/subscriptions', payload)
         showToast('Suscripción creada correctamente.', 'success')
       }
-      setShowDrawer(false)
-      loadSubs()
-    } catch (err) {
-      showToast(err.response?.data?.error || err.message, 'error')
-    }
+      setShowDrawer(false); loadSubs()
+    } catch (err) { showToast(err.response?.data?.error || err.message, 'error') }
   }
 
   const confirmDelete = async () => {
@@ -459,29 +418,80 @@ export default function SubscriptionsPage() {
       await api.delete(`/admin/subscriptions/${deleteTarget.id}`)
       showToast('Suscripción eliminada.', 'success')
       loadSubs()
-    } catch (err) {
-      showToast(err.response?.data?.error || err.message, 'error')
-    } finally {
-      setDeleteTarget(null)
-    }
+    } catch (err) { showToast(err.response?.data?.error || err.message, 'error') }
+    finally { setDeleteTarget(null) }
   }
 
-  /* ── KPI stats (from suscripciones) ── */
-  const stats = useMemo(() => ({
+  /* ── CategoryPanel: navega a Pagos igual que el Planificador ── */
+  const handleGenerateVenta = (screen, catKey) => {
+    setActivePanel(null)
+    navigate('/admin/payments', {
+      state: {
+        prefillVenta: screenToVentaPrefill(screen, catKey),
+        prefillSource: CATEGORY_CONFIG[catKey]?.title || 'Suscripciones',
+      },
+    })
+  }
+
+  /* ── KPI suscripciones ── */
+  const subStats = useMemo(() => ({
     total:      subs.length,
     activos:    subs.filter(s => s.estado === 'Activo').length,
     vencidos:   subs.filter(s => s.estado === 'Vencido').length,
     cancelados: subs.filter(s => s.estado === 'Cancelado').length,
   }), [subs])
 
-  /* ── Process planificador rows (same logic as PlanificadorPage) ── */
-  const { rows: planRows, planStats } = useMemo(() => {
-    if (!planData) return { rows: [], planStats: {} }
+  /* ── Stats + tarjetas inteligentes del planificador ── */
+  const planStats = useMemo(() => {
+    if (!planData) return {}
+    const { pantallas, diasAlerta } = planData
+    const variantes    = pantallas.map(p => getRowVariant(p, diasAlerta))
+    const libres       = variantes.filter(v => v === 'libre').length
+    const asignadas    = pantallas.length - libres
+    const ocupacion    = pantallas.length ? Math.round((asignadas / pantallas.length) * 100) : 0
+    return {
+      diasAlerta,
+      total:         pantallas.length,
+      cuentas:       new Set(pantallas.map(p => p.cuentaId)).size,
+      activas:       pantallas.reduce((sum, p) => sum + (Number(p.pantallas) || 0), 0),
+      proximaVencer: variantes.filter(v => v === 'alerta').length,
+      libres,
+      vencidas:      variantes.filter(v => v === 'vencido').length,
+      deudores:      pantallas.filter(p => p.debe).length,
+      cortesias:     variantes.filter(v => v === 'cortesia').length,
+      creditoTotal:  pantallas.reduce((s, p) => s + (Number(p.credito) || 0), 0),
+      ocupacion,
+      asignadas,
+    }
+  }, [planData])
+
+  /* ── Category lists para los paneles detalle ── */
+  const categoryLists = useMemo(() => {
+    if (!planData) return {}
+    const { pantallas, diasAlerta } = planData
+    const enriched = pantallas.map(p => ({
+      ...p,
+      _variant: getRowVariant(p, diasAlerta),
+      _dias: calcDias(p.duracionReal || p.finalizacion) ?? p.diasVencimientoReal ?? p.diasVencimiento ?? null,
+    }))
+    const byDiasAsc = (a, b) => (a._dias ?? Infinity) - (b._dias ?? Infinity)
+    const byNombre  = (a, b) => [a.nombre, a.apellido].join(' ').localeCompare([b.nombre, b.apellido].join(' '), 'es', { sensitivity: 'base' })
+    return {
+      alerta:   enriched.filter(p => p._variant === 'alerta').sort(byDiasAsc),
+      vencido:  enriched.filter(p => p._variant === 'vencido').sort(byDiasAsc),
+      libre:    enriched.filter(p => p._variant === 'libre').sort(byNombre),
+      debe:     enriched.filter(p => p.debe).sort((a, b) => (Number(b.montoDebe) || 0) - (Number(a.montoDebe) || 0)),
+      cortesia: enriched.filter(p => p._variant === 'cortesia').sort(byDiasAsc),
+      credito:  enriched.filter(p => (Number(p.credito) || 0) > 0).sort((a, b) => (Number(b.credito) || 0) - (Number(a.credito) || 0)),
+    }
+  }, [planData])
+
+  /* ── Rows filtradas para la tabla ── */
+  const { planRows } = useMemo(() => {
+    if (!planData) return { planRows: [] }
     const { pantallas, diasAlerta } = planData
 
     let filtered = pantallas
-
-    // Search filter
     if (search.trim()) {
       const sq = search.toLowerCase()
       filtered = filtered.filter(p =>
@@ -494,14 +504,9 @@ export default function SubscriptionsPage() {
         (p.customerId || '').toLowerCase().includes(sq)
       )
     }
-
-    // Status filter
     if (filterEstado !== 'Todos') {
-      const target = filterEstado.toLowerCase()
-      filtered = filtered.filter(p => getRowVariant(p, diasAlerta) === target)
+      filtered = filtered.filter(p => getRowVariant(p, diasAlerta) === filterEstado)
     }
-
-    // Sort
     filtered = [...filtered].sort((a, b) => {
       if (sortConfig.key) {
         const aVal = getPlanSortVal(a, sortConfig.key)
@@ -519,20 +524,20 @@ export default function SubscriptionsPage() {
       return a.idPantalla < b.idPantalla ? -1 : 1
     })
 
-    const rows = filtered.map((p, i) => ({
-      ...p,
-      isGroupStart: i === 0 || filtered[i - 1].cuentaId !== p.cuentaId,
-    }))
-
-    return { rows, planStats: { diasAlerta, total: pantallas.length } }
+    return {
+      planRows: filtered.map((p, i) => ({
+        ...p,
+        isGroupStart: i === 0 || filtered[i - 1].cuentaId !== p.cuentaId,
+      })),
+    }
   }, [planData, search, filterEstado, sortConfig])
 
-  const hasFilters   = search.trim() !== '' || filterEstado !== 'Todos'
-  const isLoading    = loadingSubs || loadingPlan
+  const hasFilters = search.trim() !== '' || filterEstado !== 'Todos'
+  const isLoading  = loadingSubs || loadingPlan
 
-  /* ══════════════════════════════════════════════════════════════
+  /* ════════════════════════════════════════════════════════════
      RENDER
-  ══════════════════════════════════════════════════════════════ */
+  ════════════════════════════════════════════════════════════ */
   return (
     <>
       <style>{CSS}</style>
@@ -559,18 +564,16 @@ export default function SubscriptionsPage() {
                 Suscripciones
               </h1>
               <p className="text-slate-400 text-sm mt-2 max-w-sm">
-                Vista completa del planificador — idéntica a la tabla en Planificador.
+                Vista completa sincronizada con el Planificador
                 {planStats.total != null && !isLoading && (
-                  <span className="ml-1 text-slate-500">· {planStats.total} pantallas</span>
+                  <span className="text-slate-500"> · {planStats.total} pantallas</span>
                 )}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => { loadSubs(); loadPlan() }}
+              <button onClick={() => { loadSubs(); loadPlan() }}
                 className="shrink-0 px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80
-                           border border-white/20 hover:bg-white/10 transition-colors flex items-center gap-2"
-              >
+                           border border-white/20 hover:bg-white/10 transition-colors flex items-center gap-2">
                 <RefreshCw size={15} className={isLoading ? 'animate-spin' : ''} />
                 Actualizar
               </button>
@@ -583,55 +586,95 @@ export default function SubscriptionsPage() {
           </div>
         </div>
 
-        {/* ── KPI CARDS (suscripciones) ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard icon={Users}        label="Total"      value={stats.total}      loading={loadingSubs} gradFrom="#64748b" gradTo="#94a3b8" delay={2} />
-          <KpiCard icon={CheckCircle2} label="Activas"    value={stats.activos}    loading={loadingSubs} gradFrom="#10b981" gradTo="#34d399" delay={3} />
-          <KpiCard icon={Clock}        label="Vencidas"   value={stats.vencidos}   loading={loadingSubs} gradFrom="#ef4444" gradTo="#f87171" delay={4} />
-          <KpiCard icon={TrendingUp}   label="Canceladas" value={stats.cancelados} loading={loadingSubs} gradFrom="#8b5cf6" gradTo="#a78bfa" delay={5} />
+        {/* ── SECCIÓN 1: KPI SUSCRIPCIONES ── */}
+        <div>
+          <SectionLabel>Resumen de suscripciones</SectionLabel>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard icon={Users}        label="Total"      value={subStats.total}      loading={loadingSubs} gradFrom="#64748b" gradTo="#94a3b8" delay={2} />
+            <KpiCard icon={CheckCircle2} label="Activas"    value={subStats.activos}    loading={loadingSubs} gradFrom="#10b981" gradTo="#34d399" delay={3} />
+            <KpiCard icon={Clock}        label="Vencidas"   value={subStats.vencidos}   loading={loadingSubs} gradFrom="#ef4444" gradTo="#f87171" delay={4} />
+            <KpiCard icon={TrendingUp}   label="Canceladas" value={subStats.cancelados} loading={loadingSubs} gradFrom="#8b5cf6" gradTo="#a78bfa" delay={5} />
+          </div>
         </div>
 
-        {/* ── FILTER BAR ── */}
-        <div className="sp-a3 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input type="search" placeholder="Buscar nombre, cuenta, nickname…"
-              value={search} onChange={e => setSearch(e.target.value)}
-              data-testid="search-input"
-              className="sp-search w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200
-                         bg-white text-sm text-slate-700 placeholder:text-slate-400 transition-shadow duration-200" />
+        {/* ── SECCIÓN 2: TARJETAS INTELIGENTES DEL PLANIFICADOR ── */}
+        <div className="sp-a3">
+          <SectionLabel>Tarjetas inteligentes — planificador</SectionLabel>
+
+          {/* Fila 1: métricas generales */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            {loadingPlan ? (
+              [...Array(4)].map((_, i) => <div key={i} className="sp-skeleton h-28 rounded-xl" />)
+            ) : (
+              <>
+                <StatCard icon={Tv}           label="Cuentas totales"  value={planStats.cuentas ?? '—'}       variant="solid"   sub={`${planStats.total ?? 0} pantallas`} />
+                <StatCard icon={CheckCircle2} label="Pantallas activas" value={planStats.activas ?? '—'}       variant="light" />
+                <StatCard icon={Clock}        label="Próx. a vencer"   value={planStats.proximaVencer ?? '—'} variant="outline" sub={`≤ ${planStats.diasAlerta ?? 7} días`}
+                  onClick={() => setActivePanel('alerta')} />
+                <StatCard icon={Monitor}      label="Sin asignar"       value={planStats.libres ?? '—'}        variant="light"   sub="Pantallas libres"
+                  onClick={() => setActivePanel('libre')} />
+              </>
+            )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <SlidersHorizontal size={14} className="text-slate-400 shrink-0" />
-            {[
-              { key: 'Todos',   color: 'bg-slate-800 text-white border-slate-800',   inactive: 'border-slate-200 text-slate-500' },
-              { key: 'vigente', color: 'bg-emerald-500 text-white border-emerald-500', inactive: 'border-slate-200 text-slate-500' },
-              { key: 'alerta',  color: 'bg-amber-500 text-white border-amber-500',     inactive: 'border-slate-200 text-slate-500' },
-              { key: 'vencido', color: 'bg-red-500 text-white border-red-500',         inactive: 'border-slate-200 text-slate-500' },
-              { key: 'libre',   color: 'bg-slate-400 text-white border-slate-400',     inactive: 'border-slate-200 text-slate-500' },
-            ].map(({ key, color, inactive }) => (
-              <button key={key}
-                onClick={() => setFilterEstado(key)}
-                data-testid={`filter-${key.toLowerCase()}`}
-                className={`sp-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all
-                  ${filterEstado === key ? color : inactive}`}>
-                {key === 'Todos' ? 'Todos' : key.charAt(0).toUpperCase() + key.slice(1)}
-              </button>
-            ))}
-            {!loadingPlan && planRows.length > 0 && (
-              <span className="text-xs text-slate-400 ml-1">{planRows.length} filas</span>
+
+          {/* Fila 2: indicadores de negocio */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {loadingPlan ? (
+              [...Array(5)].map((_, i) => <div key={i} className="sp-skeleton h-28 rounded-xl" />)
+            ) : (
+              <>
+                <StatCard icon={XCircle}    label="Vencidas"           value={planStats.vencidas ?? '—'}                    variant="outline" tone="red"     sub="Requieren acción inmediata"
+                  onClick={() => setActivePanel('vencido')} />
+                <StatCard icon={Wallet}     label="Cuentas que deben"  value={planStats.deudores ?? '—'}                    variant="outline" tone="amber"   sub="Pendientes de cobro"
+                  onClick={() => setActivePanel('debe')} />
+                <StatCard icon={Gift}       label="Cortesías activas"  value={planStats.cortesias ?? '—'}                   variant="outline" tone="purple"  sub="Sin generar ingreso"
+                  onClick={() => setActivePanel('cortesia')} />
+                <StatCard icon={DollarSign} label="Crédito en cartera" value={formatCurrency(planStats.creditoTotal ?? 0)} variant="light"   tone="emerald" sub="Saldo acumulado de cuentas"
+                  onClick={() => setActivePanel('credito')} />
+                <StatCard icon={Percent}    label="Ocupación"          value={`${planStats.ocupacion ?? 0}%`}               variant="light"   tone="orange"  sub={`${planStats.asignadas ?? 0} de ${planStats.total ?? 0} pantallas`} />
+              </>
             )}
           </div>
         </div>
 
-        {/* ── PLANIFICADOR TABLE (shared component) ── */}
+        {/* ── SECCIÓN 3: FILTROS + TABLA ── */}
         <div className="sp-a4">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
-              Tabla sincronizada con Planificador — actualización en tiempo real
-            </p>
+          <SectionLabel>Vista de pantallas — sincronizada con Planificador</SectionLabel>
+
+          {/* Filtros */}
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input type="search" placeholder="Buscar nombre, cuenta, nickname…"
+                value={search} onChange={e => setSearch(e.target.value)}
+                data-testid="search-input"
+                className="sp-search w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200
+                           bg-white text-sm text-slate-700 placeholder:text-slate-400 transition-shadow" />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <SlidersHorizontal size={14} className="text-slate-400 shrink-0" />
+              {[
+                { key: 'Todos',   active: 'bg-slate-800 text-white border-slate-800'    },
+                { key: 'vigente', active: 'bg-emerald-500 text-white border-emerald-500' },
+                { key: 'alerta',  active: 'bg-amber-500 text-white border-amber-500'     },
+                { key: 'vencido', active: 'bg-red-500 text-white border-red-500'         },
+                { key: 'libre',   active: 'bg-slate-400 text-white border-slate-400'     },
+              ].map(({ key, active }) => (
+                <button key={key}
+                  onClick={() => setFilterEstado(key)}
+                  data-testid={`filter-${key}`}
+                  className={`sp-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all
+                    ${filterEstado === key ? active : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                  {key === 'Todos' ? 'Todos' : key.charAt(0).toUpperCase() + key.slice(1)}
+                </button>
+              ))}
+              {!loadingPlan && planRows.length > 0 && (
+                <span className="text-xs text-slate-400 ml-1">{planRows.length} filas</span>
+              )}
+            </div>
           </div>
+
+          {/* Tabla compartida */}
           <Card className="overflow-hidden border-slate-200/80">
             {isLoading
               ? <SkeletonTable />
@@ -655,6 +698,16 @@ export default function SubscriptionsPage() {
         </div>
 
       </div>
+
+      {/* ── CATEGORY PANEL (tarjetas inteligentes) ── */}
+      {activePanel && (
+        <CategoryPanel
+          catKey={activePanel}
+          screens={categoryLists[activePanel] || []}
+          onClose={() => setActivePanel(null)}
+          onGenerate={handleGenerateVenta}
+        />
+      )}
 
       {/* ── DRAWER ── */}
       {showDrawer && (
