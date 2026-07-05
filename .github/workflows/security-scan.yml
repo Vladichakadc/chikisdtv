@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: '0 3 * * *'   # escaneo nocturno
+    - cron: '0 3 * * *'
 
 jobs:
   codeql:
@@ -49,10 +49,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          elif [ -f package.json ]; then
-            npm install
+          if [ -f package.json ]; then
+            npm install --no-audit
           else
             echo "No package.json - se omite instalacion"
           fi
@@ -65,8 +63,8 @@ jobs:
 
       - name: npm audit (falla en high/critical)
         run: |
-          if [ -f package-lock.json ]; then
+          if [ -f package.json ]; then
             npm audit --audit-level=high
           else
-            echo "No package-lock.json - se omite npm audit"
+            echo "No package.json - se omite npm audit"
           fi
