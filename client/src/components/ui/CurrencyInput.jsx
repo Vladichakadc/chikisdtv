@@ -53,6 +53,11 @@ export function CurrencyInput({ label, error, value, onChange, decimals = 0, pre
     onChange({ target: { value: next } })
   }
 
+  // El padding izquierdo escala con el largo del prefijo ("$" vs "US$") para
+  // que el texto escrito nunca quede debajo del prefijo, sin importar cuántos
+  // caracteres tenga (ch = ancho de un carácter en la fuente del input).
+  const paddingLeft = prefix ? `calc(0.75rem + ${prefix.length}ch + 0.25rem)` : '0.75rem'
+
   return (
     <div className="w-full">
       {label && <label className="block text-sm font-medium text-brand-accent mb-1">{label}</label>}
@@ -63,9 +68,9 @@ export function CurrencyInput({ label, error, value, onChange, decimals = 0, pre
           inputMode="decimal"
           value={display(raw, decimals)}
           onChange={handleChange}
+          style={{ paddingLeft }}
           className={cn(
             'w-full py-2 pr-3 rounded-lg border border-ui-border bg-white text-brand-accent placeholder:text-gray-400',
-            prefix ? 'pl-7' : 'pl-3',
             'focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent',
             error && 'border-state-error focus:ring-state-error',
             className

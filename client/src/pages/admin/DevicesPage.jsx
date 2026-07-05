@@ -244,7 +244,14 @@ export default function DevicesPage() {
     setShowCostosImport(false)
     setRefCustom(false)
     let nextId = ''
-    try { nextId = (await api.get('/admin/inventario-equipos/next-id')).data.nextId } catch { /* se puede escribir a mano */ }
+    try {
+      nextId = (await api.get('/admin/inventario-equipos/next-id')).data.nextId
+    } catch {
+      // El campo ya no se puede escribir a mano: sin respuesta del servidor se
+      // genera un ID único localmente para no dejar el formulario bloqueado.
+      nextId = `in-${Date.now()}`
+      showToast('No se pudo consultar el consecutivo del servidor; se generó un ID temporal.', 'error')
+    }
     setInvForm({ ...EMPTY_INV, idInventario: nextId, fechaCompra: new Date().toISOString().slice(0, 10) })
     setShowInvForm(true)
   }
@@ -662,9 +669,8 @@ export default function DevicesPage() {
             <form onSubmit={handleInvSubmit}>
               <CardBody className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Input
-                  label="ID inventario *" value={invForm.idInventario} required disabled={Boolean(invEditing)}
-                  onChange={(e) => setInvForm({ ...invForm, idInventario: e.target.value })}
-                  className={invEditing ? 'bg-gray-50 text-gray-400' : ''} placeholder="in017"
+                  label="ID inventario" value={invForm.idInventario} disabled readOnly
+                  className="bg-gray-50 text-gray-400" placeholder="Generado automáticamente"
                 />
                 <Input
                   label="Fecha de compra" type="date" value={invForm.fechaCompra || ''}
