@@ -1,0 +1,9 @@
+# nixpacks.toml — Configuración de build para Railway
+# Fuerza Node 20 LTS que es compatible con Vite 8 y @vitejs/plugin-react 6
+
+[variables]
+NODE_VERSION = "20"
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
