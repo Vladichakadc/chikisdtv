@@ -5,7 +5,7 @@
   "description": "ChikisdTV - plataforma de gestion (backend + frontend)",
   "scripts": {
     "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
-    "start": "npm start --prefix server"
+    "start": "node server/server.js"
   },
   "engines": {
     "node": ">=20.19.0"

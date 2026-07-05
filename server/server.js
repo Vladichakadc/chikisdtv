@@ -28,10 +28,17 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'ChikisdTV', 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
+// Sirve el frontend en producción.
+// Doble condición: NODE_ENV=production O la carpeta dist existe (Railway no siempre
+// inyecta NODE_ENV aunque sí construya el frontend).
+const distPath = path.join(__dirname, '..', 'client', 'dist');
+const serveStatic = process.env.NODE_ENV === 'production' ||
+  (function() { try { require('fs').accessSync(distPath); return true; } catch { return false; } })();
+
+if (serveStatic) {
+  app.use(express.static(distPath));
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 }
 
@@ -133,9 +140,25 @@ async function seedDevicesFromVentas() {
     // garantizando que producción quede sana sin necesidad de scripts manuales.
     await autoFixCuentaIdMismatches();
 
-    app.listen(PORT, () => {
+    // Guarda referencia al servidor para graceful shutdown
+    const server = app.listen(PORT, () => {
       console.log(`[CHIKISDTV] Servidor corriendo en http://localhost:${PORT}`);
     });
+
+    // Graceful shutdown — Railway envía SIGTERM antes de redeployar.
+    // Sin este handler, npm lo interpreta como error aunque el proceso haya
+    // arrancado y respondido correctamente.
+    const shutdown = (signal) => {
+      console.log(`[CHIKISDTV] ${signal} recibido — cerrando servidor...`);
+      server.close(() => {
+        console.log('[CHIKISDTV] Servidor cerrado limpiamente.');
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(0), 10000); // fuerza salida tras 10 s
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT',  () => shutdown('SIGINT'));
+
   } catch (err) {
     console.error('[STARTUP ERROR]', err);
     process.exit(1);
