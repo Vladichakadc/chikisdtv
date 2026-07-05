@@ -74,11 +74,14 @@ const COLS = [
   { key: 'apellido',       label: 'Apellido' },
   { key: 'sku',            label: 'SKU' },
   { key: 'tipoFire',       label: 'Dispositivo' },
+  { key: 'serial',         label: 'Serial' },
   { key: 'idPantalla',     label: 'Pantalla' },
   { key: 'nickname',       label: 'Nickname' },
   { key: 'estado',         label: 'Estado' },
+  { key: 'garantia',       label: 'Garantía' },
   { key: 'fecha',          label: 'Fecha' },
   { key: 'precioVenta',    label: 'Precio' },
+  { key: 'costo',          label: 'Costo' },
   { key: 'medioPago',      label: 'Medio Pago' },
   { key: 'acciones',       label: '' },
 ]
@@ -111,7 +114,19 @@ function renderCell(row, key, onEdit, onDelete) {
       return <span className="font-mono text-xs font-bold text-indigo-700">{v}</span>
     case 'idPantalla':
     case 'sku':
+    case 'serial':
       return <span className="font-mono text-xs">{v || '—'}</span>
+    case 'garantia':
+      return (
+        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold
+          ${v === 'SI' ? 'bg-emerald-100 text-emerald-700'
+          : v === 'NO' ? 'bg-gray-100 text-gray-500'
+          : 'bg-gray-50 text-gray-400'}`}>
+          {v || '—'}
+        </span>
+      )
+    case 'costo':
+      return <span className="text-gray-600 whitespace-nowrap">{fmtCOP(v)}</span>
     case 'nombre':
     case 'apellido':
     case 'tipoFire':
@@ -134,6 +149,51 @@ function renderCell(row, key, onEdit, onDelete) {
   }
 }
 
+// ─── Garantía derivada: cubre 1 año desde la fecha de venta ─────────────────
+// (misma regla que el backend en routes/admin/ventasEquipos.js)
+
+function computeGarantia(fecha) {
+  if (!fecha) return 'NO'
+  const f = new Date(fecha)
+  if (isNaN(f.getTime())) return 'NO'
+  const limite = new Date()
+  limite.setFullYear(limite.getFullYear() - 1)
+  return f >= limite ? 'SI' : 'NO'
+}
+
+// ─── Medios de pago: bancos y billeteras usados en Colombia ──────────────────
+
+const MEDIOS_PAGO = [
+  'Efectivo',
+  'Nequi',
+  'Daviplata',
+  'Transfiya',
+  'PSE',
+  'Bancolombia',
+  'Banco de Bogotá',
+  'Davivienda',
+  'BBVA Colombia',
+  'Banco de Occidente',
+  'Banco Popular',
+  'Banco AV Villas',
+  'Banco Caja Social',
+  'Scotiabank Colpatria',
+  'Itaú Colombia',
+  'Banco Agrario',
+  'Banco Falabella',
+  'Banco Pichincha',
+  'Banco GNB Sudameris',
+  'Bancoomeva',
+  'Banco Finandina',
+  'Banco Serfinanza',
+  'Banco W',
+  'Lulo Bank',
+  'Nu Colombia',
+  'RappiPay',
+  'Movii',
+  'Otro',
+]
+
 // ─── SKU adicionales con su Tipo Fire correspondiente ───────────────────────
 
 const SKU_TIPO_FIRE = {
@@ -147,10 +207,11 @@ const SKU_TIPO_FIRE = {
 const EMPTY = {
   idVM: '', customerId: '', nombre: '', apellido: '',
   sku: '', tipoFire: '', idPantalla: '', nickname: '',
+  serial: '',
   cuentaId: '', cuenta: '', estado: 'Activo', cortesia: 'NO',
   pantallas: 1, fechaAlta: '', fecha: '',
-  anio: '', mes: '', precioVenta: '', medioPago: '',
-  itemQuantity: 1, tipoPago: 'Activacion Pantalla', tipoPlan: '',
+  anio: '', mes: '', precioVenta: '', costo: '', medioPago: '',
+  itemQuantity: 1, tipoPago: 'Venta', tipoPlan: '',
   tipoPantalla: '', cuentaDedicada: 'NO',
 }
 
@@ -288,6 +349,19 @@ export default function VentaDispositivosPage() {
     }
   }
 
+  const handleImport = async () => {
+    if (!confirm('Esto reemplaza TODOS los registros con los datos del Excel 1-orders_table_Ventas_Firetv2024.xlsx. Las ediciones manuales (pantalla, estado, cuenta…) se pierden. ¿Continuar?')) return
+    setLoading(true)
+    try {
+      const { data } = await api.post('/admin/payments/ventas-equipos/import')
+      showToast(`Se importaron ${data.imported} registros desde el Excel.`, 'success')
+      await load()
+    } catch (e) {
+      showToast(e.response?.data?.error || e.message, 'error')
+      setLoading(false)
+    }
+  }
+
   const handleDelete = async (idVM) => {
     if (!confirm(`¿Eliminar la venta ${idVM}?`)) return
     try {
@@ -306,9 +380,11 @@ export default function VentaDispositivosPage() {
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [rows])
 
+  // Bancos/billeteras colombianos + cualquier valor histórico que ya exista en los datos
   const medioPagoOptions = useMemo(() => {
-    const set = new Set(rows.map(r => (r.medioPago || '').trim()).filter(Boolean))
-    return [...set].sort((a, b) => a.localeCompare(b))
+    const extras = new Set(rows.map(r => (r.medioPago || '').trim()).filter(Boolean))
+    MEDIOS_PAGO.forEach(m => extras.delete(m))
+    return [...MEDIOS_PAGO, ...[...extras].sort((a, b) => a.localeCompare(b))]
   }, [rows])
 
   // Clientes (Tabla Cliente) ordenados para el selector
@@ -364,7 +440,8 @@ export default function VentaDispositivosPage() {
       (r.apellido || '').toLowerCase().includes(s) ||
       (r.tipoFire || '').toLowerCase().includes(s) ||
       (r.idPantalla || '').toLowerCase().includes(s) ||
-      (r.sku || '').toLowerCase().includes(s)
+      (r.sku || '').toLowerCase().includes(s) ||
+      (r.serial || '').toLowerCase().includes(s)
     )
   }, [rows, search])
 
@@ -400,12 +477,21 @@ export default function VentaDispositivosPage() {
           <h1 className="text-3xl font-bold text-indigo-700">Venta de Dispositivos</h1>
           <p className="text-gray-500">Historial de dispositivos físicos vendidos · {stats.total.toLocaleString()} registros</p>
         </div>
-        <button
-          onClick={() => openNew()}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors shadow-sm hover:shadow-md"
-        >
-          <Plus size={16} /> Nueva Venta de Equipo
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleImport}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-sm font-medium transition-colors shadow-sm"
+            title="Reemplaza todos los registros con el contenido del Excel"
+          >
+            <RotateCcw size={16} /> Recargar desde Excel
+          </button>
+          <button
+            onClick={() => openNew()}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors shadow-sm hover:shadow-md"
+          >
+            <Plus size={16} /> Nueva Venta de Equipo
+          </button>
+        </div>
       </div>
 
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
@@ -618,6 +704,16 @@ export default function VentaDispositivosPage() {
                     <label className="block text-xs font-medium text-gray-600 mb-1">Serial del equipo</label>
                     <input value={form.serial || ''} onChange={f('serial')} placeholder="Serial físico" className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none text-sm font-mono" />
                   </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Garantía (automática)</label>
+                    <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm flex items-center gap-2">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold
+                        ${computeGarantia(form.fecha) === 'SI' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'}`}>
+                        {computeGarantia(form.fecha)}
+                      </span>
+                      <span className="text-xs text-gray-400">cubre 1 año desde la fecha de venta</span>
+                    </div>
+                  </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Pantalla / Nickname (Planificador)</label>
                     <select
@@ -676,18 +772,15 @@ export default function VentaDispositivosPage() {
                     <CurrencyInput value={form.precioVenta} onChange={f('precioVenta')} decimals={0} className="border-indigo-200 focus:ring-indigo-400 text-sm" />
                   </div>
                   <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Costo del equipo</label>
+                    <CurrencyInput value={form.costo} onChange={f('costo')} decimals={0} className="border-indigo-200 focus:ring-indigo-400 text-sm" />
+                  </div>
+                  <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Medio de Pago</label>
                     <select value={form.medioPago} onChange={f('medioPago')} className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none text-sm bg-white">
                       <option value="">—</option>
                       {form.medioPago && !medioPagoOptions.includes(form.medioPago) && <option value={form.medioPago}>{form.medioPago}</option>}
                       {medioPagoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de Pago</label>
-                    <select value={form.tipoPago} onChange={f('tipoPago')} className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none text-sm bg-white">
-                      <option value="Activacion Pantalla">Activacion Pantalla</option>
-                      <option value="Activacion">Activacion</option>
                     </select>
                   </div>
                 </div>

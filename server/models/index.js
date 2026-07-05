@@ -10,6 +10,7 @@ const Venta = require('./Venta');
 const VentaEquipo = require('./VentaEquipo');
 const CuentaPadre = require('./CuentaPadre');
 const CostoPantalla = require('./CostoPantalla');
+const InventarioEquipo = require('./InventarioEquipo');
 
 // Client associations
 Client.hasMany(Subscription, { foreignKey: 'clientId', as: 'subscriptions' });
@@ -37,4 +38,18 @@ Device.belongsTo(Subscription, { foreignKey: 'subscriptionId', as: 'subscription
 Baja.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 Client.hasMany(Baja, { foreignKey: 'clientId', as: 'bajas' });
 
-module.exports = { Client, Plan, Subscription, Payment, Device, Planificador, Baja, TablaCliente, Venta, VentaEquipo, CuentaPadre, CostoPantalla };
+// VentaEquipo ↔ Client / TablaCliente: la venta de un dispositivo físico se
+// vincula por customerId (clave de negocio compartida por ambas tablas).
+// constraints:false — el Excel puede traer customerIds sin cliente registrado aún.
+VentaEquipo.belongsTo(Client, { foreignKey: 'customerId', targetKey: 'customerId', as: 'client', constraints: false });
+Client.hasMany(VentaEquipo, { foreignKey: 'customerId', sourceKey: 'customerId', as: 'ventasEquipos', constraints: false });
+VentaEquipo.belongsTo(TablaCliente, { foreignKey: 'customerId', targetKey: 'customerId', as: 'tablaCliente', constraints: false });
+TablaCliente.hasMany(VentaEquipo, { foreignKey: 'customerId', sourceKey: 'customerId', as: 'ventasEquipos', constraints: false });
+
+// InventarioEquipo ↔ VentaEquipo: la unidad física del inventario se enlaza
+// con su venta a través del serial del equipo (serie = VentaEquipo.serial).
+// constraints:false — no es FK dura: las unidades "En Bodega" aún no tienen venta.
+InventarioEquipo.belongsTo(VentaEquipo, { foreignKey: 'serie', targetKey: 'serial', as: 'venta', constraints: false });
+VentaEquipo.hasOne(InventarioEquipo, { foreignKey: 'serie', sourceKey: 'serial', as: 'inventario', constraints: false });
+
+module.exports = { Client, Plan, Subscription, Payment, Device, Planificador, Baja, TablaCliente, Venta, VentaEquipo, CuentaPadre, CostoPantalla, InventarioEquipo };

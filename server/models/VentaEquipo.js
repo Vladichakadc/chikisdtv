@@ -10,6 +10,7 @@ const VentaEquipo = sequelize.define('VentaEquipo', {
   tipoFire:       DataTypes.STRING,
   idPantalla:     DataTypes.STRING,   // Pantalla del Planificador (ej. M001-1)
   serial:         DataTypes.STRING,   // Serial físico del equipo vendido
+  garantia:       DataTypes.STRING,   // "SI" / "NO" — columna Garantia del Excel
   nickname:       DataTypes.STRING,
   cuentaId:       DataTypes.STRING,
   cuenta:         DataTypes.STRING,

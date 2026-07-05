@@ -14,6 +14,7 @@ router.use(require('./ventasLicencia'));
 router.use(require('./ventasEquipos'));
 router.use(require('./payments'));
 router.use(require('./devices'));
+router.use(require('./inventarioEquipos'));
 router.use(require('./planificador'));
 router.use(require('./cuentasPadre'));
 router.use(require('./bajas'));
