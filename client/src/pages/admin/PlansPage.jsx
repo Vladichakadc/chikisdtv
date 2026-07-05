@@ -21,6 +21,7 @@ import {
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
+import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
 
 /* ══════════════════════════════════════════════════════════════
@@ -103,28 +104,6 @@ const EMPTY = {
 ══════════════════════════════════════════════════════════════ */
 
 /** KPI card */
-function KpiCard({ icon: Icon, label, value, sub, loading, gradFrom, gradTo, delay }) {
-  return (
-    <div className={`pl-kpi pl-a${delay} relative bg-white rounded-2xl border border-slate-200 overflow-hidden select-none`}>
-      <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl"
-           style={{ background: `linear-gradient(90deg,${gradFrom},${gradTo})` }} />
-      <div className="p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{label}</p>
-          {loading
-            ? <div className="pl-skeleton h-8 w-16 mt-1" />
-            : <p className="text-3xl font-bold text-slate-800 tabular-nums leading-none">{value}</p>
-          }
-          {sub && !loading && <p className="text-xs text-slate-400 mt-1.5">{sub}</p>}
-        </div>
-        <div className="p-2.5 rounded-xl shrink-0"
-             style={{ background: `linear-gradient(135deg,${gradFrom}20,${gradTo}30)` }}>
-          <Icon size={20} style={{ color: gradFrom }} />
-        </div>
-      </div>
-    </div>
-  )
-}
 
 /** Skeleton table */
 function SkeletonTable() {

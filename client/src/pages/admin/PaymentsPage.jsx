@@ -11,6 +11,7 @@ import { useUi } from '../../context/UiContext'
 import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
+import { KpiCard } from '../../components/ui/KpiCard'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
 
@@ -51,47 +52,11 @@ const CSS = `
   }
 `
 
-function PagoCard({ icon: Icon, label, value, sub, variant, onClick }) {
-  const isSolid = variant === 'solid'
-  const isOutline = variant === 'outline'
-  
-  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
-    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? 'bg-emerald-50 border border-emerald-200' : 'border border-slate-200 shadow-sm'}
-    ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50' : ''}`
-
-  const topBorder = isSolid 
-    ? 'linear-gradient(90deg, #10b981, #059669)'
-    : 'linear-gradient(90deg, #34d39980, #10b98180)'
-
-  return (
-    <div className={containerClass} onClick={onClick}>
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
-      <div className="p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? 'text-emerald-600' : 'text-slate-400'}`}>
-            {label}
-          </p>
-          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
-            {value}
-          </p>
-          {sub && (
-            <p className={`text-xs mt-2 font-medium ${isOutline ? 'text-emerald-600' : 'text-slate-500'}`}>
-              {sub}
-            </p>
-          )}
-          {onClick && (
-            <div className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors">
-              <span>¿Cómo se calcula?</span>
-            </div>
-          )}
-        </div>
-        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'}`}>
-          <Icon size={22} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// PagoCard → KpiCard global (dark Huashu)
+const PagoCard = (props) => <KpiCard {...props}
+  gradFrom={props.variant === 'outline' ? '#10b981' : '#10b981'}
+  gradTo={props.variant === 'outline' ? '#34d399' : '#059669'}
+/>
 
 // ─── Columnas ─────────────────────────────────────────────────────────────────
 

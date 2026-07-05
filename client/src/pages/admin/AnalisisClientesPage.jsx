@@ -5,6 +5,7 @@ import {
 import { ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from 'recharts'
 import { ChartInsight, narrarGeografia, LABEL_STYLE, PIE_COLORS } from './dashboard/biShared'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
+import { KpiCard } from '../../components/ui/KpiCard'
 import api from '../../config/api'
 
 const CSS = `
@@ -20,37 +21,6 @@ const CSS = `
   .cl-kpi.clickable { cursor: pointer }
 `
 
-function KpiCard({ icon: Icon, label, value, loading, gradFrom, gradTo, delay = 0, onClick, sub }) {
-  return (
-    <div
-      onClick={onClick}
-      className={`cl-kpi relative bg-white rounded-2xl p-5 overflow-hidden border border-slate-100 shadow-sm flex flex-col justify-between ${onClick ? 'clickable' : ''}`}
-      style={{ animation: `cl-fade-up .4s cubic-bezier(.22,1,.36,1) ${delay * 0.06}s both` }}
-    >
-      <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-        <Icon size={80} style={{ color: gradFrom }} />
-      </div>
-      <div className="relative z-10 flex items-center justify-between mb-4">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md"
-             style={{ background: `linear-gradient(135deg, ${gradFrom}, ${gradTo})` }}>
-          <Icon size={20} />
-        </div>
-        {onClick && (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 bg-slate-50 px-2 py-1 rounded-md">
-            Info
-          </span>
-        )}
-      </div>
-      <div className="relative z-10">
-        <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-1">{label}</p>
-        <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none">
-          {loading ? <span className="inline-block w-16 h-8 rounded-md cl-skeleton" /> : value}
-        </p>
-        {sub && <p className="text-[11px] font-medium text-slate-400 mt-2">{sub}</p>}
-      </div>
-    </div>
-  )
-}
 
 export default function AnalisisClientesPage() {
   const [rows, setRows] = useState([])

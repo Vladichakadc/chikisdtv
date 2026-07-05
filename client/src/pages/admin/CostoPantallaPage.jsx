@@ -12,6 +12,7 @@ import { useUi } from '../../context/UiContext'
 import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
+import { KpiCard } from '../../components/ui/KpiCard'
 import { formatDate, formatCurrency, formatUSD, formatNumber } from '../../utils/excelUtils'
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList, Cell, ReferenceLine } from 'recharts'
 import { ChartInsight } from './dashboard/biShared'
@@ -109,38 +110,6 @@ const CSS = `
   }
 `
 
-function KpiCard({ icon: Icon, label, value, sub, loading, gradFrom, gradTo, delay, onClick, explainLabel }) {
-  return (
-    <div
-      className={`iv-kpi iv-a${delay} relative bg-white rounded-2xl border border-slate-200
-                  overflow-hidden select-none ${onClick ? 'clickable' : ''}`}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick() } : undefined}
-    >
-      <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl"
-           style={{ background: `linear-gradient(90deg,${gradFrom},${gradTo})` }} />
-      <div className="p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{label}</p>
-          {loading
-            ? <div className="iv-skeleton h-8 w-16 mt-1" />
-            : <p className="text-3xl font-bold text-slate-800 tabular-nums leading-none">{value}</p>
-          }
-          {sub && !loading && <p className="text-xs text-slate-400 mt-1.5">{sub}</p>}
-          {onClick && !loading && (
-            <p className="text-[10px] font-semibold text-orange-500 mt-2">¿Cómo se calcula? →</p>
-          )}
-        </div>
-        <div className="p-2.5 rounded-xl shrink-0"
-             style={{ background: `linear-gradient(135deg,${gradFrom}20,${gradTo}30)` }}>
-          <Icon size={20} style={{ color: gradFrom }} />
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Proyección: componentes y helpers ────────────────────────────────────────
 

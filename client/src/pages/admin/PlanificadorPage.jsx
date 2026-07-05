@@ -908,39 +908,39 @@ export default function PlanificadorPage() {
 
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
-      {/* Stats */}
+      {/* Stats — Fila 1 */}
       <div className="pl-a2 grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <StatCard icon={Tv}           label="Cuentas totales"  value={stats.cuentas}       variant="solid"   sub={`${stats.total} pantallas`}
+        <StatCard icon={Tv}           label="Cuentas totales"  value={stats.cuentas}       variant="solid"   tone="indigo"  sub={`${stats.total} pantallas`}
           onClick={() => setExplain({
             title: 'Cuentas totales', value: stats.cuentas, icon: Tv,
             queEs: 'Cuántas cuentas padre distintas tienen pantallas registradas en el Planificador, y cuántas pantallas suman entre todas.',
             comoSeCalcula: 'Se cuentan los **IDs de cuenta únicos** entre las filas del Planificador. Las pantallas son la suma de la columna # — un registro puede valer por 2 o más pantallas.',
             origen: 'Tabla del Planificador. El inventario completo de cuentas (incluidas las que no tienen pantallas) vive en **Cuentas Padre**.',
           })} />
-        <StatCard icon={CheckCircle2} label="Pantallas activas" value={stats.activas}       variant="light"
+        <StatCard icon={CheckCircle2} label="Pantallas activas" value={stats.activas}       variant="light"   tone="emerald"
           onClick={() => setExplain({
             title: 'Pantallas activas', value: stats.activas, icon: CheckCircle2,
             queEs: 'Pantallas asignadas a un cliente y con el servicio vigente (no vencidas).',
             comoSeCalcula: 'Se suman las pantallas de las filas que tienen cliente asignado y cuya fecha de vencimiento no ha pasado.',
             origen: 'Campos de cliente y fechas de cada fila del Planificador.',
           })} />
-        <StatCard icon={Clock}        label="Próx. a vencer"   value={stats.proximaVencer} variant="outline" sub={`≤ ${stats.diasAlerta} días`}
+        <StatCard icon={Clock}        label="Próx. a vencer"   value={stats.proximaVencer} variant="outline" tone="amber"   sub={`≤ ${stats.diasAlerta} días`}
           onClick={() => setActivePanel('alerta')} />
-        <StatCard icon={Monitor}      label="Sin asignar"       value={stats.libres}        variant="light"   sub="Pantallas libres"
+        <StatCard icon={Monitor}      label="Sin asignar"       value={stats.libres}        variant="light"   tone="sky"     sub="Pantallas libres"
           onClick={() => setActivePanel('libre')} />
       </div>
 
-      {/* Indicadores financieros y de negocio — haz clic para ver el detalle accionable y generar ventas */}
+      {/* Indicadores financieros y de negocio */}
       <div className="pl-a3 grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard icon={XCircle}    label="Vencidas"            value={stats.vencidas}                variant="outline" tone="red"     sub="Requieren acción inmediata"
+        <StatCard icon={XCircle}    label="Vencidas"            value={stats.vencidas}                    variant="outline" tone="red"     sub="Requieren acción inmediata"
           onClick={() => setActivePanel('vencido')} />
-        <StatCard icon={Wallet}     label="Cuentas que deben"   value={stats.deudores}                variant="outline" tone="amber"   sub="Pendientes de cobro"
+        <StatCard icon={Wallet}     label="Cuentas que deben"   value={stats.deudores}                    variant="outline" tone="amber"   sub="Pendientes de cobro"
           onClick={() => setActivePanel('debe')} />
-        <StatCard icon={Gift}       label="Cortesías activas"   value={stats.cortesias}               variant="outline" tone="purple"  sub="Sin generar ingreso"
+        <StatCard icon={Gift}       label="Cortesías activas"   value={stats.cortesias}                   variant="outline" tone="pink"    sub="Sin generar ingreso"
           onClick={() => setActivePanel('cortesia')} />
-        <StatCard icon={DollarSign} label="Cartera por cobrar"  value={formatCurrency(stats.montoCartera)} variant="light" tone="red" sub="Dinero pendiente"
+        <StatCard icon={DollarSign} label="Cartera por cobrar"  value={formatCurrency(stats.montoCartera)} variant="solid"   tone="orange"  sub="Dinero pendiente"
           onClick={() => setActivePanel('debe')} />
-        <StatCard icon={Percent}    label="Ocupación"           value={`${stats.ocupacion}%`}         variant="light"   tone="orange"  sub={`${stats.asignadas} de ${stats.total} pantallas asignadas`}
+        <StatCard icon={Percent}    label="Ocupación"           value={`${stats.ocupacion}%`}              variant="light"   tone="cyan"    sub={`${stats.asignadas} de ${stats.total} pantallas`}
           onClick={() => setExplain({
             title: 'Ocupación', value: `${stats.ocupacion}%`, icon: Percent,
             queEs: 'Qué porcentaje de las pantallas registradas en el Planificador están asignadas a un cliente.',
