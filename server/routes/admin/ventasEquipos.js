@@ -59,7 +59,7 @@ function mapTipoFireToDeviceType(t) {
 }
 
 async function importVentasEquipos() {
-  const filepath = path.join(__dirname, '..', '..', '..', 'Tablas', 'order_inventario2026.xlsx');
+  const filepath = path.join(__dirname, '..', '..', '..', 'Tablas', '1-orders_table_Ventas_Firetv2024.xlsx');
   let wb;
   try {
     wb = XLSX.readFile(filepath);
