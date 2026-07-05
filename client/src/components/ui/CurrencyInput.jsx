@@ -35,8 +35,17 @@ export function CurrencyInput({ label, error, value, onChange, decimals = 0, pre
 
   useEffect(() => {
     if (value === '' || value == null) { setRaw(''); return }
-    setRaw(String(value).replace(',', '.'))
-  }, [value])
+    const s = String(value).replace(',', '.')
+    // Normaliza valores externos con decimales de sobra (p. ej. costos importados
+    // de Excel como 163869.3060595037): con decimals=0 se redondea a entero,
+    // con decimals>0 se recorta a la precisión permitida.
+    const n = Number(s)
+    if (!isNaN(n) && s.includes('.')) {
+      setRaw(decimals > 0 ? String(Number(n.toFixed(decimals))) : String(Math.round(n)))
+    } else {
+      setRaw(s)
+    }
+  }, [value, decimals])
 
   const handleChange = (e) => {
     const next = sanitize(e.target.value, decimals)

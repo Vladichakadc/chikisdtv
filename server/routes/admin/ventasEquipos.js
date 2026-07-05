@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { VentaEquipo, Client, Device } = require('../../models');
+const { VentaEquipo, Client, Device, TablaCliente } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
 const XLSX = require('xlsx');
 const path = require('path');
@@ -36,6 +36,18 @@ function normalizeDate(d) {
   return null;
 }
 
+// Regla de negocio: la garantía cubre 1 año desde la fecha de venta.
+// Se calcula siempre a partir de `fecha` (no se acepta valor manual) para que
+// una venta que cumpla el año pase sola de SI a NO.
+function computeGarantia(fecha) {
+  if (!fecha) return 'NO';
+  const f = new Date(fecha);
+  if (isNaN(f.getTime())) return 'NO';
+  const limite = new Date();
+  limite.setFullYear(limite.getFullYear() - 1);
+  return f >= limite ? 'SI' : 'NO';
+}
+
 function mapTipoFireToDeviceType(t) {
   if (!t) return 'Otro';
   t = t.toLowerCase();
@@ -61,28 +73,44 @@ async function importVentasEquipos() {
   
   if (data.length <= 1) return 0;
   
+  // Mapa customerId → { nombre, apellido } para enriquecer cada venta con los
+  // datos del cliente (asociación VentaEquipo ↔ TablaCliente por customerId).
+  const clientes = await TablaCliente.findAll({ attributes: ['customerId', 'nombre', 'apellido'], raw: true });
+  const clientesById = new Map(clientes.map(c => [String(c.customerId).trim(), c]));
+
   const records = [];
-  // Estructura real de la hoja "Venta Fire TV" (13 columnas):
+  // Estructura real de la hoja "Venta Fire TV" (14 columnas):
   // 0 Id_vnta | 1 Customer_id | 2 Accion | 3 SKU | 4 TIPO DE FIRE | 5 Nickname |
-  // 6 Fecha | 7 Año | 8 Mes | 9 Precio Venta Firetv | 10 Item_Quantity | 11 Costo | 12 Serial
+  // 6 Fecha | 7 Año | 8 Mes | 9 Precio Venta Firetv | 10 Item_Quantity | 11 Costo | 12 Serial | 13 Garantia
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (!row[0] && !row[1]) continue;
 
+    const customerId = row[1] != null ? String(row[1]).trim() : null;
+    const cliente = customerId ? clientesById.get(customerId) : null;
+    const fecha = normalizeDate(row[6]);
+
     records.push({
       idVM:           String(row[0] || `FVM-${Date.now()}-${i}`),
-      customerId:     row[1] != null ? String(row[1]) : null,
+      customerId,
+      nombre:         cliente?.nombre || null,
+      apellido:       cliente?.apellido || null,
       tipoPago:       row[2] ? String(row[2]).trim() : null,   // "Venta"
       sku:            row[3] || null,
       tipoFire:       row[4] || null,
       nickname:       row[5] || null,
-      fecha:          normalizeDate(row[6]),
+      fecha,
       anio:           row[7] != null ? String(row[7]) : null,
       mes:            row[8] || null,
-      precioVenta:    row[9] != null ? Number(row[9]) : null,
+      precioVenta:    row[9] != null ? Math.round(Number(row[9])) : null,
       itemQuantity:   row[10] != null ? Number(row[10]) : null,
-      costo:          row[11] != null ? Number(row[11]) : null,
+      // El Excel trae costos con decimales largos (fórmulas de prorrateo);
+      // en COP se manejan pesos enteros.
+      costo:          row[11] != null ? Math.round(Number(row[11])) : null,
       serial:         row[12] != null ? String(row[12]) : null,
+      // La columna 13 (Garantia) del Excel se ignora: la garantía se deriva
+      // de la fecha de venta (cubre 1 año).
+      garantia:       computeGarantia(fecha),
       // El Excel no trae estos campos: se completan luego desde el Planificador / formulario
       estado:         'Activo',
       idPantalla:     null,
@@ -127,7 +155,8 @@ function sanitizeVentaBody(body) {
     d[f] = (body[f] || '').toString().trim() || null;
   }
 
-  // Auto-calcular año y mes a partir de la fecha (YYYY-MM-DD)
+  // Auto-calcular año, mes y garantía a partir de la fecha (YYYY-MM-DD)
+  if (d.fecha !== undefined) d.garantia = computeGarantia(d.fecha);
   if (d.fecha) {
     const parts = d.fecha.split('-');
     if (parts.length === 3) {
@@ -158,7 +187,13 @@ router.get('/payments/ventas-equipos', asyncHandler(async (_req, res) => {
   const count = await VentaEquipo.count();
   if (count === 0) await importVentasEquipos();
   const rows = await VentaEquipo.findAll({ order: [['fecha', 'DESC']] });
-  res.json(rows);
+  // La garantía se recalcula en cada lectura: una venta que cumple el año
+  // debe pasar de SI a NO sin esperar a que alguien edite el registro.
+  res.json(rows.map(r => {
+    const j = r.toJSON();
+    j.garantia = computeGarantia(j.fecha);
+    return j;
+  }));
 }));
 
 router.post('/payments/ventas-equipos', asyncHandler(async (req, res) => {
@@ -203,3 +238,5 @@ router.delete('/payments/ventas-equipos/:idVM', asyncHandler(async (req, res) =>
 }));
 
 module.exports = router;
+// Expuesta para scripts de migración/recarga (scratch_*.js)
+module.exports.importVentasEquipos = importVentasEquipos;
