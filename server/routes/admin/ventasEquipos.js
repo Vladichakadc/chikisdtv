@@ -68,8 +68,21 @@ async function importVentasEquipos() {
     return 0; // Abort early so we don't wipe the DB
   }
   
-  const sheetName = wb.SheetNames[0];
-  const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1 });
+  let data = [];
+  for (const name of wb.SheetNames) {
+    const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1 });
+    if (sheetData.length > 1 && sheetData[0]) {
+      const headerStr = sheetData[0].map(String).join(' ').toLowerCase();
+      if (headerStr.includes('vnta') || headerStr.includes('customer') || headerStr.includes('fecha') || headerStr.includes('fire')) {
+        data = sheetData;
+        break;
+      }
+    }
+  }
+  
+  if (data.length === 0 && wb.SheetNames.length > 0) {
+    data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+  }
   
   if (data.length <= 1) return 0;
   
@@ -181,6 +194,18 @@ router.get('/payments/ventas-equipos/next-id', asyncHandler(async (_req, res) =>
 router.post('/payments/ventas-equipos/import', asyncHandler(async (_req, res) => {
   const count = await importVentasEquipos();
   res.json({ imported: count });
+}));
+
+router.get('/payments/ventas-equipos/debug-xlsx', asyncHandler(async (_req, res) => {
+  const filepath = path.join(__dirname, '..', '..', '..', 'Tablas', 'order_inventario2026.xlsx');
+  try {
+    const wb = XLSX.readFile(filepath);
+    const sheetName = wb.SheetNames[0];
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1 });
+    res.json({ sheetNames: wb.SheetNames, firstSheetRows: data.slice(0, 3) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 }));
 
 router.get('/payments/ventas-equipos', asyncHandler(async (_req, res) => {
