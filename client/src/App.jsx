@@ -21,6 +21,10 @@ const AnalisisRetencionPage = lazy(() => import('./pages/admin/AnalisisRetencion
 const AnalisisFinancieroPage = lazy(() => import('./pages/admin/AnalisisFinancieroPage'))
 const AnalisisDispositivosPage = lazy(() => import('./pages/admin/AnalisisDispositivosPage'))
 const VentaDispositivosPage = lazy(() => import('./pages/admin/VentaDispositivosPage'))
+const AnalisisPagosPage = lazy(() => import('./pages/admin/AnalisisPagosPage'))
+const AnalisisClientesPage = lazy(() => import('./pages/admin/AnalisisClientesPage'))
+const AnalisisInventarioPage = lazy(() => import('./pages/admin/AnalisisInventarioPage'))
+const AnalisisBajasPage = lazy(() => import('./pages/admin/AnalisisBajasPage'))
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem('token')
@@ -61,6 +65,10 @@ export default function App() {
           <Route path="retencion" element={<AnalisisRetencionPage />} />
           <Route path="analisis-financiero" element={<AnalisisFinancieroPage />} />
           <Route path="analisis-dispositivos" element={<AnalisisDispositivosPage />} />
+          <Route path="analisis-pagos" element={<AnalisisPagosPage />} />
+          <Route path="analisis-clientes" element={<AnalisisClientesPage />} />
+          <Route path="analisis-inventario" element={<AnalisisInventarioPage />} />
+          <Route path="analisis-bajas" element={<AnalisisBajasPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/admin" replace />} />

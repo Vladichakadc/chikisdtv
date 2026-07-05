@@ -24,38 +24,76 @@ import {
   PIE_COLORS, MES_LABELS, LABEL_STYLE, formatCompactCurrency, renderDonutLabel,
 } from './dashboard/biShared'
 
+const CSS = `
+  @keyframes dash-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes dash-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes dash-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  .dash-a1 { animation: dash-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .dash-a2 { animation: dash-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .dash-a3 { animation: dash-fade-up .45s cubic-bezier(.22,1,.36,1) .12s both }
+  .dash-orb-1 { animation: dash-orb-1 8s ease-in-out infinite }
+  .dash-orb-2 { animation: dash-orb-2 11s ease-in-out infinite }
+  .dash-cta {
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    box-shadow: 0 4px 18px rgba(99,102,241,.4);
+    transition: all .22s ease; border: none; color: white;
+  }
+  .dash-cta:hover { box-shadow: 0 7px 24px rgba(99,102,241,.55); transform: translateY(-2px) }
+  .dash-kpi { transition: transform .25s ease, box-shadow .25s ease }
+  .dash-kpi:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.12) }
+  @media (prefers-reduced-motion: reduce) {
+    .dash-a1, .dash-a2, .dash-a3, .dash-orb-1, .dash-orb-2 { animation: none !important; transition: none !important }
+  }
+`
+
 // ─── Stat card (KPIs operativos) ─────────────────────────────────────────────
 // Al hacer clic abre el modal explicativo del cálculo (con acceso al módulo fuente).
 
 function StatCard({ icon: Icon, title, value, color, subtitle, onClick }) {
   const interactive = typeof onClick === 'function'
+  
+  // Extract tailwind color string to map to gradients
+  let grad = 'linear-gradient(135deg, #94a3b8, #64748b)'
+  let lightGrad = 'linear-gradient(135deg, #f8fafc, #f1f5f9)'
+  let iconCol = '#64748b'
+  
+  if (color?.includes('brand-primary') || color?.includes('orange')) { grad = 'linear-gradient(135deg, #f97316, #ea580c)'; lightGrad = 'rgba(249,115,22,0.1)'; iconCol = '#ea580c' }
+  else if (color?.includes('blue')) { grad = 'linear-gradient(135deg, #0ea5e9, #3b82f6)'; lightGrad = 'rgba(14,165,233,0.1)'; iconCol = '#0ea5e9' }
+  else if (color?.includes('green')) { grad = 'linear-gradient(135deg, #10b981, #059669)'; lightGrad = 'rgba(16,185,129,0.1)'; iconCol = '#10b981' }
+  else if (color?.includes('purple')) { grad = 'linear-gradient(135deg, #a855f7, #7e22ce)'; lightGrad = 'rgba(168,85,247,0.1)'; iconCol = '#a855f7' }
+  else if (color?.includes('amber')) { grad = 'linear-gradient(135deg, #f59e0b, #d97706)'; lightGrad = 'rgba(245,158,11,0.1)'; iconCol = '#f59e0b' }
+  else if (color?.includes('red')) { grad = 'linear-gradient(135deg, #ef4444, #dc2626)'; lightGrad = 'rgba(239,68,68,0.1)'; iconCol = '#ef4444' }
+
   return (
-    <Card
+    <div
+      onClick={onClick}
       className={cn(
-        'p-5',
-        interactive && 'cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-primary/40'
+        'relative bg-white rounded-2xl border border-slate-200 overflow-hidden select-none',
+        interactive ? 'cursor-pointer dash-kpi' : ''
       )}
       {...(interactive ? {
         role: 'button',
         tabIndex: 0,
-        onClick,
         onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
       } : {})}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: grad }} />
+      <div className="p-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="text-3xl font-bold text-brand-accent mt-2">{value}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{subtitle}</p>}
+          <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{title}</p>
+          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none">{value}</p>
+          {subtitle && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{subtitle}</p>}
           {interactive && (
-            <p className="text-xs font-semibold text-brand-primary mt-2">¿Cómo se calcula?</p>
+            <p className="text-[11px] font-bold text-indigo-500 mt-3 inline-flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity">
+              <Lightbulb size={12} /> ¿Cómo se calcula?
+            </p>
           )}
         </div>
-        <div className={`p-3 rounded-xl flex-shrink-0 ${color}`}>
-          <Icon size={22} className="text-white" />
+        <div className="p-2.5 rounded-xl shrink-0" style={{ background: lightGrad }}>
+          <Icon size={20} style={{ color: iconCol }} />
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -502,44 +540,61 @@ export default function DashboardHome() {
         <IngresoPorClientePanel onClose={() => setShowArpuPanel(false)} />
       )}
 
-      <div className="mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-brand-accent">Dashboard</h1>
-          <p className="text-sm md:text-base text-gray-500">Pulso diario de ChikisdTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-brand-primary font-semibold hover:underline">Análisis Financiero</button></p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {import.meta.env.DEV && (
-            <>
-              <input
-                type="file" accept=".sqlite" id="restore-db-input" className="hidden"
-                onChange={handleRestoreLocalBackup}
-              />
-              <Button
-                onClick={() => document.getElementById('restore-db-input').click()}
-                variant="secondary" disabled={restoringBackup}
-                className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
-              >
-                <Upload size={15} /> {restoringBackup ? 'Cargando…' : 'Cargar BD local'}
-              </Button>
-            </>
-          )}
-          <Button
-            onClick={handleDownloadBackup} variant="secondary" disabled={downloadingBackup}
-            className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
-          >
-            <Download size={15} /> {downloadingBackup ? 'Descargando…' : 'Respaldo BD'}
-          </Button>
-          <Button
-            onClick={handleSync} variant="secondary" disabled={syncing}
-            className="border-brand-accent/20 text-brand-accent hover:bg-brand-accent hover:text-white hover:border-brand-accent"
-          >
-            <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando…' : 'Sincronizar Datos'}
-          </Button>
+      <style>{CSS}</style>
+
+      {/* ── HERO HEADER ── */}
+      <div className="dash-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)' }}>
+        <div className="dash-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.25] pointer-events-none" style={{ background: 'radial-gradient(circle,#a855f7,transparent 70%)' }} />
+        <div className="dash-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#6366f1,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/25 mb-4">
+              <Activity size={12} className="text-indigo-300" />
+              <span className="text-indigo-300 text-xs font-semibold tracking-widest uppercase">Operaciones</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Dashboard
+            </h1>
+            <p className="text-indigo-100/70 text-sm mt-2 max-w-xl">
+              Pulso diario de ChikisdTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-indigo-400 font-bold hover:text-white transition-colors">Análisis Financiero</button>
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {import.meta.env.DEV && (
+              <>
+                <input
+                  type="file" accept=".sqlite" id="restore-db-input" className="hidden"
+                  onChange={handleRestoreLocalBackup}
+                />
+                <button
+                  onClick={() => document.getElementById('restore-db-input').click()}
+                  disabled={restoringBackup}
+                  className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2"
+                >
+                  <Upload size={15} /> {restoringBackup ? 'Cargando…' : 'BD Local'}
+                </button>
+              </>
+            )}
+            <button
+              onClick={handleDownloadBackup} disabled={downloadingBackup}
+              className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2"
+            >
+              <Download size={15} /> {downloadingBackup ? 'Descargando…' : 'Respaldo'}
+            </button>
+            <button
+              onClick={handleSync} disabled={syncing}
+              className="dash-cta px-5 py-2.5 rounded-2xl text-sm font-bold flex items-center gap-2"
+            >
+              <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando…' : 'Sincronizar'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ─── KPIs operativos: clientes, catálogo y capacidad ─────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 dash-a2">
         <StatCard
           icon={Users} title="Clientes Activos" value={stats.totalClients} color="bg-brand-primary"
           subtitle={`${stats.clientesFinal} finales · ${stats.clientesRevendedor} revendedores — presencia en ${stats.paisesCount} países`}
@@ -587,7 +642,7 @@ export default function DashboardHome() {
       </div>
 
       {/* ─── KPIs operativos: cartera y vencimientos ─────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 dash-a2 mt-4">
         <StatCard
           icon={Clock} title="Pagos Pendientes" value={stats.pendingPayments} color="bg-amber-500"
           subtitle="A la espera de conciliación en el módulo de Pagos"
@@ -641,7 +696,7 @@ export default function DashboardHome() {
           </div>
 
           {/* ─── KPIs comparativos BI ──────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 dash-a3">
             <BiCard
               icon={Wallet} variant="solid" label="Ingresos históricos"
               value={formatCurrency(k.ingresosTotales)}

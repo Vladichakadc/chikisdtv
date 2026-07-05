@@ -13,8 +13,7 @@ import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts'
-import { ModuleStatCard as StatCard, ChartInsight, PIE_COLORS, LABEL_STYLE, renderDonutLabel } from './dashboard/biShared'
+
 
 // ─── Icono de orden ───────────────────────────────────────────────────────────
 
@@ -28,6 +27,71 @@ function SortIcon({ colKey, sortCol, sortDir }) {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const fmtCOP = (v) => (v == null || v === '' ? '—' : formatCurrency(v))
+
+const CSS = `
+  @keyframes pg-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes pg-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes pg-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  @keyframes pg-drawer-in { from { transform:translateX(100%) } to { transform:translateX(0) } }
+  @keyframes pg-fade-in { from { opacity:0 } to { opacity:1 } }
+  .pg-a1 { animation: pg-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .pg-a2 { animation: pg-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .pg-orb-1 { animation: pg-orb-1 8s ease-in-out infinite }
+  .pg-orb-2 { animation: pg-orb-2 11s ease-in-out infinite }
+  .pg-cta {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 4px 18px rgba(16,185,129,.4);
+    transition: all .22s ease; border: none;
+  }
+  .pg-cta:hover { box-shadow: 0 7px 24px rgba(16,185,129,.55); transform: translateY(-2px) }
+  .pg-overlay { animation: pg-fade-in .2s ease both }
+  .pg-drawer { animation: pg-drawer-in .3s cubic-bezier(.22,1,.36,1) both }
+  @media (prefers-reduced-motion: reduce) {
+    .pg-a1, .pg-a2, .pg-orb-1, .pg-orb-2, .pg-overlay, .pg-drawer { animation: none !important; transition: none !important }
+  }
+`
+
+function PagoCard({ icon: Icon, label, value, sub, variant, onClick }) {
+  const isSolid = variant === 'solid'
+  const isOutline = variant === 'outline'
+  
+  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
+    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? 'bg-emerald-50 border border-emerald-200' : 'border border-slate-200 shadow-sm'}
+    ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50' : ''}`
+
+  const topBorder = isSolid 
+    ? 'linear-gradient(90deg, #10b981, #059669)'
+    : 'linear-gradient(90deg, #34d39980, #10b98180)'
+
+  return (
+    <div className={containerClass} onClick={onClick}>
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
+      <div className="p-5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? 'text-emerald-600' : 'text-slate-400'}`}>
+            {label}
+          </p>
+          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
+            {value}
+          </p>
+          {sub && (
+            <p className={`text-xs mt-2 font-medium ${isOutline ? 'text-emerald-600' : 'text-slate-500'}`}>
+              {sub}
+            </p>
+          )}
+          {onClick && (
+            <div className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors">
+              <span>¿Cómo se calcula?</span>
+            </div>
+          )}
+        </div>
+        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'}`}>
+          <Icon size={22} />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ─── Columnas ─────────────────────────────────────────────────────────────────
 
@@ -542,33 +606,6 @@ export default function PaymentsPage() {
     return { total, ingresos, renovaciones, activaciones }
   }, [searched])
 
-  // ─── Composición financiera del resultado filtrado ─────────────────────────
-  // Ingresos por medio de pago y por tipo de plan — mismos registros que las
-  // tarjetas, por lo que los totales siempre coinciden entre sí.
-  const porMedioPago = useMemo(() => {
-    const map = {}
-    for (const r of searched) {
-      const medio = (r.medioPago || '').trim() || 'Sin registrar'
-      map[medio] = (map[medio] || 0) + (Number(r.precioVenta) || 0)
-    }
-    return Object.entries(map)
-      .map(([name, value]) => ({ name, value: Math.round(value) }))
-      .sort((a, b) => b.value - a.value)
-  }, [searched])
-
-  const porTipoPlan = useMemo(() => {
-    const map = {}
-    for (const r of searched) {
-      const plan = (r.tipoPlan || '').trim() || 'Sin clasificar'
-      if (!map[plan]) map[plan] = { plan, ingresos: 0, ventas: 0 }
-      map[plan].ingresos += Number(r.precioVenta) || 0
-      map[plan].ventas += 1
-    }
-    return Object.values(map)
-      .map(p => ({ ...p, ingresos: Math.round(p.ingresos), ticket: p.ventas > 0 ? Math.round(p.ingresos / p.ventas) : 0 }))
-      .sort((a, b) => b.ingresos - a.ingresos)
-  }, [searched])
-
   const filtered = useMemo(() => {
     return [...searched].sort((a, b) => {
       let va = a[sortCol] ?? ''
@@ -588,110 +625,65 @@ export default function PaymentsPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-brand-accent">Pagos</h1>
-          <p className="text-gray-500">Ventas de licencias IPTV · {stats.total.toLocaleString()} registros</p>
+      <style>{CSS}</style>
+
+      {/* ── HERO HEADER ── */}
+      <div className="pg-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#064e3b 0%,#022c22 100%)' }}>
+        <div className="pg-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#10b981,transparent 70%)' }} />
+        <div className="pg-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.15] pointer-events-none" style={{ background: 'radial-gradient(circle,#059669,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 mb-4">
+              <DollarSign size={12} className="text-emerald-300" />
+              <span className="text-emerald-300 text-xs font-semibold tracking-widest uppercase">Finanzas</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Pagos
+            </h1>
+            <p className="text-emerald-100/70 text-sm mt-2">
+              Ventas de licencias IPTV · {stats.total.toLocaleString()} registros
+            </p>
+          </div>
+          <button onClick={() => openNew()} className="pg-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
+            <Plus size={18} /> Nueva Venta
+          </button>
         </div>
-        <button
-          onClick={() => openNew()}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary hover:bg-brand-dark text-white text-sm font-medium transition-colors shadow-sm hover:shadow-md"
-        >
-          <Plus size={16} /> Nueva Venta
-        </button>
       </div>
 
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={ShoppingCart} label="Total Registros"  value={stats.total.toLocaleString()}          variant="solid"   sub={(search || selectedYears !== null || selectedMonths !== null) ? 'Resultados filtrados' : 'Histórico completo'}
+        <PagoCard icon={ShoppingCart} label="Total Registros"  value={stats.total.toLocaleString()}          variant="solid"   sub={(search || selectedYears !== null || selectedMonths !== null) ? 'Resultados filtrados' : 'Histórico completo'}
           onClick={() => setExplain({
             title: 'Total Registros', value: stats.total.toLocaleString(), icon: ShoppingCart,
             queEs: 'Cuántas ventas de licencias hay en la vista actual. Si tienes un filtro de búsqueda, año o mes activo, el número refleja solo lo filtrado.',
             comoSeCalcula: 'Conteo simple de las filas de la tabla de ventas que pasan el filtro activo. **Sin filtros, coincide con el histórico completo.**',
             origen: 'Tabla de ventas de licencias de este módulo (importada del Excel original y alimentada con cada venta nueva).',
           })} />
-        <StatCard icon={DollarSign}   label="Ingresos Totales" value={fmtCOP(stats.ingresos)}                variant="light"   sub="Licencias vendidas"
+        <PagoCard icon={DollarSign}   label="Ingresos Totales" value={fmtCOP(stats.ingresos)}                variant="light"   sub="Licencias vendidas"
           onClick={() => setExplain({
             title: 'Ingresos Totales', value: fmtCOP(stats.ingresos), icon: DollarSign,
             queEs: 'La plata que ha entrado por ventas de licencias en la vista actual (filtros incluidos).',
             comoSeCalcula: 'Se **suma el precio de venta** de cada registro visible. Sin filtros activos, este número es el mismo "Ingresos históricos" que muestran el Dashboard y Análisis Financiero — todos beben de la misma tabla.',
             origen: 'Campo precio de venta de cada fila de este módulo.',
           })} />
-        <StatCard icon={RotateCcw}    label="Renovaciones"     value={stats.renovaciones.toLocaleString()}   variant="outline" sub="Clientes recurrentes"
+        <PagoCard icon={RotateCcw}    label="Renovaciones"     value={stats.renovaciones.toLocaleString()}   variant="outline" sub="Clientes recurrentes"
           onClick={() => setExplain({
             title: 'Renovaciones', value: stats.renovaciones.toLocaleString(), icon: RotateCcw,
             queEs: 'Ventas de clientes que ya estaban y volvieron a pagar — el ingreso recurrente y más barato de conseguir.',
             comoSeCalcula: 'Se cuentan los registros visibles cuyo **tipo de pago es "Renovacion"**.',
             origen: 'Campo tipo de pago de cada venta de este módulo.',
           })} />
-        <StatCard icon={Zap}          label="Activaciones"     value={stats.activaciones.toLocaleString()}   variant="light"   sub="Nuevas pantallas"
+        <PagoCard icon={Zap}          label="Activaciones"     value={stats.activaciones.toLocaleString()}   variant="light"   sub="Nuevas pantallas"
           onClick={() => setExplain({
             title: 'Activaciones', value: stats.activaciones.toLocaleString(), icon: Zap,
             queEs: 'Ventas que representan pantallas o clientes nuevos — el motor de crecimiento de la base.',
             comoSeCalcula: 'Se cuentan los registros visibles cuyo tipo de pago **empieza por "Activacion"** (incluye "Activacion" y "Activacion Pantalla").',
             origen: 'Campo tipo de pago de cada venta de este módulo.',
           })} />
-      </div>
-
-      {/* ─── Composición financiera (refleja el filtro activo) ──────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <Card className="border-orange-100">
-          <CardHeader className="border-orange-50">
-            <CardTitle>Ingresos por medio de pago</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Por dónde entra la plata — refleja el filtro activo de la tabla</p>
-          </CardHeader>
-          <CardBody>
-            <ResponsiveContainer width="100%" height={230}>
-              <PieChart>
-                <Pie data={porMedioPago} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={3} label={renderDonutLabel} labelLine={false}>
-                  {porMedioPago.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(v) => formatCurrency(v)} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="space-y-1.5 mt-1">
-              {porMedioPago.slice(0, 5).map((p, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-gray-600">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                    {p.name}
-                  </span>
-                  <span className="font-semibold text-brand-accent">{formatCurrency(p.value)}</span>
-                </div>
-              ))}
-            </div>
-            <ChartInsight text={porMedioPago.length > 0
-              ? `**${porMedioPago[0].name}** es el canal de recaudo dominante con ${formatCurrency(porMedioPago[0].value)}${porMedioPago.length > 1 ? `, seguido de **${porMedioPago[1].name}** (${formatCurrency(porMedioPago[1].value)})` : ''}. Concentrar el recaudo en pocos canales simplifica la conciliación, pero conviene mantener al menos dos activos por si uno falla o cambia sus comisiones.`
-              : null} />
-          </CardBody>
-        </Card>
-
-        <Card className="border-orange-100">
-          <CardHeader className="border-orange-50">
-            <CardTitle>Ingresos por tipo de plan</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Qué planes sostienen el ingreso — con ticket promedio por plan</p>
-          </CardHeader>
-          <CardBody>
-            <ResponsiveContainer width="100%" height={230}>
-              <ComposedChart data={porTipoPlan} layout="vertical" margin={{ top: 5, right: 70, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} horizontal={false} />
-                <XAxis type="number" tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`} tick={{ fontSize: 11, fill: '#78716c' }} />
-                <YAxis type="category" dataKey="plan" tick={{ fontSize: 11, fill: '#78716c' }} width={100} />
-                <Tooltip formatter={(v, name, p) => [`${formatCurrency(v)} · ${p.payload.ventas} ventas · ticket ${formatCurrency(p.payload.ticket)}`, 'Ingresos']} />
-                <Bar dataKey="ingresos" name="Ingresos" radius={[0, 6, 6, 0]} barSize={22}>
-                  {porTipoPlan.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  <LabelList dataKey="ingresos" position="right" formatter={(v) => v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : formatCurrency(v)} style={{ ...LABEL_STYLE, fontSize: 11 }} />
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-            <ChartInsight text={porTipoPlan.length > 0
-              ? `**${porTipoPlan[0].plan}** lidera con ${formatCurrency(porTipoPlan[0].ingresos)} en ${porTipoPlan[0].ventas} ventas (ticket promedio ${formatCurrency(porTipoPlan[0].ticket)}). Los planes largos (semestral/anual) adelantan caja pero "esconden" el churn; los mensuales dan señal temprana de fuga. El detalle del MRR normalizado por plan está en **Análisis Financiero**.`
-              : null} />
-          </CardBody>
-        </Card>
       </div>
 
       {/* Búsqueda y filtros */}
@@ -703,7 +695,7 @@ export default function PaymentsPage() {
             placeholder="Buscar por ID, nombre, nickname, pantalla, cuenta…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-orange-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2.5 border border-emerald-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all"
           />
         </div>
 
@@ -712,32 +704,32 @@ export default function PaymentsPage() {
           <button
             type="button"
             onClick={() => setYearMenuOpen(o => !o)}
-            className="flex items-center gap-2 px-4 py-2.5 border border-orange-200 rounded-xl bg-white shadow-sm hover:bg-orange-50 text-sm font-medium text-gray-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 border border-emerald-200 rounded-xl bg-white shadow-sm hover:bg-emerald-50 text-sm font-medium text-gray-700 transition-colors"
           >
-            <Calendar size={16} className="text-orange-500" />
+            <Calendar size={16} className="text-emerald-500" />
             <span>Año: <strong className="text-brand-accent">{yearFilterLabel}</strong></span>
             <ChevronDown size={14} className={cn('text-gray-400 transition-transform', yearMenuOpen && 'rotate-180')} />
           </button>
 
           {yearMenuOpen && (
-            <div className="absolute z-20 mt-2 w-44 rounded-xl border border-orange-100 bg-white shadow-lg p-1.5">
-              <label className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-orange-50 cursor-pointer text-sm font-semibold text-brand-accent border-b border-gray-100 mb-1">
+            <div className="absolute z-20 mt-2 w-44 rounded-xl border border-emerald-100 bg-white shadow-lg p-1.5">
+              <label className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 cursor-pointer text-sm font-semibold text-brand-accent border-b border-gray-100 mb-1">
                 <input
                   type="checkbox"
                   checked={allYearsSelected}
                   onChange={toggleAllYears}
-                  className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-500 focus:ring-emerald-400"
                 />
                 Seleccionar todos
               </label>
               <div className="max-h-56 overflow-auto">
                 {yearOptions.map(year => (
-                  <label key={year} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-orange-50 cursor-pointer text-sm text-gray-600">
+                  <label key={year} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 cursor-pointer text-sm text-gray-600">
                     <input
                       type="checkbox"
                       checked={isYearSelected(year)}
                       onChange={() => toggleYear(year)}
-                      className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-500 focus:ring-emerald-400"
                     />
                     {year}
                   </label>
@@ -755,32 +747,32 @@ export default function PaymentsPage() {
           <button
             type="button"
             onClick={() => setMonthMenuOpen(o => !o)}
-            className="flex items-center gap-2 px-4 py-2.5 border border-orange-200 rounded-xl bg-white shadow-sm hover:bg-orange-50 text-sm font-medium text-gray-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 border border-emerald-200 rounded-xl bg-white shadow-sm hover:bg-emerald-50 text-sm font-medium text-gray-700 transition-colors"
           >
-            <Calendar size={16} className="text-orange-500" />
+            <Calendar size={16} className="text-emerald-500" />
             <span>Mes: <strong className="text-brand-accent">{monthFilterLabel}</strong></span>
             <ChevronDown size={14} className={cn('text-gray-400 transition-transform', monthMenuOpen && 'rotate-180')} />
           </button>
 
           {monthMenuOpen && (
-            <div className="absolute z-20 mt-2 w-48 rounded-xl border border-orange-100 bg-white shadow-lg p-1.5">
-              <label className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-orange-50 cursor-pointer text-sm font-semibold text-brand-accent border-b border-gray-100 mb-1">
+            <div className="absolute z-20 mt-2 w-48 rounded-xl border border-emerald-100 bg-white shadow-lg p-1.5">
+              <label className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 cursor-pointer text-sm font-semibold text-brand-accent border-b border-gray-100 mb-1">
                 <input
                   type="checkbox"
                   checked={allMonthsSelected}
                   onChange={toggleAllMonths}
-                  className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-500 focus:ring-emerald-400"
                 />
                 Seleccionar todos
               </label>
               <div className="max-h-56 overflow-auto">
                 {monthOptions.map(month => (
-                  <label key={month} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-orange-50 cursor-pointer text-sm text-gray-600">
+                  <label key={month} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 cursor-pointer text-sm text-gray-600">
                     <input
                       type="checkbox"
                       checked={isMonthSelected(month)}
                       onChange={() => toggleMonth(month)}
-                      className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-500 focus:ring-emerald-400"
                     />
                     {month}
                   </label>
@@ -795,7 +787,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* Tabla */}
-      <Card className="shadow-lg border-orange-100 overflow-hidden">
+      <Card className="shadow-lg border-emerald-100 overflow-hidden">
         <CardBody className="p-0">
           {loading ? (
             <div className="p-12 text-center">
@@ -805,33 +797,33 @@ export default function PaymentsPage() {
           ) : error ? (
             <p className="p-8 text-center text-red-500">{error}</p>
           ) : (
-            <div className="overflow-auto max-h-[34rem] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-orange-200 hover:[&::-webkit-scrollbar-thumb]:bg-orange-300">
-              <table className="w-full text-sm border-separate border-spacing-0">
-                <thead>
-                  <tr className="text-left text-white">
-                    {COLS.map(col => (
-                      <th
-                        key={col.key}
-                        scope="col"
-                        onClick={() => handleSort(col.key)}
-                        className={`sticky top-0 z-10 bg-orange-600 px-3 py-3 font-semibold whitespace-nowrap transition-colors select-none shadow-[0_1px_0_0_rgba(0,0,0,0.08)] ${col.key !== 'acciones' ? 'cursor-pointer hover:bg-orange-700' : ''}`}
+              <div className="overflow-auto max-h-[34rem] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-emerald-200 hover:[&::-webkit-scrollbar-thumb]:bg-emerald-300">
+                <table className="w-full text-sm border-separate border-spacing-0">
+                  <thead>
+                    <tr className="text-left text-white">
+                      {COLS.map(col => (
+                        <th
+                          key={col.key}
+                          scope="col"
+                          onClick={() => handleSort(col.key)}
+                          className={`sticky top-0 z-10 bg-emerald-600 px-3 py-3 font-semibold whitespace-nowrap transition-colors select-none shadow-[0_1px_0_0_rgba(0,0,0,0.08)] ${col.key !== 'acciones' ? 'cursor-pointer hover:bg-emerald-700' : ''}`}
+                        >
+                          {col.key !== 'acciones' ? (
+                            <div className="flex items-center gap-1">
+                              {col.label}
+                              <SortIcon colKey={col.key} sortCol={sortCol} sortDir={sortDir} />
+                            </div>
+                          ) : null}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((row, i) => (
+                      <tr
+                        key={row.idVM}
+                        className={`border-b border-emerald-50 hover:bg-emerald-50/70 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30'}`}
                       >
-                        {col.key !== 'acciones' ? (
-                          <div className="flex items-center gap-1">
-                            {col.label}
-                            <SortIcon colKey={col.key} sortCol={sortCol} sortDir={sortDir} />
-                          </div>
-                        ) : null}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row, i) => (
-                    <tr
-                      key={row.idVM}
-                      className={`border-b border-orange-50 hover:bg-orange-50/70 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}`}
-                    >
                       {COLS.map(col => (
                         <td key={col.key} className="px-3 py-2 whitespace-nowrap">
                           {renderCell(row, col.key, openEdit, handleDelete)}
@@ -851,282 +843,284 @@ export default function PaymentsPage() {
             </div>
           )}
         </CardBody>
-        <div className="flex items-center justify-between border-t border-orange-100 bg-orange-50/40 px-4 py-2 text-xs text-gray-500">
+        <div className="flex items-center justify-between border-t border-emerald-100 bg-emerald-50/40 px-4 py-2 text-xs text-gray-500">
           <span>{filtered.length.toLocaleString()} de {rows.length.toLocaleString()} registros</span>
           <span>Ordenado por <strong className="text-brand-accent">{COLS.find(c => c.key === sortCol)?.label ?? sortCol}</strong> ({sortDir === 'asc' ? '↑ ascendente' : '↓ descendente'})</span>
         </div>
       </Card>
 
-      {/* Modal formulario */}
+      {/* Form Drawer (PRO MAX Drawer) */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-8">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4">
-            {/* Header modal */}
-            <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl px-6 py-4 flex items-center justify-between">
+        <>
+          <div className="pg-overlay fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" onClick={closeForm} />
+          <div className="pg-drawer fixed inset-y-0 right-0 z-50 w-full md:w-[600px] bg-white shadow-2xl flex flex-col border-l border-slate-100">
+            {/* Header del Drawer */}
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
               <div>
-                <h2 className="text-xl font-bold text-white">
-                  {editing ? 'Editar Venta' : 'Nueva Venta'}
-                </h2>
-                <p className="text-orange-100 text-sm">
+                <h2 className="text-xl font-bold text-slate-800">{editing ? 'Editar Venta' : 'Nueva Venta'}</h2>
+                <p className="text-sm text-slate-500 mt-1">
                   {editing ? `Editando ${editing.idVM}` : 'Complete todos los campos'}
                 </p>
               </div>
-              <button onClick={closeForm} className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors">
+              <button onClick={closeForm} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
                 <X size={20} />
               </button>
             </div>
 
             {prefillNote && (
-              <div className="mx-6 mt-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                <Sparkles size={14} className="shrink-0" />
+              <div className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                <Sparkles size={16} className="shrink-0" />
                 <span>Datos pre-cargados automáticamente desde el Planificador · categoría <strong>{prefillNote}</strong>. Verifica y completa lo que falte antes de guardar.</span>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Sección: Identificación */}
-              <section>
-                <h3 className="text-sm font-semibold text-orange-600 uppercase tracking-wide mb-3 border-b border-orange-100 pb-1">
-                  Identificación
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">ID Venta</label>
-                    <input
-                      value={form.idVM}
-                      disabled
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-400 text-sm font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">ID Cliente</label>
-                    <input value={form.customerId} onChange={f('customerId')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">SKU</label>
-                    <select value={form.sku} onChange={f('sku')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm font-mono bg-white">
-                      <option value="">Seleccionar dispositivo…</option>
-                      {form.sku && !skuOptions.includes(form.sku) && (
-                        <option value={form.sku}>{form.sku} (actual)</option>
+            {/* Cuerpo del Formulario */}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                
+                {/* Sección: Identificación */}
+                <section>
+                  <h3 className="text-sm font-semibold text-emerald-700 flex items-center gap-2 border-b border-emerald-100 pb-1 mb-4">
+                    📋 Identificación
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ID Venta</label>
+                      <input
+                        value={form.idVM}
+                        disabled
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 font-mono font-bold cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ID Cliente</label>
+                      <input value={form.customerId} onChange={f('customerId')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+                      <select value={form.sku} onChange={f('sku')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all font-mono">
+                        <option value="">Seleccionar dispositivo…</option>
+                        {form.sku && !skuOptions.includes(form.sku) && (
+                          <option value={form.sku}>{form.sku} (actual)</option>
+                        )}
+                        {skuOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                      {form.nickname && !lastVentaForNickname(form.nickname)?.sku && !nicknames.find(n => n.nickname === form.nickname)?.sku && (
+                        <p className="text-[11px] font-semibold text-emerald-600 mt-1">Cliente nuevo · seleccione el dispositivo</p>
                       )}
-                      {skuOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                    {form.nickname && !lastVentaForNickname(form.nickname)?.sku && !nicknames.find(n => n.nickname === form.nickname)?.sku && (
-                      <p className="text-[11px] text-orange-500 mt-1">Cliente nuevo · seleccione el dispositivo</p>
-                    )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ID Pantalla</label>
+                      <input value={form.idPantalla} onChange={f('idPantalla')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all font-mono" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta ID</label>
+                      <input value={form.cuentaId} onChange={f('cuentaId')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all font-mono" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta</label>
+                      <input value={form.cuenta} onChange={f('cuenta')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">ID Pantalla</label>
-                    <input value={form.idPantalla} onChange={f('idPantalla')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm font-mono" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cuenta ID</label>
-                    <input value={form.cuentaId} onChange={f('cuentaId')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm font-mono" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cuenta</label>
-                    <input value={form.cuenta} onChange={f('cuenta')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              {/* Sección: Cliente */}
-              <section>
-                <h3 className="text-sm font-semibold text-orange-600 uppercase tracking-wide mb-3 border-b border-orange-100 pb-1">
-                  Cliente
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-                    <input value={form.nombre} onChange={f('nombre')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
+                {/* Sección: Cliente */}
+                <section>
+                  <h3 className="text-sm font-semibold text-emerald-700 flex items-center gap-2 border-b border-emerald-100 pb-1 mb-4">
+                    👤 Cliente
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                      <input value={form.nombre} onChange={f('nombre')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+                      <input value={form.apellido} onChange={f('apellido')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nickname</label>
+                      <select value={form.nickname} onChange={f('nickname')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">Seleccionar nickname…</option>
+                        {form.nickname && !nicknames.some(n => n.nickname === form.nickname) && (
+                          <option value={form.nickname}>{form.nickname} (actual)</option>
+                        )}
+                        {nicknames.map(n => (
+                          <option key={n.nickname} value={n.nickname}>{n.nickname}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Fire</label>
+                      <select value={form.tipoFire} onChange={f('tipoFire')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">Seleccionar equipo…</option>
+                        {form.tipoFire && ![
+                          'FireTV Stick', 'FireTV Stick 4K', 'FireTV Stick 4K Max', 'FireTV Cube', 'FireTV TV',
+                          'Watch ONN 4K Original', 'Watch ONN 4K China', 'Watch ONN HD Original',
+                          'Smart TV (Android/Google)', 'Smart TV (Samsung/LG/Roku)', 'PC / Web', 'Celular / Tablet', 'Otro'
+                        ].includes(form.tipoFire) && <option value={form.tipoFire}>{form.tipoFire} (actual)</option>}
+                        <option>FireTV Stick</option>
+                        <option>FireTV Stick 4K</option>
+                        <option>FireTV Stick 4K Max</option>
+                        <option>FireTV Cube</option>
+                        <option>FireTV TV</option>
+                        <option>Watch ONN 4K Original</option>
+                        <option>Watch ONN 4K China</option>
+                        <option>Watch ONN HD Original</option>
+                        <option>Smart TV (Android/Google)</option>
+                        <option>Smart TV (Samsung/LG/Roku)</option>
+                        <option>PC / Web</option>
+                        <option>Celular / Tablet</option>
+                        <option>Otro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                      <select value={form.estado} onChange={f('estado')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">—</option>
+                        <option>Activo</option>
+                        <option>Desactivado</option>
+                        <option>Baja</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cortesía</label>
+                      <select value={form.cortesia} onChange={f('cortesia')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">—</option>
+                        <option>SI</option>
+                        <option>NO</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pantallas</label>
+                      <input type="number" min="1" value={form.pantallas} onChange={f('pantallas')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Pantalla</label>
+                      <input value={form.tipoPantalla} onChange={f('tipoPantalla')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Dedicada</label>
+                      <select value={form.cuentaDedicada} onChange={f('cuentaDedicada')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">—</option>
+                        <option>SI</option>
+                        <option>NO</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
-                    <input value={form.apellido} onChange={f('apellido')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Nickname</label>
-                    <select value={form.nickname} onChange={f('nickname')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">Seleccionar nickname…</option>
-                      {form.nickname && !nicknames.some(n => n.nickname === form.nickname) && (
-                        <option value={form.nickname}>{form.nickname} (actual)</option>
-                      )}
-                      {nicknames.map(n => (
-                        <option key={n.nickname} value={n.nickname}>{n.nickname}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tipo Fire</label>
-                    <select value={form.tipoFire} onChange={f('tipoFire')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">Seleccionar equipo…</option>
-                      {form.tipoFire && ![
-                        'FireTV Stick', 'FireTV Stick 4K', 'FireTV Stick 4K Max', 'FireTV Cube', 'FireTV TV',
-                        'Watch ONN 4K Original', 'Watch ONN 4K China', 'Watch ONN HD Original',
-                        'Smart TV (Android/Google)', 'Smart TV (Samsung/LG/Roku)', 'PC / Web', 'Celular / Tablet', 'Otro'
-                      ].includes(form.tipoFire) && <option value={form.tipoFire}>{form.tipoFire} (actual)</option>}
-                      <option>FireTV Stick</option>
-                      <option>FireTV Stick 4K</option>
-                      <option>FireTV Stick 4K Max</option>
-                      <option>FireTV Cube</option>
-                      <option>FireTV TV</option>
-                      <option>Watch ONN 4K Original</option>
-                      <option>Watch ONN 4K China</option>
-                      <option>Watch ONN HD Original</option>
-                      <option>Smart TV (Android/Google)</option>
-                      <option>Smart TV (Samsung/LG/Roku)</option>
-                      <option>PC / Web</option>
-                      <option>Celular / Tablet</option>
-                      <option>Otro</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Estado</label>
-                    <select value={form.estado} onChange={f('estado')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">—</option>
-                      <option>Activo</option>
-                      <option>Desactivado</option>
-                      <option>Baja</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cortesía</label>
-                    <select value={form.cortesia} onChange={f('cortesia')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">—</option>
-                      <option>SI</option>
-                      <option>NO</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Pantallas</label>
-                    <input type="number" min="1" value={form.pantallas} onChange={f('pantallas')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tipo Pantalla</label>
-                    <input value={form.tipoPantalla} onChange={f('tipoPantalla')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cuenta Dedicada</label>
-                    <select value={form.cuentaDedicada} onChange={f('cuentaDedicada')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">—</option>
-                      <option>SI</option>
-                      <option>NO</option>
-                    </select>
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              {/* Sección: Pago */}
-              <section>
-                <h3 className="text-sm font-semibold text-orange-600 uppercase tracking-wide mb-3 border-b border-orange-100 pb-1">
-                  Pago y Fechas
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
-                    <input type="date" value={form.fecha} onChange={f('fecha')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
+                {/* Sección: Pago */}
+                <section>
+                  <h3 className="text-sm font-semibold text-emerald-700 flex items-center gap-2 border-b border-emerald-100 pb-1 mb-4">
+                    💳 Pago y Fechas
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                      <input type="date" value={form.fecha} onChange={f('fecha')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fecha de Alta <span className="text-gray-400 font-normal normal-case">(opcional)</span>
+                      </label>
+                      <input type="date" value={form.fechaAlta} onChange={f('fechaAlta')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
+                      <input value={form.anio} onChange={f('anio')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+                      <select value={form.mes} onChange={f('mes')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">—</option>
+                        {MESES.map(m => (
+                          <option key={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Precio Venta</label>
+                      <CurrencyInput value={form.precioVenta} onChange={f('precioVenta')} decimals={0}
+                        className="border-gray-200 focus:ring-emerald-400 w-full px-3 py-2.5 rounded-xl bg-white text-gray-800" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
+                      <select value={form.medioPago} onChange={f('medioPago')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">—</option>
+                        {form.medioPago && !medioPagoOptions.includes(form.medioPago) && (
+                          <option value={form.medioPago}>{form.medioPago} (actual)</option>
+                        )}
+                        {medioPagoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                      <input type="number" min="1" value={form.itemQuantity} onChange={f('itemQuantity')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Pago</label>
+                      <select value={form.tipoPago} onChange={f('tipoPago')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">—</option>
+                        <option>Renovacion</option>
+                        <option>Activacion</option>
+                        <option>Activacion Pantalla</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Plan</label>
+                      <select value={form.tipoPlan} onChange={f('tipoPlan')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
+                        <option value="">—</option>
+                        {form.tipoPlan && !tipoPlanOptions.includes(form.tipoPlan) && (
+                          <option value={form.tipoPlan}>{form.tipoPlan} (actual)</option>
+                        )}
+                        {tipoPlanOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Fecha de Alta <span className="text-gray-400 font-normal normal-case">(opcional)</span>
-                    </label>
-                    <input type="date" value={form.fechaAlta} onChange={f('fechaAlta')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Año</label>
-                    <input value={form.anio} onChange={f('anio')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Mes</label>
-                    <select value={form.mes} onChange={f('mes')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">—</option>
-                      {MESES.map(m => (
-                        <option key={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Precio Venta</label>
-                    <CurrencyInput value={form.precioVenta} onChange={f('precioVenta')} decimals={0}
-                      className="border-orange-200 focus:ring-orange-400 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Medio de Pago</label>
-                    <select value={form.medioPago} onChange={f('medioPago')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">—</option>
-                      {form.medioPago && !medioPagoOptions.includes(form.medioPago) && (
-                        <option value={form.medioPago}>{form.medioPago} (actual)</option>
-                      )}
-                      {medioPagoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
-                    <input type="number" min="1" value={form.itemQuantity} onChange={f('itemQuantity')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de Pago</label>
-                    <select value={form.tipoPago} onChange={f('tipoPago')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">—</option>
-                      <option>Renovacion</option>
-                      <option>Activacion</option>
-                      <option>Activacion Pantalla</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de Plan</label>
-                    <select value={form.tipoPlan} onChange={f('tipoPlan')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option value="">—</option>
-                      {form.tipoPlan && !tipoPlanOptions.includes(form.tipoPlan) && (
-                        <option value={form.tipoPlan}>{form.tipoPlan} (actual)</option>
-                      )}
-                      {tipoPlanOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              {/* Botones */}
-              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+              </div>
+              <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
                 <button
                   type="button"
                   onClick={closeForm}
-                  className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"
+                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 text-sm font-bold transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold shadow transition-colors"
+                  className="pg-cta px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md hover:shadow-lg"
                 >
                   {editing ? 'Guardar cambios' : 'Crear venta'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </>
       )}
     </div>
   )

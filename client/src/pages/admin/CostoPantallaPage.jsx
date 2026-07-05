@@ -14,7 +14,7 @@ import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatDate, formatCurrency, formatUSD, formatNumber } from '../../utils/excelUtils'
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList, Cell, ReferenceLine } from 'recharts'
-import { ModuleStatCard as StatCard, ChartInsight } from './dashboard/biShared'
+import { ChartInsight } from './dashboard/biShared'
 
 const MES_ORDEN = {
   ENERO: 1, FEBRERO: 2, MARZO: 3, ABRIL: 4, MAYO: 5, JUNIO: 6,
@@ -36,6 +36,71 @@ function SortIcon({ colKey, sortCol, sortDir }) {
 const fmtCOP = (v) => (v == null || v === '' ? '—' : formatCurrency(v))
 const fmtUSD = (v) => (v == null || v === '' ? '—' : formatUSD(v))
 const fmtNum = (v) => (v == null || v === '' ? '—' : formatNumber(v))
+
+const CSS = `
+  @keyframes cp-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes cp-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes cp-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  @keyframes cp-drawer-in { from { transform:translateX(100%) } to { transform:translateX(0) } }
+  @keyframes cp-fade-in { from { opacity:0 } to { opacity:1 } }
+  .cp-a1 { animation: cp-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .cp-a2 { animation: cp-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .cp-orb-1 { animation: cp-orb-1 8s ease-in-out infinite }
+  .cp-orb-2 { animation: cp-orb-2 11s ease-in-out infinite }
+  .cp-cta {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    box-shadow: 0 4px 18px rgba(249,115,22,.4);
+    transition: all .22s ease; border: none;
+  }
+  .cp-cta:hover { box-shadow: 0 7px 24px rgba(249,115,22,.55); transform: translateY(-2px) }
+  .cp-overlay { animation: cp-fade-in .2s ease both }
+  .cp-drawer { animation: cp-drawer-in .3s cubic-bezier(.22,1,.36,1) both }
+  @media (prefers-reduced-motion: reduce) {
+    .cp-a1, .cp-a2, .cp-orb-1, .cp-orb-2, .cp-overlay, .cp-drawer { animation: none !important; transition: none !important }
+  }
+`
+
+function CostoCard({ icon: Icon, label, value, sub, variant, onClick }) {
+  const isSolid = variant === 'solid'
+  const isOutline = variant === 'outline'
+  
+  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
+    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? 'bg-orange-50 border border-orange-200' : 'border border-slate-200 shadow-sm'}
+    ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50' : ''}`
+
+  const topBorder = isSolid 
+    ? 'linear-gradient(90deg, #f97316, #ea580c)'
+    : 'linear-gradient(90deg, #fdba7480, #f9731680)'
+
+  return (
+    <div className={containerClass} onClick={onClick}>
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
+      <div className="p-5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? 'text-orange-600' : 'text-slate-400'}`}>
+            {label}
+          </p>
+          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
+            {value}
+          </p>
+          {sub && (
+            <p className={`text-xs mt-2 font-medium ${isOutline ? 'text-orange-600' : 'text-slate-500'}`}>
+              {sub}
+            </p>
+          )}
+          {onClick && (
+            <div className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors">
+              <span>¿Cómo se calcula?</span>
+            </div>
+          )}
+        </div>
+        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? 'bg-orange-50 text-orange-600' : 'bg-orange-50 text-orange-600'}`}>
+          <Icon size={22} />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ─── Proyección: componentes y helpers ────────────────────────────────────────
 
@@ -614,19 +679,35 @@ export default function CostoPantallaPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-brand-accent">Costo Pantalla</h1>
-          <p className="text-gray-500">Control de costos por recarga IPTV · {stats.total.toLocaleString()} registros</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={handleImport} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-orange-200 text-orange-700 hover:bg-orange-50 text-sm font-medium transition-colors">
-            <Upload size={15} /> Importar Excel
-          </button>
-          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium transition-colors shadow">
-            <Plus size={16} /> Nuevo Registro
-          </button>
+      <style>{CSS}</style>
+
+      {/* ── HERO HEADER ── */}
+      <div className="cp-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#7c2d12 0%,#431407 100%)' }}>
+        <div className="cp-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#f97316,transparent 70%)' }} />
+        <div className="cp-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.15] pointer-events-none" style={{ background: 'radial-gradient(circle,#ea580c,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/15 border border-orange-500/25 mb-4">
+              <DollarSign size={12} className="text-orange-300" />
+              <span className="text-orange-300 text-xs font-semibold tracking-widest uppercase">Finanzas</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Costo Pantalla
+            </h1>
+            <p className="text-orange-100/70 text-sm mt-2">
+              Control de costos por recarga IPTV · {stats.total.toLocaleString()} registros
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={handleImport} className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2">
+              <Upload size={16} /> Importar Excel
+            </button>
+            <button onClick={openNew} className="cp-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
+              <Plus size={18} /> Nueva Recarga
+            </button>
+          </div>
         </div>
       </div>
 
@@ -634,36 +715,36 @@ export default function CostoPantallaPage() {
       <CpMesDetalleModal data={cpMesModal} onClose={() => setCpMesModal(null)} />
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard icon={Monitor}     label="Total Recargas"    value={stats.total.toLocaleString()}        variant="solid"   sub="Histórico completo"
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 cp-a2">
+        <CostoCard icon={Monitor}     label="Total Recargas"    value={stats.total.toLocaleString()}        variant="solid"   sub="Histórico completo"
           onClick={() => setExplain({
             title: 'Total Recargas', value: stats.total.toLocaleString(), icon: Monitor,
             queEs: 'Cuántas compras de créditos se han hecho en el histórico — cada recarga es una transacción con el proveedor de IPTV.',
             comoSeCalcula: 'Conteo simple de los registros de este módulo.',
             origen: 'Tabla de costos de pantalla de este módulo.',
           })} />
-        <StatCard icon={DollarSign}  label="Total Costo COP"   value={fmtCOP(stats.totalCostoCOP)}        variant="light"   sub="Sin impuesto 4x1000"
+        <CostoCard icon={DollarSign}  label="Total Costo COP"   value={fmtCOP(stats.totalCostoCOP)}        variant="light"   sub="Sin impuesto 4x1000"
           onClick={() => setExplain({
             title: 'Total Costo COP', value: fmtCOP(stats.totalCostoCOP), icon: DollarSign,
             queEs: 'Lo pagado en pesos por las recargas, **sin incluir** el impuesto 4x1000 de las transferencias.',
             comoSeCalcula: 'Se suma el campo **Costo COP** de cada recarga. Ojo: el Dashboard y Análisis Financiero reportan el costo **con** impuesto — esa cifra es la tarjeta "Costo Total" de al lado.',
             origen: 'Campo Costo COP de cada registro de este módulo.',
           })} />
-        <StatCard icon={DollarSign}  label="Costo Total (+4x1000)" value={fmtCOP(stats.totalConImpuesto)}  variant="outline" sub="La cifra del Dashboard"
+        <CostoCard icon={DollarSign}  label="Costo Total (+4x1000)" value={fmtCOP(stats.totalConImpuesto)}  variant="outline" sub="La cifra del Dashboard"
           onClick={() => setExplain({
             title: 'Costo Total (+4x1000)', value: fmtCOP(stats.totalConImpuesto), icon: DollarSign,
             queEs: 'El costo real completo de operar: recargas más el impuesto 4x1000 que cobra el banco por cada transferencia.',
             comoSeCalcula: '**Costo COP + impuesto 4x1000** de cada recarga, sumados. Esta es exactamente la cifra que el Dashboard muestra como "Costos históricos" y Análisis Financiero como "OPEX" — así todo coincide entre módulos.',
             origen: `Campos Costo COP (${fmtCOP(stats.totalCostoCOP)}) + Imp. 4x1000 (${fmtCOP(stats.totalImpuesto)}) de este módulo.`,
           })} />
-        <StatCard icon={TrendingUp}  label="Total Costo USD"   value={fmtUSD(stats.totalCostoUSD)}        variant="light" sub="Inversión en dólares"
+        <CostoCard icon={TrendingUp}  label="Total Costo USD"   value={fmtUSD(stats.totalCostoUSD)}        variant="light" sub="Inversión en dólares"
           onClick={() => setExplain({
             title: 'Total Costo USD', value: fmtUSD(stats.totalCostoUSD), icon: TrendingUp,
             queEs: 'Lo pagado en dólares por las recargas — el proveedor cobra en USD y la TRM del día define cuántos pesos cuesta.',
             comoSeCalcula: 'Se suma el campo **Costo USD** de cada recarga. La relación con el costo en pesos es la TRM: Costo COP ÷ Costo USD.',
             origen: 'Campo Costo USD de cada registro de este módulo.',
           })} />
-        <StatCard icon={BarChart3}   label="Total Créditos"    value={stats.totalCreditos.toLocaleString()} variant="light"  sub="Créditos comprados"
+        <CostoCard icon={BarChart3}   label="Total Créditos"    value={stats.totalCreditos.toLocaleString()} variant="light"  sub="Créditos comprados"
           onClick={() => setExplain({
             title: 'Total Créditos', value: stats.totalCreditos.toLocaleString(), icon: BarChart3,
             queEs: 'Cuántos créditos (cupos de cuenta) se han comprado en total — la "materia prima" que luego se convierte en pantallas vendibles.',
@@ -986,156 +1067,164 @@ export default function CostoPantallaPage() {
         )
       })()}
 
-      {/* Modal formulario */}
+      {/* Form Drawer (PRO MAX Drawer) */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-8">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4">
-            <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-t-2xl px-6 py-4 flex items-center justify-between">
+        <>
+          <div className="cp-overlay fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" onClick={closeForm} />
+          <div className="cp-drawer fixed inset-y-0 right-0 z-50 w-full md:w-[600px] bg-white shadow-2xl flex flex-col border-l border-slate-100">
+            {/* Header del Drawer */}
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
               <div>
-                <h2 className="text-xl font-bold text-white">
-                  {editing ? 'Editar Registro' : 'Nueva Recarga'}
-                </h2>
-                <p className="text-orange-100 text-sm">
-                  {editing ? `Editando ${editing.idRec}` : 'Complete los campos'}
+                <h2 className="text-xl font-bold text-slate-800">{editing ? 'Editar Registro' : 'Nueva Recarga'}</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  {editing ? `Editando ${editing.idRec}` : 'Complete todos los campos'}
                 </p>
               </div>
-              <button onClick={closeForm} className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors">
+              <button onClick={closeForm} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Sección: Identificación */}
-              <section>
-                <h3 className="text-sm font-semibold text-orange-600 uppercase tracking-wide mb-3 border-b border-orange-100 pb-1">
-                  Identificación
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">ID Registro</label>
-                    <input value={form.idRec} onChange={f('idRec')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm font-mono" placeholder="R39" />
+            {/* Cuerpo del Formulario */}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                
+                {/* Sección: Identificación */}
+                <section>
+                  <h3 className="text-sm font-semibold text-orange-700 flex items-center gap-2 border-b border-orange-100 pb-1 mb-4">
+                    📋 Identificación
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ID Registro</label>
+                      <input value={form.idRec} onChange={f('idRec')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm font-mono transition-all" placeholder="R39" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Acción</label>
+                      <select value={form.accion} onChange={f('accion')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white transition-all">
+                        <option>Recarga</option>
+                        <option>Compra</option>
+                        <option>Ajuste</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Créditos</label>
+                      <input type="number" value={form.creditos} onChange={f('creditos')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                      <input type="number" min="1" value={form.itemQuantity} onChange={f('itemQuantity')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Acción</label>
-                    <select value={form.accion} onChange={f('accion')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option>Recarga</option>
-                      <option>Compra</option>
-                      <option>Ajuste</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Créditos</label>
-                    <input type="number" value={form.creditos} onChange={f('creditos')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
-                    <input type="number" min="1" value={form.itemQuantity} onChange={f('itemQuantity')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              {/* Sección: Fechas */}
-              <section>
-                <h3 className="text-sm font-semibold text-orange-600 uppercase tracking-wide mb-3 border-b border-orange-100 pb-1">
-                  Fecha
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
-                    <input type="date" value={form.fecha} onChange={f('fecha')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
+                {/* Sección: Fechas */}
+                <section>
+                  <h3 className="text-sm font-semibold text-orange-700 flex items-center gap-2 border-b border-orange-100 pb-1 mb-4">
+                    📅 Fecha
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                      <input type="date" value={form.fecha} onChange={f('fecha')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Año (auto)</label>
+                      <input value={form.anio} onChange={f('anio')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-sm cursor-not-allowed" disabled />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mes (auto)</label>
+                      <input value={form.mes} onChange={f('mes')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-sm cursor-not-allowed" disabled />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Año (auto)</label>
-                    <input value={form.anio} onChange={f('anio')}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Mes (auto)</label>
-                    <input value={form.mes} onChange={f('mes')}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 text-sm" />
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              {/* Sección: Costos */}
-              <section>
-                <h3 className="text-sm font-semibold text-orange-600 uppercase tracking-wide mb-3 border-b border-orange-100 pb-1">
-                  Costos
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Costo COP</label>
-                    <CurrencyInput value={form.costoCOP} onChange={f('costoCOP')} decimals={0}
-                      className="border-orange-200 focus:ring-orange-400 text-sm" />
+                {/* Sección: Costos */}
+                <section>
+                  <h3 className="text-sm font-semibold text-orange-700 flex items-center gap-2 border-b border-orange-100 pb-1 mb-4">
+                    💰 Costos
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Costo COP</label>
+                      <CurrencyInput value={form.costoCOP} onChange={f('costoCOP')} decimals={0}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Impuesto 4x1000 COP (auto)</label>
+                      <CurrencyInput value={form.impuesto4x100COP} onChange={f('impuesto4x100COP')} decimals={0}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-sm cursor-not-allowed" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Costo USD</label>
+                      <CurrencyInput value={form.costoUSD} onChange={f('costoUSD')} decimals={2}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">TRM</label>
+                      <CurrencyInput value={form.trm} onChange={f('trm')} decimals={2} prefix=""
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cto. Unit. Cuenta USD</label>
+                      <CurrencyInput value={form.costoUnitarioCuentaUSD} onChange={f('costoUnitarioCuentaUSD')} decimals={2}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cto. Unit. Cuenta COP</label>
+                      <CurrencyInput value={form.costoUnitarioCuentaCOP} onChange={f('costoUnitarioCuentaCOP')} decimals={0}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cto. Pantalla USD</label>
+                      <CurrencyInput value={form.costoPantallaUSD} onChange={f('costoPantallaUSD')} decimals={2}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cto. Pantalla COP</label>
+                      <CurrencyInput value={form.costoPantallaCOP} onChange={f('costoPantallaCOP')} decimals={0}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm transition-all" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
+                      <select value={form.medioPago} onChange={f('medioPago')}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white transition-all">
+                        <option>Nequi</option>
+                        <option>Bancolombia</option>
+                        <option>Daviplata</option>
+                        <option>Efectivo</option>
+                        <option>Otro</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Impuesto 4x1000 COP (auto)</label>
-                    <CurrencyInput value={form.impuesto4x100COP} onChange={f('impuesto4x100COP')} decimals={0}
-                      className="border-gray-200 bg-gray-50 text-gray-500 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Costo USD</label>
-                    <CurrencyInput value={form.costoUSD} onChange={f('costoUSD')} decimals={2}
-                      className="border-orange-200 focus:ring-orange-400 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">TRM</label>
-                    <CurrencyInput value={form.trm} onChange={f('trm')} decimals={2} prefix=""
-                      className="border-orange-200 focus:ring-orange-400 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cto. Unit. Cuenta USD</label>
-                    <CurrencyInput value={form.costoUnitarioCuentaUSD} onChange={f('costoUnitarioCuentaUSD')} decimals={2}
-                      className="border-orange-200 focus:ring-orange-400 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cto. Unit. Cuenta COP</label>
-                    <CurrencyInput value={form.costoUnitarioCuentaCOP} onChange={f('costoUnitarioCuentaCOP')} decimals={0}
-                      className="border-orange-200 focus:ring-orange-400 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cto. Pantalla USD</label>
-                    <CurrencyInput value={form.costoPantallaUSD} onChange={f('costoPantallaUSD')} decimals={2}
-                      className="border-orange-200 focus:ring-orange-400 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Cto. Pantalla COP</label>
-                    <CurrencyInput value={form.costoPantallaCOP} onChange={f('costoPantallaCOP')} decimals={0}
-                      className="border-orange-200 focus:ring-orange-400 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Medio de Pago</label>
-                    <select value={form.medioPago} onChange={f('medioPago')}
-                      className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                      <option>Nequi</option>
-                      <option>Bancolombia</option>
-                      <option>Daviplata</option>
-                      <option>Efectivo</option>
-                      <option>Otro</option>
-                    </select>
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              {/* Botones */}
-              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-                <button type="button" onClick={closeForm}
-                  className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors">
+              </div>
+              <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={closeForm}
+                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 text-sm font-bold transition-colors"
+                >
                   Cancelar
                 </button>
-                <button type="submit"
-                  className="px-6 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold shadow transition-colors">
+                <button
+                  type="submit"
+                  className="cp-cta px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md hover:shadow-lg"
+                >
                   {editing ? 'Guardar cambios' : 'Crear registro'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </>
       )}
     </div>
   )

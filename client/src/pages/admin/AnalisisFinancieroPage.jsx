@@ -35,39 +35,61 @@ const fmtM = (v) => {
 
 const tooltipMoney = (value, name) => [formatCurrency(value), name]
 
+const CSS = `
+  @keyframes fin-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes fin-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes fin-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  .fin-a1 { animation: fin-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .fin-a2 { animation: fin-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .fin-a3 { animation: fin-fade-up .45s cubic-bezier(.22,1,.36,1) .12s both }
+  .fin-orb-1 { animation: fin-orb-1 8s ease-in-out infinite }
+  .fin-orb-2 { animation: fin-orb-2 11s ease-in-out infinite }
+  .fin-kpi { transition: transform .25s ease, box-shadow .25s ease }
+  .fin-kpi:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.12) }
+  @media (prefers-reduced-motion: reduce) {
+    .fin-a1, .fin-a2, .fin-a3, .fin-orb-1, .fin-orb-2 { animation: none !important; transition: none !important }
+  }
+`
+
 // ─── KPI card (con clic → modal explicativo) ────────────────────────────────
 
 function KpiCard({ icon: Icon, label, value, sub, tone = 'neutral', onClick }) {
-  const tones = {
-    positive: 'border-green-200 bg-green-50/50',
-    negative: 'border-red-200 bg-red-50/50',
-    neutral:  'border-ui-border bg-white',
-    accent:   'border-orange-200 bg-orange-50/50',
-  }
-  const iconTones = {
-    positive: 'bg-green-100 text-green-600',
-    negative: 'bg-red-100 text-red-600',
-    neutral:  'bg-slate-100 text-slate-600',
-    accent:   'bg-orange-100 text-orange-600',
-  }
   const interactive = typeof onClick === 'function'
+  
+  let grad = 'linear-gradient(135deg, #94a3b8, #64748b)'
+  let lightGrad = 'linear-gradient(135deg, #f8fafc, #f1f5f9)'
+  let iconCol = '#64748b'
+
+  if (tone === 'positive') { grad = 'linear-gradient(135deg, #10b981, #059669)'; lightGrad = 'rgba(16,185,129,0.1)'; iconCol = '#10b981' }
+  else if (tone === 'negative') { grad = 'linear-gradient(135deg, #ef4444, #dc2626)'; lightGrad = 'rgba(239,68,68,0.1)'; iconCol = '#ef4444' }
+  else if (tone === 'accent') { grad = 'linear-gradient(135deg, #f97316, #ea580c)'; lightGrad = 'rgba(249,115,22,0.1)'; iconCol = '#ea580c' }
+
   return (
     <div
-      className={cn('rounded-xl border p-4 shadow-card', tones[tone], interactive && 'cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg')}
+      onClick={onClick}
+      className={cn(
+        'relative bg-white rounded-2xl border border-slate-200 overflow-hidden select-none',
+        interactive ? 'cursor-pointer fin-kpi' : ''
+      )}
       {...(interactive ? {
-        role: 'button', tabIndex: 0, onClick,
+        role: 'button', tabIndex: 0,
         onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
       } : {})}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: grad }} />
+      <div className="p-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
-          <p className="text-2xl font-bold text-brand-accent mt-1 tabular-nums truncate">{value}</p>
-          {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-          {interactive && <p className="text-xs font-semibold text-brand-primary mt-1.5">¿Cómo se calcula?</p>}
+          <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{label}</p>
+          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none truncate">{value}</p>
+          {sub && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{sub}</p>}
+          {interactive && (
+            <p className="text-[11px] font-bold text-emerald-500 mt-3 inline-flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity">
+              <Lightbulb size={12} /> ¿Cómo se calcula?
+            </p>
+          )}
         </div>
-        <div className={cn('rounded-lg p-2 flex-shrink-0', iconTones[tone])}>
-          <Icon size={18} />
+        <div className="p-2.5 rounded-xl shrink-0" style={{ background: lightGrad }}>
+          <Icon size={20} style={{ color: iconCol }} />
         </div>
       </div>
     </div>
@@ -175,15 +197,15 @@ function TabBtn({ active, onClick, icon: Icon, label, sub }) {
     <button
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-semibold transition-all border',
+        'flex items-center gap-2.5 px-6 py-3 rounded-xl text-sm font-bold transition-all',
         active
-          ? 'bg-orange-500 text-white border-orange-500 shadow-md'
-          : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:text-orange-600'
+          ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400'
+          : 'bg-white text-slate-500 border border-slate-200 hover:border-emerald-300 hover:text-emerald-600'
       )}
     >
       <Icon size={18} />
       <span>{label}</span>
-      {sub && <span className={cn('text-xs rounded-full px-2 py-0.5', active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500')}>{sub}</span>}
+      {sub && <span className={cn('text-[10px] font-bold uppercase tracking-wider rounded-md px-2 py-1', active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500')}>{sub}</span>}
     </button>
   )
 }
@@ -298,19 +320,32 @@ export default function AnalisisFinancieroPage() {
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
       {showArpuPanel && <IngresoPorClientePanel onClose={() => setShowArpuPanel(false)} />}
 
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl p-2.5 shadow-md">
-          <Landmark size={22} className="text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-brand-accent">Análisis Financiero</h1>
-          <p className="text-sm text-gray-500">EBITDA, rentabilidad, MRR y LTV — todos los valores en pesos colombianos (COP)</p>
+      <style>{CSS}</style>
+
+      {/* ── HERO HEADER ── */}
+      <div className="fin-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#022c22 0%,#064e3b 100%)' }}>
+        <div className="fin-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.25] pointer-events-none" style={{ background: 'radial-gradient(circle,#10b981,transparent 70%)' }} />
+        <div className="fin-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#34d399,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 mb-4">
+              <Landmark size={12} className="text-emerald-300" />
+              <span className="text-emerald-300 text-xs font-semibold tracking-widest uppercase">Análisis Financiero</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Rendimiento y EBITDA
+            </h1>
+            <p className="text-emerald-100/70 text-sm mt-2 max-w-xl">
+              EBITDA, rentabilidad, MRR y LTV — todos los valores en pesos colombianos (COP)
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-3 flex-wrap fin-a2">
         <TabBtn
           active={tab === 'licencias'}
           onClick={() => setTab('licencias')}
@@ -334,9 +369,9 @@ export default function AnalisisFinancieroPage() {
         <div className="space-y-8">
 
           {/* ─── EBITDA: KPIs fila 1 ──────────────────────────────────────── */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 mb-3 flex items-center gap-1.5">
-              <Tv size={13} /> Ingresos de licencias/suscripciones · OPEX excluido de equipos
+          <div className="fin-a2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 mb-3 flex items-center gap-1.5">
+              <Tv size={14} /> Ingresos de licencias/suscripciones · OPEX excluido de equipos
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
@@ -394,7 +429,7 @@ export default function AnalisisFinancieroPage() {
           </div>
 
           {/* ─── EBITDA: KPIs fila 2 ──────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 fin-a3">
             <KpiCard
               icon={Activity} label="EBITDA licencias · LTM" tone={kpisLicencias.ltm.ebitda >= 0 ? 'positive' : 'negative'}
               value={fmtM(kpisLicencias.ltm.ebitda)}

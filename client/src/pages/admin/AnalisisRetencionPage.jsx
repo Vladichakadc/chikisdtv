@@ -12,6 +12,22 @@ import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { formatCurrency } from '../../utils/excelUtils'
 
+const CSS = `
+  @keyframes ret-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes ret-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes ret-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  .ret-a1 { animation: ret-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .ret-a2 { animation: ret-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .ret-a3 { animation: ret-fade-up .45s cubic-bezier(.22,1,.36,1) .12s both }
+  .ret-orb-1 { animation: ret-orb-1 8s ease-in-out infinite }
+  .ret-orb-2 { animation: ret-orb-2 11s ease-in-out infinite }
+  .ret-kpi { transition: transform .25s ease, box-shadow .25s ease }
+  .ret-kpi:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.12) }
+  @media (prefers-reduced-motion: reduce) {
+    .ret-a1, .ret-a2, .ret-a3, .ret-orb-1, .ret-orb-2 { animation: none !important; transition: none !important }
+  }
+`
+
 // ─── Helpers de UI ────────────────────────────────────────────────────────────
 
 function SmartTag({ tone = 'info', icon: Icon = Sparkles, children }) {
@@ -347,16 +363,27 @@ export default function AnalisisRetencionPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Encabezado */}
-      <div className="flex items-center gap-4">
-        <div className="bg-gradient-to-br from-violet-500 to-violet-700 rounded-xl p-3 shadow-lg">
-          <GitMerge size={26} className="text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-brand-accent">Análisis de Retención</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            ¿Qué porcentaje de los clientes activados en cada mes sigue generando transacciones en los meses siguientes?
-          </p>
+      <style>{CSS}</style>
+
+      {/* ── HERO HEADER ── */}
+      <div className="ret-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)' }}>
+        <div className="ret-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.25] pointer-events-none" style={{ background: 'radial-gradient(circle,#a855f7,transparent 70%)' }} />
+        <div className="ret-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#8b5cf6,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/15 border border-violet-500/25 mb-4">
+              <GitMerge size={12} className="text-violet-300" />
+              <span className="text-violet-300 text-xs font-semibold tracking-widest uppercase">Análisis</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Análisis de Retención
+            </h1>
+            <p className="text-violet-100/70 text-sm mt-2 max-w-xl">
+              ¿Qué porcentaje de los clientes activados en cada mes sigue generando transacciones en los meses siguientes?
+            </p>
+          </div>
         </div>
       </div>
 
@@ -377,7 +404,7 @@ export default function AnalisisRetencionPage() {
           <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
           {/* KPIs de retención — transaccional vs ajustado por plan */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 ret-a2">
             {[
               { n: 'mes1', Icon: Users,      label: 'Retención · Mes 1',  sub: 'Primera renovación', tag: tagMes1, desc: 'De cada 100 clientes activados, cuántos generan una 2ª transacción al mes siguiente. Clientes en plan semestral/anual pueden aparecer como "no retenidos" aunque estén activos.' },
               { n: 'mes3', Icon: Repeat,     label: 'Retención · Mes 3',  sub: 'Punto de estabilización', tag: tagMes3, desc: 'Cuántos siguen con actividad a los 3 meses. Separa clientes de paso de los recurrentes.' },
@@ -388,28 +415,35 @@ export default function AnalisisRetencionPage() {
               const vAj = data.resumenAjustado?.[n]
               const brecha = vAj != null && vTx != null ? vAj - vTx : null
               return (
-                <div key={n} className="bg-white border-2 border-violet-100 rounded-xl p-4 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 cursor-pointer"
+                <div key={n} className="relative bg-white rounded-2xl border border-slate-200 overflow-hidden select-none cursor-pointer ret-kpi"
                   onClick={() => setExplain({ title: label, value: vTx != null ? `${vTx}%` : '—', icon: Icon,
                     queEs: desc,
                     comoSeCalcula: 'Cada cliente entra a la cohorte del mes de su primera "Activacion Pantalla". Se mide si tuvo alguna transacción (excl. cortesías) en el mes N. **Ajustado**: los planes semestrales se marcan como activos 7 meses, los anuales 14 meses.',
                     origen: 'Ventas del módulo Pagos agrupadas por cohorte de primera activación.',
                   })}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-violet-100 rounded-lg p-1.5"><Icon size={16} className="text-violet-600" /></div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+                  <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: 'linear-gradient(135deg, #a855f7, #7e22ce)' }} />
+                  <div className="p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="bg-violet-500/10 rounded-lg p-2"><Icon size={18} className="text-violet-600" /></div>
+                      <p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-400">{label}</p>
+                    </div>
+                    <div className="flex items-end gap-2 mb-1.5">
+                      <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none">{vAj != null ? `${vAj}%` : '—'}</p>
+                      {brecha != null && brecha > 0 && (
+                        <span className="text-xs text-slate-400 font-medium">({vTx}% tx)</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-3">
+                      {brecha != null && brecha > 0 && (
+                        <SmartTag tone="info">+{brecha}pp ajustado por plan</SmartTag>
+                      )}
+                      {tag && <div>{(() => { const t = tag(vTx); return t ? <SmartTag tone={t.tone}>{t.text}</SmartTag> : null })()}</div>}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-3 leading-relaxed">{sub}</p>
+                    <p className="text-[11px] font-bold text-violet-500 mt-3 inline-flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity">
+                      <Lightbulb size={12} /> ¿Cómo se calcula?
+                    </p>
                   </div>
-                  <div className="flex items-end gap-2 mb-1">
-                    <p className="text-2xl font-bold text-violet-700">{vAj != null ? `${vAj}%` : '—'}</p>
-                    {brecha != null && brecha > 0 && (
-                      <span className="text-xs text-gray-400 mb-0.5">({vTx}% tx)</span>
-                    )}
-                  </div>
-                  {brecha != null && brecha > 0 && (
-                    <SmartTag tone="info">+{brecha}pp ajustado por plan</SmartTag>
-                  )}
-                  {tag && <div className="mt-1.5">{(() => { const t = tag(vTx); return t ? <SmartTag tone={t.tone}>{t.text}</SmartTag> : null })()}</div>}
-                  <p className="text-xs text-gray-400 mt-1.5 leading-snug">{sub}</p>
-                  <p className="text-xs font-semibold text-violet-500 mt-1.5">¿Cómo se calcula?</p>
                 </div>
               )
             })}
@@ -417,7 +451,7 @@ export default function AnalisisRetencionPage() {
 
           {/* Distribución de planes */}
           {data.distribucionPlanes?.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 ret-a3">
               <Card className="border-violet-100 lg:col-span-2">
                 <CardHeader className="border-violet-50">
                   <CardTitle>Curva promedio de retención por mes de vida</CardTitle>

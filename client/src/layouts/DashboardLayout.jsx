@@ -4,20 +4,61 @@ import { useState, useEffect, Suspense } from 'react'
 import { cn } from '../utils/cn'
 
 const navItems = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { 
+    to: '/admin', 
+    label: 'Dashboard', 
+    icon: LayoutDashboard, 
+    end: true,
+    subItems: [
+      { to: '/admin/analisis-financiero', label: 'Análisis Financiero', icon: Landmark },
+      { to: '/admin/retencion', label: 'Análisis Retención', icon: GitMerge }
+    ]
+  },
   { to: '/admin/planificador', label: 'Planificador', icon: CalendarClock },
-  { to: '/admin/clients', label: 'Clientes', icon: Users },
+  { to: '/admin/cuentas-padre', label: 'Cuentas Padre', icon: KeyRound },
+  { 
+    to: '/admin/clients', 
+    label: 'Clientes', 
+    icon: Users,
+    subItems: [
+      { to: '/admin/analisis-clientes', label: 'Análisis Demográfico', icon: Users }
+    ]
+  },
   { to: '/admin/plans', label: 'Planes', icon: Package },
   { to: '/admin/subscriptions', label: 'Suscripciones', icon: FileText },
-  { to: '/admin/payments', label: 'Pagos', icon: CreditCard },
+  { 
+    to: '/admin/payments', 
+    label: 'Pagos', 
+    icon: CreditCard,
+    subItems: [
+      { to: '/admin/analisis-pagos', label: 'Análisis de Pagos', icon: Landmark }
+    ]
+  },
   { to: '/admin/costo-pantalla', label: 'Costo Pantalla', icon: Monitor },
-  { to: '/admin/ventas-dispositivos', label: 'Venta Dispositivos', icon: Tv },
-  { to: '/admin/devices', label: 'Inventario Equipos', icon: Tv },
-  { to: '/admin/bajas', label: 'Bajas', icon: UserX },
-  { to: '/admin/cuentas-padre', label: 'Cuentas Padre', icon: KeyRound },
-  { to: '/admin/retencion', label: 'Análisis Retención', icon: GitMerge },
-  { to: '/admin/analisis-financiero', label: 'Análisis Financiero', icon: Landmark },
-  { to: '/admin/analisis-dispositivos', label: 'Análisis Dispositivos', icon: Tv },
+  { 
+    to: '/admin/ventas-dispositivos', 
+    label: 'Venta Dispositivos', 
+    icon: Tv,
+    subItems: [
+      { to: '/admin/analisis-dispositivos', label: 'Análisis Dispositivos', icon: Tv }
+    ]
+  },
+  { 
+    to: '/admin/devices', 
+    label: 'Inventario Equipos', 
+    icon: Tv,
+    subItems: [
+      { to: '/admin/analisis-inventario', label: 'Análisis Inventario', icon: Tv }
+    ]
+  },
+  { 
+    to: '/admin/bajas', 
+    label: 'Bajas', 
+    icon: UserX,
+    subItems: [
+      { to: '/admin/analisis-bajas', label: 'Análisis de Bajas', icon: UserX }
+    ]
+  },
 ]
 
 export default function DashboardLayout() {
@@ -98,22 +139,50 @@ export default function DashboardLayout() {
           {navItems.map((item) => {
             const Icon = item.icon
             return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 px-4 py-3 md:py-2.5 min-h-[44px] md:min-h-0 transition-colors touch-manipulation active:bg-slate-600',
-                    isActive
-                      ? 'bg-brand-primary text-white border-l-4 border-white'
-                      : 'text-slate-300 hover:bg-slate-700 border-l-4 border-transparent'
-                  )
-                }
-              >
-                <Icon size={18} className="flex-shrink-0" />
-                {showLabels && <span className="font-medium">{item.label}</span>}
-              </NavLink>
+              <div key={item.to}>
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) => {
+                    const isSubActive = item.subItems?.some(sub => location.pathname === sub.to)
+                    return cn(
+                      'flex items-center gap-3 px-4 py-3 md:py-2.5 min-h-[44px] md:min-h-0 transition-colors touch-manipulation active:bg-slate-600',
+                      isActive || isSubActive
+                        ? 'bg-brand-primary text-white border-l-4 border-white'
+                        : 'text-slate-300 hover:bg-slate-700 border-l-4 border-transparent'
+                    )
+                  }}
+                >
+                  <Icon size={18} className="flex-shrink-0" />
+                  {showLabels && <span className="font-medium">{item.label}</span>}
+                </NavLink>
+
+                {item.subItems && showLabels && (
+                  <div className="flex flex-col bg-slate-800/40">
+                    {item.subItems.map(sub => {
+                      const SubIcon = sub.icon
+                      return (
+                        <NavLink
+                          key={sub.to}
+                          to={sub.to}
+                          end={sub.end}
+                          className={({ isActive }) =>
+                            cn(
+                              'flex items-center gap-3 pl-11 pr-4 py-2 min-h-[40px] transition-colors text-sm',
+                              isActive
+                                ? 'text-brand-primary bg-slate-800 border-l-4 border-brand-primary'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-700 border-l-4 border-transparent'
+                            )
+                          }
+                        >
+                          <SubIcon size={14} className="flex-shrink-0" />
+                          <span className="font-medium">{sub.label}</span>
+                        </NavLink>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             )
           })}
         </nav>
