@@ -38,64 +38,104 @@ const fmtUSD = (v) => (v == null || v === '' ? '—' : formatUSD(v))
 const fmtNum = (v) => (v == null || v === '' ? '—' : formatNumber(v))
 
 const CSS = `
-  @keyframes cp-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
-  @keyframes cp-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
-  @keyframes cp-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
-  @keyframes cp-drawer-in { from { transform:translateX(100%) } to { transform:translateX(0) } }
-  @keyframes cp-fade-in { from { opacity:0 } to { opacity:1 } }
-  .cp-a1 { animation: cp-fade-up .45s cubic-bezier(.22,1,.36,1) both }
-  .cp-a2 { animation: cp-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
-  .cp-orb-1 { animation: cp-orb-1 8s ease-in-out infinite }
-  .cp-orb-2 { animation: cp-orb-2 11s ease-in-out infinite }
-  .cp-cta {
-    background: linear-gradient(135deg, #f97316, #ea580c);
-    box-shadow: 0 4px 18px rgba(249,115,22,.4);
-    transition: all .22s ease; border: none;
+  @keyframes iv-fade-up  { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes iv-fade-in  { from { opacity:0 } to { opacity:1 } }
+  @keyframes iv-scale-in { from { opacity:0; transform:scale(.94) translateY(10px) } to { opacity:1; transform:scale(1) translateY(0) } }
+  @keyframes iv-slide-in { from { opacity:0; transform:translateX(100%) } to { opacity:1; transform:translateX(0) } }
+  @keyframes iv-shimmer  { from { background-position:-200% 0 } to { background-position:200% 0 } }
+  @keyframes iv-orb-1    { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes iv-orb-2    { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+
+  .iv-a1 { animation: iv-fade-up .45s cubic-bezier(.22,1,.36,1) both }
+  .iv-a2 { animation: iv-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
+  .iv-a3 { animation: iv-fade-up .45s cubic-bezier(.22,1,.36,1) .12s both }
+  .iv-a4 { animation: iv-fade-up .45s cubic-bezier(.22,1,.36,1) .18s both }
+  .iv-a5 { animation: iv-fade-up .45s cubic-bezier(.22,1,.36,1) .24s both }
+
+  .iv-skeleton {
+    background: linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: iv-shimmer 1.6s infinite;
+    border-radius: 6px;
   }
-  .cp-cta:hover { box-shadow: 0 7px 24px rgba(249,115,22,.55); transform: translateY(-2px) }
-  .cp-overlay { animation: cp-fade-in .2s ease both }
-  .cp-drawer { animation: cp-drawer-in .3s cubic-bezier(.22,1,.36,1) both }
+  .iv-drawer  { animation: iv-slide-in .3s cubic-bezier(.22,1,.36,1) both }
+  .iv-overlay { animation: iv-fade-in .2s ease both }
+  .iv-confirm { animation: iv-scale-in .22s cubic-bezier(.22,1,.36,1) both }
+
+  .iv-kpi { transition: transform .25s ease, box-shadow .25s ease }
+  .iv-kpi:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.12) }
+  .iv-kpi.clickable { cursor: pointer }
+
+  .iv-cta {
+    background: linear-gradient(135deg,#f97316,#ea580c);
+    box-shadow: 0 4px 18px rgba(249,115,22,.4);
+    transition: all .22s ease;
+  }
+  .iv-cta:hover  { box-shadow: 0 7px 24px rgba(249,115,22,.55); transform: translateY(-2px) }
+  .iv-cta:active { transform: translateY(0) }
+
+  .iv-btn-ghost {
+    transition: all .2s ease;
+    border: 1px solid rgba(255,255,255,.2);
+  }
+  .iv-btn-ghost:hover { background: rgba(255,255,255,.1) }
+
+  .iv-btn-danger {
+    background: linear-gradient(135deg,#ef4444,#f87171);
+    box-shadow: 0 4px 14px rgba(239,68,68,.3);
+    transition: all .2s ease;
+  }
+  .iv-btn-danger:hover { box-shadow: 0 6px 20px rgba(239,68,68,.45); transform: translateY(-1px) }
+
+  .iv-orb-1 { animation: iv-orb-1 8s ease-in-out infinite }
+  .iv-orb-2 { animation: iv-orb-2 11s ease-in-out infinite }
+
+  .iv-search:focus { outline: none; box-shadow: 0 0 0 3px rgba(249,115,22,.18) }
+
+  .iv-row { transition: background .15s ease }
+  .iv-row:hover td { background: rgba(249,115,22,.04) }
+
+  .iv-th-sort { transition: background .15s ease }
+  .iv-th-sort:hover { background: rgba(255,255,255,.12) }
+
+  .iv-action-btn { transition: all .18s ease; opacity: 0 }
+  tr:hover .iv-action-btn { opacity: 1 }
+  .iv-action-btn:hover { transform: scale(1.15) }
+
   @media (prefers-reduced-motion: reduce) {
-    .cp-a1, .cp-a2, .cp-orb-1, .cp-orb-2, .cp-overlay, .cp-drawer { animation: none !important; transition: none !important }
+    .iv-a1,.iv-a2,.iv-a3,.iv-a4,.iv-a5,
+    .iv-drawer,.iv-overlay,.iv-confirm,
+    .iv-orb-1,.iv-orb-2,.iv-skeleton { animation: none !important; transition: none !important }
   }
 `
 
-function CostoCard({ icon: Icon, label, value, sub, variant, onClick }) {
-  const isSolid = variant === 'solid'
-  const isOutline = variant === 'outline'
-  
-  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
-    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? 'bg-orange-50 border border-orange-200' : 'border border-slate-200 shadow-sm'}
-    ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50' : ''}`
-
-  const topBorder = isSolid 
-    ? 'linear-gradient(90deg, #f97316, #ea580c)'
-    : 'linear-gradient(90deg, #fdba7480, #f9731680)'
-
+function KpiCard({ icon: Icon, label, value, sub, loading, gradFrom, gradTo, delay, onClick, explainLabel }) {
   return (
-    <div className={containerClass} onClick={onClick}>
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
+    <div
+      className={`iv-kpi iv-a${delay} relative bg-white rounded-2xl border border-slate-200
+                  overflow-hidden select-none ${onClick ? 'clickable' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick() } : undefined}
+    >
+      <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl"
+           style={{ background: `linear-gradient(90deg,${gradFrom},${gradTo})` }} />
       <div className="p-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? 'text-orange-600' : 'text-slate-400'}`}>
-            {label}
-          </p>
-          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
-            {value}
-          </p>
-          {sub && (
-            <p className={`text-xs mt-2 font-medium ${isOutline ? 'text-orange-600' : 'text-slate-500'}`}>
-              {sub}
-            </p>
-          )}
-          {onClick && (
-            <div className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors">
-              <span>¿Cómo se calcula?</span>
-            </div>
+          <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{label}</p>
+          {loading
+            ? <div className="iv-skeleton h-8 w-16 mt-1" />
+            : <p className="text-3xl font-bold text-slate-800 tabular-nums leading-none">{value}</p>
+          }
+          {sub && !loading && <p className="text-xs text-slate-400 mt-1.5">{sub}</p>}
+          {onClick && !loading && (
+            <p className="text-[10px] font-semibold text-orange-500 mt-2">¿Cómo se calcula? →</p>
           )}
         </div>
-        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? 'bg-orange-50 text-orange-600' : 'bg-orange-50 text-orange-600'}`}>
-          <Icon size={22} />
+        <div className="p-2.5 rounded-xl shrink-0"
+             style={{ background: `linear-gradient(135deg,${gradFrom}20,${gradTo}30)` }}>
+          <Icon size={20} style={{ color: gradFrom }} />
         </div>
       </div>
     </div>
@@ -682,9 +722,9 @@ export default function CostoPantallaPage() {
       <style>{CSS}</style>
 
       {/* ── HERO HEADER ── */}
-      <div className="cp-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#7c2d12 0%,#431407 100%)' }}>
-        <div className="cp-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#f97316,transparent 70%)' }} />
-        <div className="cp-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.15] pointer-events-none" style={{ background: 'radial-gradient(circle,#ea580c,transparent 70%)' }} />
+      <div className="iv-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#7c2d12 0%,#431407 100%)' }}>
+        <div className="iv-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#f97316,transparent 70%)' }} />
+        <div className="iv-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.15] pointer-events-none" style={{ background: 'radial-gradient(circle,#ea580c,transparent 70%)' }} />
         <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
 
         <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
@@ -704,7 +744,7 @@ export default function CostoPantallaPage() {
             <button onClick={handleImport} className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2">
               <Upload size={16} /> Importar Excel
             </button>
-            <button onClick={openNew} className="cp-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
+            <button onClick={openNew} className="iv-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
               <Plus size={18} /> Nueva Recarga
             </button>
           </div>
@@ -715,36 +755,36 @@ export default function CostoPantallaPage() {
       <CpMesDetalleModal data={cpMesModal} onClose={() => setCpMesModal(null)} />
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 cp-a2">
-        <CostoCard icon={Monitor}     label="Total Recargas"    value={stats.total.toLocaleString()}        variant="solid"   sub="Histórico completo"
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 iv-a2">
+        <KpiCard icon={Monitor}     label="Total Recargas"    value={stats.total.toLocaleString()}   loading={loading} gradFrom="#f97316" gradTo="#fb923c" delay={2} sub="Histórico completo"
           onClick={() => setExplain({
             title: 'Total Recargas', value: stats.total.toLocaleString(), icon: Monitor,
             queEs: 'Cuántas compras de créditos se han hecho en el histórico — cada recarga es una transacción con el proveedor de IPTV.',
             comoSeCalcula: 'Conteo simple de los registros de este módulo.',
             origen: 'Tabla de costos de pantalla de este módulo.',
           })} />
-        <CostoCard icon={DollarSign}  label="Total Costo COP"   value={fmtCOP(stats.totalCostoCOP)}        variant="light"   sub="Sin impuesto 4x1000"
+        <KpiCard icon={DollarSign}  label="Total Costo COP"   value={fmtCOP(stats.totalCostoCOP)}   loading={loading} gradFrom="#10b981" gradTo="#34d399" delay={3} sub="Sin impuesto 4x1000"
           onClick={() => setExplain({
             title: 'Total Costo COP', value: fmtCOP(stats.totalCostoCOP), icon: DollarSign,
             queEs: 'Lo pagado en pesos por las recargas, **sin incluir** el impuesto 4x1000 de las transferencias.',
             comoSeCalcula: 'Se suma el campo **Costo COP** de cada recarga. Ojo: el Dashboard y Análisis Financiero reportan el costo **con** impuesto — esa cifra es la tarjeta "Costo Total" de al lado.',
             origen: 'Campo Costo COP de cada registro de este módulo.',
           })} />
-        <CostoCard icon={DollarSign}  label="Costo Total (+4x1000)" value={fmtCOP(stats.totalConImpuesto)}  variant="outline" sub="La cifra del Dashboard"
+        <KpiCard icon={DollarSign}  label="Costo Total (+4x1000)" value={fmtCOP(stats.totalConImpuesto)} loading={loading} gradFrom="#6366f1" gradTo="#818cf8" delay={4} sub="La cifra del Dashboard"
           onClick={() => setExplain({
             title: 'Costo Total (+4x1000)', value: fmtCOP(stats.totalConImpuesto), icon: DollarSign,
             queEs: 'El costo real completo de operar: recargas más el impuesto 4x1000 que cobra el banco por cada transferencia.',
             comoSeCalcula: '**Costo COP + impuesto 4x1000** de cada recarga, sumados. Esta es exactamente la cifra que el Dashboard muestra como "Costos históricos" y Análisis Financiero como "OPEX" — así todo coincide entre módulos.',
             origen: `Campos Costo COP (${fmtCOP(stats.totalCostoCOP)}) + Imp. 4x1000 (${fmtCOP(stats.totalImpuesto)}) de este módulo.`,
           })} />
-        <CostoCard icon={TrendingUp}  label="Total Costo USD"   value={fmtUSD(stats.totalCostoUSD)}        variant="light" sub="Inversión en dólares"
+        <KpiCard icon={TrendingUp}  label="Total Costo USD"   value={fmtUSD(stats.totalCostoUSD)}   loading={loading} gradFrom="#8b5cf6" gradTo="#a78bfa" delay={5} sub="Inversión en dólares"
           onClick={() => setExplain({
             title: 'Total Costo USD', value: fmtUSD(stats.totalCostoUSD), icon: TrendingUp,
             queEs: 'Lo pagado en dólares por las recargas — el proveedor cobra en USD y la TRM del día define cuántos pesos cuesta.',
             comoSeCalcula: 'Se suma el campo **Costo USD** de cada recarga. La relación con el costo en pesos es la TRM: Costo COP ÷ Costo USD.',
             origen: 'Campo Costo USD de cada registro de este módulo.',
           })} />
-        <CostoCard icon={BarChart3}   label="Total Créditos"    value={stats.totalCreditos.toLocaleString()} variant="light"  sub="Créditos comprados"
+        <KpiCard icon={BarChart3}   label="Total Créditos"    value={stats.totalCreditos.toLocaleString()} loading={loading} gradFrom="#f59e0b" gradTo="#fbbf24" delay={6} sub="Créditos comprados"
           onClick={() => setExplain({
             title: 'Total Créditos', value: stats.totalCreditos.toLocaleString(), icon: BarChart3,
             queEs: 'Cuántos créditos (cupos de cuenta) se han comprado en total — la "materia prima" que luego se convierte en pantallas vendibles.',
@@ -753,82 +793,88 @@ export default function CostoPantallaPage() {
           })} />
       </div>
 
-      {/* Búsqueda */}
-      <div className="mb-4">
-        <div className="relative max-w-md">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por ID, acción, mes, año, medio pago…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-orange-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none transition-all"
-          />
+      {/* ── SEARCH + TABLE ── */}
+      <div className="iv-a4">
+        {/* Search bar */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input type="search" placeholder="Buscar por ID, acción, mes, año, medio pago…"
+              value={search} onChange={e => setSearch(e.target.value)}
+              className="iv-search w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200
+                         bg-white text-sm text-slate-700 placeholder:text-slate-400 transition-shadow" />
+          </div>
+          {!loading && (
+            <span className="text-xs text-slate-400 whitespace-nowrap">
+              {filtered.length.toLocaleString()} de {rows.length.toLocaleString()} registros
+            </span>
+          )}
+        </div>
+
+        {/* Table card */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
+          {loading
+            ? (
+              <div className="divide-y divide-slate-100">
+                {[...Array(7)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 px-6 py-3.5 animate-pulse">
+                    <div className="iv-skeleton w-16 h-3.5 rounded" />
+                    <div className="iv-skeleton w-20 h-3.5 rounded" />
+                    <div className="flex-1 iv-skeleton h-3.5 rounded" />
+                  </div>
+                ))}
+              </div>
+            )
+            : error
+              ? (
+                <div className="py-16 text-center">
+                  <p className="text-red-500 text-sm">{error}</p>
+                </div>
+              )
+              : (
+                <>
+                  <div className="overflow-auto max-h-[36rem] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5
+                                  [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full
+                                  [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300">
+                    <table className="w-full text-sm border-separate border-spacing-0">
+                      <thead>
+                        <tr className="text-left text-slate-500 text-xs uppercase tracking-wider bg-slate-50">
+                          {COLS.map(col => (
+                            <th key={col.key} onClick={() => handleSort(col.key)}
+                                className={`sticky top-0 z-10 bg-slate-50 px-4 py-3 font-semibold whitespace-nowrap
+                                          border-b border-slate-200 backdrop-blur-sm
+                                          ${col.key !== 'acciones' ? 'cursor-pointer iv-th-sort' : ''}`}>
+                              {col.key !== 'acciones' ? (
+                                <div className="flex items-center gap-1.5">
+                                  {col.label}
+                                  <SortIcon colKey={col.key} sortCol={sortCol} sortDir={sortDir} />
+                                </div>
+                              ) : null}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filtered.length === 0 ? (
+                          <tr><td colSpan={COLS.length} className="px-4 py-16 text-center text-slate-400">No se encontraron registros.</td></tr>
+                        ) : (
+                          filtered.map(row => (
+                            <tr key={row.id} className="iv-row bg-white hover:bg-slate-50/50">
+                              {COLS.map(col => (
+                                <td key={col.key} className="px-4 py-2.5 whitespace-nowrap">
+                                  {renderCell(row, col.key, openEdit, handleDelete)}
+                                </td>
+                              ))}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
         </div>
       </div>
-
-      {/* Tabla */}
-      <Card className="shadow-lg border-orange-100 overflow-hidden mb-6">
-        <CardBody className="p-0">
-          {loading ? (
-            <div className="p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-3" />
-              <p className="text-gray-500">Cargando costos…</p>
-            </div>
-          ) : error ? (
-            <p className="p-8 text-center text-red-500">{error}</p>
-          ) : (
-            <div className="overflow-auto max-h-[34rem] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-orange-200 hover:[&::-webkit-scrollbar-thumb]:bg-orange-300">
-              <table className="w-full text-sm border-separate border-spacing-0">
-                <thead>
-                  <tr className="text-left text-white">
-                    {COLS.map(col => (
-                      <th
-                        key={col.key}
-                        scope="col"
-                        onClick={() => handleSort(col.key)}
-                        className={`sticky top-0 z-10 bg-orange-600 px-3 py-3 font-semibold whitespace-nowrap transition-colors select-none shadow-[0_1px_0_0_rgba(0,0,0,0.08)] ${col.key !== 'acciones' ? 'cursor-pointer hover:bg-orange-700' : ''}`}
-                      >
-                        {col.key !== 'acciones' ? (
-                          <div className="flex items-center gap-1">
-                            {col.label}
-                            <SortIcon colKey={col.key} sortCol={sortCol} sortDir={sortDir} />
-                          </div>
-                        ) : null}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row, i) => (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-orange-50 hover:bg-orange-50/70 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}`}
-                    >
-                      {COLS.map(col => (
-                        <td key={col.key} className="px-3 py-2 whitespace-nowrap">
-                          {renderCell(row, col.key, openEdit, handleDelete)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  {filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={COLS.length} className="px-4 py-12 text-center text-gray-400">
-                        No se encontraron registros.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardBody>
-        <div className="flex items-center justify-between border-t border-orange-100 bg-orange-50/40 px-4 py-2 text-xs text-gray-500">
-          <span>{filtered.length.toLocaleString()} de {rows.length.toLocaleString()} registros</span>
-          <span>Ordenado por <strong className="text-brand-accent">{COLS.find(c => c.key === sortCol)?.label ?? sortCol}</strong> ({sortDir === 'asc' ? '↑ ascendente' : '↓ descendente'})</span>
-        </div>
-      </Card>
 
       {/* ─── Evolución mensual del costo (OPEX) y TRM ─────────────────────── */}
       {serieMensualCosto.length >= 2 && (
@@ -1070,17 +1116,17 @@ export default function CostoPantallaPage() {
       {/* Form Drawer (PRO MAX Drawer) */}
       {showForm && (
         <>
-          <div className="cp-overlay fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]" onClick={closeForm} />
-          <div className="cp-drawer fixed inset-y-0 right-0 z-50 w-full md:w-[600px] bg-white shadow-2xl flex flex-col border-l border-slate-100">
+          <div className="iv-overlay fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" onClick={closeForm} />
+          <div className="iv-drawer fixed inset-y-0 right-0 z-50 w-full md:w-[600px] bg-white shadow-2xl flex flex-col border-l border-slate-200">
             {/* Header del Drawer */}
-            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white flex-shrink-0">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
               <div>
                 <h2 className="text-xl font-bold text-slate-800">{editing ? 'Editar Registro' : 'Nueva Recarga'}</h2>
                 <p className="text-sm text-slate-500 mt-1">
                   {editing ? `Editando ${editing.idRec}` : 'Complete todos los campos'}
                 </p>
               </div>
-              <button onClick={closeForm} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+              <button onClick={closeForm} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -1211,13 +1257,13 @@ export default function CostoPantallaPage() {
                 <button
                   type="button"
                   onClick={closeForm}
-                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 text-sm font-bold transition-colors"
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-white text-sm font-bold transition-colors shadow-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="cp-cta px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md hover:shadow-lg"
+                  className="iv-cta px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md hover:shadow-lg"
                 >
                   {editing ? 'Guardar cambios' : 'Crear registro'}
                 </button>

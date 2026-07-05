@@ -59,13 +59,13 @@ function mapTipoFireToDeviceType(t) {
 }
 
 async function importVentasEquipos() {
-  const filepath = path.join(__dirname, '..', '..', '..', 'Tablas', '1-orders_table_Ventas_Firetv2024.xlsx');
+  const filepath = path.join(__dirname, '..', '..', '..', 'Tablas', '1-orders_table_Ventas_Firetv2026.xlsx');
   let wb;
   try {
     wb = XLSX.readFile(filepath);
   } catch (e) {
-    console.error('[IMPORT EXCEL] Error leyendo 1-orders_table_Ventas_Firetv2024.xlsx:', e.message);
-    return 0;
+    console.error('[IMPORT EXCEL] Error leyendo 1-orders_table_Ventas_Firetv2026.xlsx:', e.message);
+    return 0; // Abort early so we don't wipe the DB
   }
   
   const sheetName = wb.SheetNames[0];
