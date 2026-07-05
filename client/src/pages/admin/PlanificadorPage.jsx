@@ -506,7 +506,18 @@ export default function PlanificadorPage() {
     const vencidas      = variantes.filter(v => v === 'vencido').length
     const deudores      = pantallas.filter(p => p.debe).length
     const cortesias     = variantes.filter(v => v === 'cortesia').length
-    const creditoTotal  = pantallas.reduce((s, p) => s + (Number(p.credito) || 0), 0)
+    
+    // El crédito pertenece a la Cuenta Padre, no a la pantalla individual.
+    // Para no duplicarlo, sumamos 1 sola vez por cada cuentaId única.
+    const uniqueCuentas = new Map()
+    pantallas.forEach(p => {
+      if (p.cuentaId && !uniqueCuentas.has(p.cuentaId)) {
+        uniqueCuentas.set(p.cuentaId, Number(p.credito) || 0)
+      }
+    })
+    let creditoTotal = 0
+    uniqueCuentas.forEach(val => { creditoTotal += val })
+
     const ocupacion     = pantallas.length ? Math.round((asignadas / pantallas.length) * 100) : 0
 
     let filtered = pantallas
@@ -853,7 +864,7 @@ export default function PlanificadorPage() {
           onClick={() => setActivePanel('debe')} />
         <StatCard icon={Gift}       label="Cortesías activas"   value={stats.cortesias}               variant="outline" tone="purple"  sub="Sin generar ingreso"
           onClick={() => setActivePanel('cortesia')} />
-        <StatCard icon={DollarSign} label="Crédito en cartera"  value={formatCurrency(stats.creditoTotal)} variant="light" tone="emerald" sub="Saldo acumulado de cuentas"
+        <StatCard icon={Package}    label="Crédito en cartera"  value={`${stats.creditoTotal} Cr`}    variant="light" tone="emerald" sub="Stock en Cuentas Padre"
           onClick={() => setActivePanel('credito')} />
         <StatCard icon={Percent}    label="Ocupación"           value={`${stats.ocupacion}%`}         variant="light"   tone="orange"  sub={`${stats.asignadas} de ${stats.total} pantallas asignadas`}
           onClick={() => setExplain({

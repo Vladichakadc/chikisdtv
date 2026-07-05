@@ -1,4 +1,4 @@
-import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck } from 'lucide-react'
+import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
 import { STAT_TONES } from './StatCard'
@@ -62,11 +62,11 @@ export const CATEGORY_CONFIG = {
     hint: 'Evalúa convertir estas cortesías en clientes de pago al finalizar su vigencia.',
   },
   credito: {
-    title: 'Crédito en cartera', icon: DollarSign, tone: 'emerald', tipoPago: 'Renovacion',
-    extraLabel: 'Saldo a favor',
-    badge: (p) => <span className="font-semibold text-emerald-700">{formatCurrency(p.credito || 0)}</span>,
-    emptyMsg: 'No hay saldo de crédito acumulado en las cuentas.',
-    hint: 'Aplica este saldo a favor como abono en la próxima venta/renovación de cada cuenta.',
+    title: 'Crédito en cartera', icon: Package, tone: 'emerald', tipoPago: 'Renovacion',
+    extraLabel: 'Stock de créditos',
+    badge: (p) => <span className="font-semibold text-emerald-700">{p.credito || 0} Cr</span>,
+    emptyMsg: 'No hay saldo de crédito acumulado en las cuentas padre.',
+    hint: 'Aplica estos créditos a favor como abono en la próxima venta/renovación de pantallas de esta cuenta padre.',
   },
 }
 
