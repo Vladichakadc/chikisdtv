@@ -505,19 +505,9 @@ export default function PlanificadorPage() {
     const asignadas     = pantallas.length - libres
     const vencidas      = variantes.filter(v => v === 'vencido').length
     const deudores      = pantallas.filter(p => p.debe).length
+    const montoCartera  = pantallas.reduce((s, p) => s + (p.debe ? (Number(p.montoDebe) || 0) : 0), 0)
     const cortesias     = variantes.filter(v => v === 'cortesia').length
     
-    // El crédito pertenece a la Cuenta Padre, no a la pantalla individual.
-    // Para no duplicarlo, sumamos 1 sola vez por cada cuentaId única.
-    const uniqueCuentas = new Map()
-    pantallas.forEach(p => {
-      if (p.cuentaId && !uniqueCuentas.has(p.cuentaId)) {
-        uniqueCuentas.set(p.cuentaId, Number(p.credito) || 0)
-      }
-    })
-    let creditoTotal = 0
-    uniqueCuentas.forEach(val => { creditoTotal += val })
-
     const ocupacion     = pantallas.length ? Math.round((asignadas / pantallas.length) * 100) : 0
 
     let filtered = pantallas
@@ -569,7 +559,7 @@ export default function PlanificadorPage() {
       rows,
       stats: {
         cuentas, activas, proximaVencer, libres, diasAlerta, total: pantallas.length,
-        vencidas, deudores, cortesias, creditoTotal, ocupacion, asignadas,
+        vencidas, deudores, cortesias, montoCartera, ocupacion, asignadas,
       },
     }
   }, [data, search, filterStatus, sortConfig])
@@ -593,7 +583,6 @@ export default function PlanificadorPage() {
       libre:    enriched.filter(p => p._variant === 'libre').sort(byNombre),
       debe:     enriched.filter(p => p.debe).sort((a, b) => (Number(b.montoDebe) || 0) - (Number(a.montoDebe) || 0)),
       cortesia: enriched.filter(p => p._variant === 'cortesia').sort(byDiasAsc),
-      credito:  enriched.filter(p => (Number(p.credito) || 0) > 0).sort((a, b) => (Number(b.credito) || 0) - (Number(a.credito) || 0)),
     }
   }, [data])
 
@@ -864,8 +853,8 @@ export default function PlanificadorPage() {
           onClick={() => setActivePanel('debe')} />
         <StatCard icon={Gift}       label="Cortesías activas"   value={stats.cortesias}               variant="outline" tone="purple"  sub="Sin generar ingreso"
           onClick={() => setActivePanel('cortesia')} />
-        <StatCard icon={Package}    label="Crédito en cartera"  value={`${stats.creditoTotal} Cr`}    variant="light" tone="emerald" sub="Stock en Cuentas Padre"
-          onClick={() => setActivePanel('credito')} />
+        <StatCard icon={DollarSign} label="Cartera por cobrar"  value={formatCurrency(stats.montoCartera)} variant="light" tone="red" sub="Dinero pendiente"
+          onClick={() => setActivePanel('debe')} />
         <StatCard icon={Percent}    label="Ocupación"           value={`${stats.ocupacion}%`}         variant="light"   tone="orange"  sub={`${stats.asignadas} de ${stats.total} pantallas asignadas`}
           onClick={() => setExplain({
             title: 'Ocupación', value: `${stats.ocupacion}%`, icon: Percent,
