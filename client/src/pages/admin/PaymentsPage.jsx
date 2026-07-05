@@ -621,6 +621,14 @@ export default function PaymentsPage() {
     })
   }, [searched, sortCol, sortDir])
 
+  // Render paginado: con ~2.500 ventas, pintar TODAS las filas congela la pestaña
+  // (cada tecla del formulario o un guardado re-renderiza la tabla completa).
+  // Se muestran de a PAGE_SIZE filas y el resto se carga bajo demanda.
+  const PAGE_SIZE = 150
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [search, selectedYears, selectedMonths, sortCol, sortDir])
+  const visible = filtered.slice(0, visibleCount)
+
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -819,7 +827,7 @@ export default function PaymentsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((row, i) => (
+                    {visible.map((row, i) => (
                       <tr
                         key={row.idVM}
                         className={`border-b border-emerald-50 hover:bg-emerald-50/70 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30'}`}
@@ -831,6 +839,19 @@ export default function PaymentsPage() {
                       ))}
                     </tr>
                   ))}
+                  {filtered.length > visibleCount && (
+                    <tr>
+                      <td colSpan={COLS.length} className="px-4 py-3 text-center bg-emerald-50/40">
+                        <button
+                          onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                          className="px-4 py-2 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-100 text-sm font-semibold transition-colors"
+                        >
+                          Mostrar {Math.min(PAGE_SIZE, filtered.length - visibleCount).toLocaleString()} más
+                          · quedan {(filtered.length - visibleCount).toLocaleString()}
+                        </button>
+                      </td>
+                    </tr>
+                  )}
                   {filtered.length === 0 && (
                     <tr>
                       <td colSpan={COLS.length} className="px-4 py-12 text-center text-gray-400">
@@ -844,7 +865,9 @@ export default function PaymentsPage() {
           )}
         </CardBody>
         <div className="flex items-center justify-between border-t border-emerald-100 bg-emerald-50/40 px-4 py-2 text-xs text-gray-500">
-          <span>{filtered.length.toLocaleString()} de {rows.length.toLocaleString()} registros</span>
+          <span>
+            {Math.min(visibleCount, filtered.length).toLocaleString()} visibles · {filtered.length.toLocaleString()} filtrados · {rows.length.toLocaleString()} totales
+          </span>
           <span>Ordenado por <strong className="text-brand-accent">{COLS.find(c => c.key === sortCol)?.label ?? sortCol}</strong> ({sortDir === 'asc' ? '↑ ascendente' : '↓ descendente'})</span>
         </div>
       </Card>
