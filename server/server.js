@@ -12,6 +12,7 @@ const { Client, Plan, CostoPantalla } = require('./models');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const { autoFixCuentaIdMismatches } = require('./services/planificadorImportService');
+const { ensureVentasEquiposSchema } = require('./utils/ensureVentasEquiposSchema');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -121,6 +122,10 @@ async function seedDevicesFromVentas() {
     // alter:true agrega las que falten. Se corre una sola vez al arranque
     // (antes se ejecutaba en cada GET /payments/costo-pantalla).
     await CostoPantalla.sync({ alter: true });
+    // ventas_equipos también ganó columnas tarde (costo, serial, garantia):
+    // ALTER dirigido e idempotente — debe correr ANTES de seedDevicesFromVentas,
+    // que hace el primer SELECT del modelo y falla si falta alguna columna.
+    await ensureVentasEquiposSchema();
     console.log('[DB] Tablas sincronizadas');
     await seedAdminAndPlans();
     await seedDevicesFromVentas();
