@@ -1,0 +1,1138 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e21]:
+    - complementary [ref=e22]:
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - generic [ref=e28]:
+          - generic [ref=e29]: ChikisdTV
+          - generic [ref=e30]: Panel Administrador
+        - button "Colapsar menú" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+      - navigation [ref=e36]:
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Principal
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - link "Dashboard" [ref=e42] [cursor=pointer]:
+                - /url: /admin
+                - img [ref=e43]
+                - generic [ref=e48]: Dashboard
+              - button "Expandir Dashboard" [ref=e49] [cursor=pointer]:
+                - img [ref=e50]
+            - generic [ref=e52]:
+              - link "Análisis Financiero" [ref=e53] [cursor=pointer]:
+                - /url: /admin/analisis-financiero
+                - img [ref=e55]
+                - generic [ref=e57]: Análisis Financiero
+              - link "Análisis Retención" [ref=e58] [cursor=pointer]:
+                - /url: /admin/retencion
+                - img [ref=e60]
+                - generic [ref=e64]: Análisis Retención
+        - generic [ref=e65]:
+          - paragraph [ref=e66]: Operación
+          - generic [ref=e67]:
+            - link "Planificador" [ref=e70] [cursor=pointer]:
+              - /url: /admin/planificador
+              - img [ref=e71]
+              - generic [ref=e75]: Planificador
+            - link "Cuentas Padre" [ref=e78] [cursor=pointer]:
+              - /url: /admin/cuentas-padre
+              - img [ref=e79]
+              - generic [ref=e82]: Cuentas Padre
+            - generic [ref=e83]:
+              - generic [ref=e84]:
+                - link "Clientes" [ref=e85] [cursor=pointer]:
+                  - /url: /admin/clients
+                  - img [ref=e86]
+                  - generic [ref=e91]: Clientes
+                - button "Expandir Clientes" [ref=e92] [cursor=pointer]:
+                  - img [ref=e93]
+              - link "Análisis Demográfico" [ref=e96] [cursor=pointer]:
+                - /url: /admin/analisis-clientes
+                - img [ref=e98]
+                - generic [ref=e101]: Análisis Demográfico
+            - link "Planes" [ref=e104] [cursor=pointer]:
+              - /url: /admin/plans
+              - img [ref=e105]
+              - generic [ref=e109]: Planes
+            - link "Suscripciones" [ref=e112] [cursor=pointer]:
+              - /url: /admin/subscriptions
+              - img [ref=e113]
+              - generic [ref=e116]: Suscripciones
+            - generic [ref=e117]:
+              - generic [ref=e118]:
+                - link "Pagos" [ref=e119] [cursor=pointer]:
+                  - /url: /admin/payments
+                  - img [ref=e120]
+                  - generic [ref=e122]: Pagos
+                - button "Expandir Pagos" [ref=e123] [cursor=pointer]:
+                  - img [ref=e124]
+              - link "Análisis de Pagos" [ref=e127] [cursor=pointer]:
+                - /url: /admin/analisis-pagos
+                - img [ref=e129]
+                - generic [ref=e131]: Análisis de Pagos
+            - generic [ref=e132]:
+              - generic [ref=e133]:
+                - link "Bajas" [ref=e134] [cursor=pointer]:
+                  - /url: /admin/bajas
+                  - img [ref=e135]
+                  - generic [ref=e140]: Bajas
+                - button "Expandir Bajas" [ref=e141] [cursor=pointer]:
+                  - img [ref=e142]
+              - link "Análisis de Bajas" [ref=e145] [cursor=pointer]:
+                - /url: /admin/analisis-bajas
+                - img [ref=e147]
+                - generic [ref=e150]: Análisis de Bajas
+        - generic [ref=e151]:
+          - paragraph [ref=e152]: Equipos
+          - generic [ref=e153]:
+            - link "Costo Pantalla" [ref=e156] [cursor=pointer]:
+              - /url: /admin/costo-pantalla
+              - img [ref=e157]
+              - generic [ref=e159]: Costo Pantalla
+            - generic [ref=e160]:
+              - generic [ref=e161]:
+                - link "Venta Dispositivos" [ref=e162] [cursor=pointer]:
+                  - /url: /admin/ventas-dispositivos
+                  - img [ref=e163]
+                  - generic [ref=e166]: Venta Dispositivos
+                - button "Expandir Venta Dispositivos" [ref=e167] [cursor=pointer]:
+                  - img [ref=e168]
+              - link "Análisis Dispositivos" [ref=e171] [cursor=pointer]:
+                - /url: /admin/analisis-dispositivos
+                - img [ref=e173]
+                - generic [ref=e176]: Análisis Dispositivos
+            - generic [ref=e177]:
+              - generic [ref=e178]:
+                - link "Inventario Equipos" [ref=e179] [cursor=pointer]:
+                  - /url: /admin/devices
+                  - img [ref=e180]
+                  - generic [ref=e190]: Inventario Equipos
+                - button "Expandir Inventario Equipos" [ref=e191] [cursor=pointer]:
+                  - img [ref=e192]
+              - link "Análisis Inventario" [ref=e195] [cursor=pointer]:
+                - /url: /admin/analisis-inventario
+                - img [ref=e197]
+                - generic [ref=e199]: Análisis Inventario
+      - generic [ref=e201]:
+        - generic [ref=e202]: A
+        - generic [ref=e203]:
+          - paragraph [ref=e204]: Administrador
+          - paragraph [ref=e205]: admin@chikisdtv.com
+        - button "Cerrar sesión" [ref=e207] [cursor=pointer]:
+          - img [ref=e208]
+    - main [ref=e212]:
+      - generic [ref=e214]:
+        - generic [ref=e216]:
+          - generic [ref=e217]:
+            - generic [ref=e218]:
+              - img [ref=e219]
+              - generic [ref=e221]: Operaciones
+            - heading "Dashboard" [level=1] [ref=e222]
+            - paragraph [ref=e223]:
+              - text: Pulso diario de ChikisdTV — el análisis financiero profundo vive en
+              - button "Análisis Financiero" [ref=e224] [cursor=pointer]
+          - generic [ref=e225]:
+            - button "BD Local" [ref=e226] [cursor=pointer]:
+              - img [ref=e227]
+              - text: BD Local
+            - button "Respaldo" [ref=e230] [cursor=pointer]:
+              - img [ref=e231]
+              - text: Respaldo
+            - button "Sincronizar" [ref=e234] [cursor=pointer]:
+              - img [ref=e235]
+              - text: Sincronizar
+        - generic [ref=e240]:
+          - button "Clientes Activos 262 265 finales · 3 revendedores — presencia en 11 países ¿Cómo se calcula?" [ref=e241] [cursor=pointer]:
+            - generic [ref=e243]:
+              - generic [ref=e244]:
+                - paragraph [ref=e245]: Clientes Activos
+                - paragraph [ref=e246]: "262"
+                - paragraph [ref=e247]: 265 finales · 3 revendedores — presencia en 11 países
+                - paragraph [ref=e248]:
+                  - img [ref=e249]
+                  - text: ¿Cómo se calcula?
+              - img [ref=e252]
+          - button "Planes 4 Catálogo vigente que respalda 82 suscripciones activas hoy ¿Cómo se calcula?" [ref=e257] [cursor=pointer]:
+            - generic [ref=e259]:
+              - generic [ref=e260]:
+                - paragraph [ref=e261]: Planes
+                - paragraph [ref=e262]: "4"
+                - paragraph [ref=e263]: Catálogo vigente que respalda 82 suscripciones activas hoy
+                - paragraph [ref=e264]:
+                  - img [ref=e265]
+                  - text: ¿Cómo se calcula?
+              - img [ref=e268]
+          - button "Pantallas activas 282 Suma de pantallas por plan del Planificador ¿Cómo se calcula?" [ref=e272] [cursor=pointer]:
+            - generic [ref=e274]:
+              - generic [ref=e275]:
+                - paragraph [ref=e276]: Pantallas activas
+                - paragraph [ref=e277]: "282"
+                - paragraph [ref=e278]: Suma de pantallas por plan del Planificador
+                - paragraph [ref=e279]:
+                  - img [ref=e280]
+                  - text: ¿Cómo se calcula?
+              - img [ref=e283]
+          - button "Dispositivos Activos 0 Inventario de equipos — 282 pantallas, 0 libres en el Planificador ¿Cómo se calcula?" [ref=e286] [cursor=pointer]:
+            - generic [ref=e288]:
+              - generic [ref=e289]:
+                - paragraph [ref=e290]: Dispositivos Activos
+                - paragraph [ref=e291]: "0"
+                - paragraph [ref=e292]: Inventario de equipos — 282 pantallas, 0 libres en el Planificador
+                - paragraph [ref=e293]:
+                  - img [ref=e294]
+                  - text: ¿Cómo se calcula?
+              - img [ref=e297]
+        - generic [ref=e300]:
+          - button "Pagos Pendientes 0 A la espera de conciliación en el módulo de Pagos ¿Cómo se calcula?" [ref=e301] [cursor=pointer]:
+            - generic [ref=e303]:
+              - generic [ref=e304]:
+                - paragraph [ref=e305]: Pagos Pendientes
+                - paragraph [ref=e306]: "0"
+                - paragraph [ref=e307]: A la espera de conciliación en el módulo de Pagos
+                - paragraph [ref=e308]:
+                  - img [ref=e309]
+                  - text: ¿Cómo se calcula?
+              - img [ref=e312]
+          - button "Pagos Vencidos 10 Cuentas vencidas del Planificador — requieren contacto urgente ¿Cómo se calcula?" [ref=e315] [cursor=pointer]:
+            - generic [ref=e317]:
+              - generic [ref=e318]:
+                - paragraph [ref=e319]: Pagos Vencidos
+                - paragraph [ref=e320]: "10"
+                - paragraph [ref=e321]: Cuentas vencidas del Planificador — requieren contacto urgente
+                - paragraph [ref=e322]:
+                  - img [ref=e323]
+                  - text: ¿Cómo se calcula?
+              - img [ref=e326]
+          - button "Próximas a vencer 9 Cuentas a ≤8 días de vencer — oportunidad de renovación ¿Cómo se calcula?" [ref=e328] [cursor=pointer]:
+            - generic [ref=e330]:
+              - generic [ref=e331]:
+                - paragraph [ref=e332]: Próximas a vencer
+                - paragraph [ref=e333]: "9"
+                - paragraph [ref=e334]: Cuentas a ≤8 días de vencer — oportunidad de renovación
+                - paragraph [ref=e335]:
+                  - img [ref=e336]
+                  - text: ¿Cómo se calcula?
+              - img [ref=e339]
+        - generic [ref=e342]:
+          - img [ref=e344]
+          - generic [ref=e346]:
+            - heading "Resultados del negocio · Ventas vs. Costos" [level=2] [ref=e347]
+            - paragraph [ref=e348]: Los cuatro números que resumen la salud financiera — haz clic en cualquier tarjeta para ver cómo se calcula
+        - generic [ref=e349]:
+          - button "Ingresos históricos $129.741.091 -47.0% vs. 2025 (año cerrado) ¿Cómo se calcula?" [ref=e350] [cursor=pointer]:
+            - generic [ref=e351]:
+              - generic [ref=e352]:
+                - paragraph [ref=e353]: Ingresos históricos
+                - paragraph [ref=e354]: $129.741.091
+                - generic [ref=e355]:
+                  - generic [ref=e356]:
+                    - img [ref=e357]
+                    - text: "-47.0%"
+                  - generic [ref=e360]: vs. 2025 (año cerrado)
+                - paragraph [ref=e361]: ¿Cómo se calcula?
+              - img [ref=e363]
+          - button "Costos históricos $45.150.783 -34.1% vs. 2025 (año cerrado) ¿Cómo se calcula?" [ref=e366] [cursor=pointer]:
+            - generic [ref=e367]:
+              - generic [ref=e368]:
+                - paragraph [ref=e369]: Costos históricos
+                - paragraph [ref=e370]: $45.150.783
+                - generic [ref=e371]:
+                  - generic [ref=e372]:
+                    - img [ref=e373]
+                    - text: "-34.1%"
+                  - generic [ref=e376]: vs. 2025 (año cerrado)
+                - paragraph [ref=e377]: ¿Cómo se calcula?
+              - img [ref=e379]
+          - button "Ganancia histórica $84.590.308 -52.5% vs. 2025 (año cerrado) · margen 65.2% ¿Cómo se calcula?" [ref=e382] [cursor=pointer]:
+            - generic [ref=e383]:
+              - generic [ref=e384]:
+                - paragraph [ref=e385]: Ganancia histórica
+                - paragraph [ref=e386]: $84.590.308
+                - generic [ref=e387]:
+                  - generic [ref=e388]:
+                    - img [ref=e389]
+                    - text: "-52.5%"
+                  - generic [ref=e392]: vs. 2025 (año cerrado) · margen 65.2%
+                - paragraph [ref=e393]: ¿Cómo se calcula?
+              - img [ref=e395]
+          - button "Margen bruto 65.2% 63.2% en 2026 ¿Cómo se calcula?" [ref=e398] [cursor=pointer]:
+            - generic [ref=e399]:
+              - generic [ref=e400]:
+                - paragraph [ref=e401]: Margen bruto
+                - paragraph [ref=e402]: 65.2%
+                - generic [ref=e404]: 63.2% en 2026
+                - paragraph [ref=e405]: ¿Cómo se calcula?
+              - img [ref=e407]
+        - generic [ref=e412]:
+          - generic [ref=e413]:
+            - paragraph [ref=e414]: Comparativo año corrido (YTD)
+            - paragraph [ref=e415]: Ene–Jul 2026 vs. 2025
+          - generic [ref=e416]:
+            - img [ref=e417]
+            - generic [ref=e419]: "Ingresos:"
+            - generic [ref=e420]: $21.135.396
+            - generic [ref=e421]:
+              - img [ref=e422]
+              - text: "-4.9%"
+          - generic [ref=e425]:
+            - img [ref=e426]
+            - generic [ref=e429]: "Costos:"
+            - generic [ref=e430]: $7.786.020
+            - generic [ref=e431]:
+              - img [ref=e432]
+              - text: "-11.9%"
+        - generic [ref=e435]:
+          - generic [ref=e436]:
+            - generic [ref=e437]:
+              - 'heading "Evolución anual: ingresos, costos y ganancia" [level=3] [ref=e438]'
+              - paragraph [ref=e439]: Tendencia desde 2022 hasta 2026 — la brecha entre la curva naranja (ingresos) y la gris (costos) es la curva verde (ganancia); el % morado sobre cada punto verde es el margen bruto de ese año
+            - generic [ref=e440]:
+              - generic [ref=e442]:
+                - list [ref=e444]:
+                  - listitem [ref=e445]:
+                    - img "Costos legend icon" [ref=e446]
+                    - text: Costos
+                  - listitem [ref=e448]:
+                    - img "Ganancia legend icon" [ref=e449]
+                    - text: Ganancia
+                  - listitem [ref=e451]:
+                    - img "Ingresos legend icon" [ref=e452]
+                    - text: Ingresos
+                - application [ref=e454]:
+                  - generic [ref=e550]:
+                    - generic [ref=e551]:
+                      - generic [ref=e553]: "2022"
+                      - generic [ref=e555]: "2023"
+                      - generic [ref=e557]: "2024"
+                      - generic [ref=e559]: "2025"
+                      - generic [ref=e561]: "2026"
+                    - generic [ref=e562]:
+                      - generic [ref=e564]: 0M
+                      - generic [ref=e566]: 10M
+                      - generic [ref=e568]: 20M
+                      - generic [ref=e570]: 30M
+                      - generic [ref=e572]: 40M
+                    - generic [ref=e573]:
+                      - generic [ref=e574]: 11.5M
+                      - generic [ref=e575]: 22.4M
+                      - generic [ref=e576]: 34.8M
+                      - generic [ref=e577]: 39.9M
+                      - generic [ref=e578]: 21.1M
+                    - generic [ref=e579]:
+                      - generic [ref=e580]: 5.3M
+                      - generic [ref=e581]: 9.3M
+                      - generic [ref=e582]: 11.0M
+                      - generic [ref=e583]: 11.8M
+                      - generic [ref=e584]: 7.8M
+                    - generic [ref=e585]:
+                      - generic [ref=e586]: 6.2M
+                      - generic [ref=e587]: 13.1M
+                      - generic [ref=e588]: 23.8M
+                      - generic [ref=e589]: 28.1M
+                      - generic [ref=e590]: 13.3M
+                    - generic [ref=e591]:
+                      - generic [ref=e592]: 54%
+                      - generic [ref=e593]: 59%
+                      - generic [ref=e594]: 68%
+                      - generic [ref=e595]: 70%
+                      - generic [ref=e596]: 63%
+              - generic [ref=e597]:
+                - img [ref=e598]
+                - paragraph [ref=e600]:
+                  - text: Entre
+                  - strong [ref=e601]: "2022"
+                  - text: "y"
+                  - strong [ref=e602]: "2026"
+                  - text: ": los ingresos pasaron de $11.466.160 a $21.135.396 (+84%), los costos de $5.262.565 a $7.786.020 (+48%), y la ganancia (margen bruto en pesos) de $6.203.595 a $13.349.376 (+115%). La curva verde (ganancia) se separa cada vez más de la gris (costos): el negocio gana eficiencia a medida que crece — cada peso adicional de ingreso deja más ganancia que el anterior."
+          - generic [ref=e603]:
+            - generic [ref=e604]:
+              - heading "Ingresos, costos y ganancia por año" [level=3] [ref=e605]
+              - paragraph [ref=e606]: Comparativo histórico con margen bruto (%)
+            - generic [ref=e607]:
+              - generic [ref=e609]:
+                - list [ref=e611]:
+                  - listitem [ref=e612]:
+                    - img "Costos legend icon" [ref=e613]
+                    - text: Costos
+                  - listitem [ref=e615]:
+                    - img "Ganancia legend icon" [ref=e616]
+                    - text: Ganancia
+                  - listitem [ref=e618]:
+                    - img "Ingresos legend icon" [ref=e619]
+                    - text: Ingresos
+                  - listitem [ref=e621]:
+                    - img "Margen % legend icon" [ref=e622]
+                    - text: Margen %
+                - application [ref=e624]:
+                  - generic [ref=e650]:
+                    - generic [ref=e651]:
+                      - generic [ref=e653]: "2022"
+                      - generic [ref=e655]: "2023"
+                      - generic [ref=e657]: "2024"
+                      - generic [ref=e659]: "2025"
+                      - generic [ref=e661]: "2026"
+                    - generic [ref=e662]:
+                      - generic [ref=e664]: 0M
+                      - generic [ref=e666]: 10M
+                      - generic [ref=e668]: 20M
+                      - generic [ref=e670]: 30M
+                      - generic [ref=e672]: 40M
+                    - generic [ref=e673]:
+                      - generic [ref=e675]: 0%
+                      - generic [ref=e677]: 25%
+                      - generic [ref=e679]: 50%
+                      - generic [ref=e681]: 75%
+                      - generic [ref=e683]: 100%
+              - generic [ref=e684]:
+                - img [ref=e685]
+                - paragraph [ref=e687]:
+                  - text: "Leyendo barra por barra, año a año:"
+                  - strong [ref=e688]: "2023"
+                  - text: ": ingreso +95.4%, margen 58.7% (el ingreso le ganó al costo → el margen se amplía);"
+                  - strong [ref=e689]: "2024"
+                  - text: ": ingreso +55.5%, margen 68.3% (el ingreso le ganó al costo → el margen se amplía);"
+                  - strong [ref=e690]: "2025"
+                  - text: ": ingreso +14.5%, margen 70.4% (el ingreso le ganó al costo → el margen se amplía);"
+                  - strong [ref=e691]: "2026"
+                  - text: ": ingreso -47.0%, margen 63.2% (el costo creció más que el ingreso → el margen se comprime). La barra de"
+                  - strong [ref=e692]: "2026"
+                  - text: se ve más baja porque el año está en curso (306 ventas registradas frente a 748 del 2025 ya cerrado) — no es una contracción real, es un corte parcial; para comparar de forma justa usa el comparativo "año corrido" (YTD) de arriba.
+        - generic [ref=e693]:
+          - generic [ref=e694]:
+            - heading "Tendencia mensual de ingresos y costos" [level=3] [ref=e695]
+            - paragraph [ref=e696]: Barras = ingresos/costos brutos · Línea violeta = MRR normalizado (elimina distorsión de planes anuales/semestrales)
+          - generic [ref=e697]:
+            - generic [ref=e699]:
+              - list [ref=e701]:
+                - listitem [ref=e702]:
+                  - img "Costos legend icon" [ref=e703]
+                  - text: Costos
+                - listitem [ref=e705]:
+                  - img "Ingresos brutos legend icon" [ref=e706]
+                  - text: Ingresos brutos
+                - listitem [ref=e708]:
+                  - img "MRR normalizado legend icon" [ref=e709]
+                  - text: MRR normalizado
+              - application [ref=e711]:
+                - generic [ref=e740]:
+                  - generic [ref=e741]:
+                    - generic [ref=e743]: Ene 22
+                    - generic [ref=e745]: Abr 22
+                    - generic [ref=e747]: Jul 22
+                    - generic [ref=e749]: Oct 22
+                    - generic [ref=e751]: Ene 23
+                    - generic [ref=e753]: Abr 23
+                    - generic [ref=e755]: Jul 23
+                    - generic [ref=e757]: Oct 23
+                    - generic [ref=e759]: Ene 24
+                    - generic [ref=e761]: Abr 24
+                    - generic [ref=e763]: Jul 24
+                    - generic [ref=e765]: Oct 24
+                    - generic [ref=e767]: Ene 25
+                    - generic [ref=e769]: Abr 25
+                    - generic [ref=e771]: Jul 25
+                    - generic [ref=e773]: Oct 25
+                    - generic [ref=e775]: Ene 26
+                    - generic [ref=e777]: Abr 26
+                    - generic [ref=e779]: Jul 26
+                  - generic [ref=e780]:
+                    - generic [ref=e782]: 0.0M
+                    - generic [ref=e784]: 1.5M
+                    - generic [ref=e786]: 3.0M
+                    - generic [ref=e788]: 4.5M
+                    - generic [ref=e790]: 6.0M
+            - generic [ref=e791]:
+              - img [ref=e792]
+              - paragraph [ref=e794]:
+                - text: El mes de mayor ingreso histórico fue
+                - strong [ref=e795]: Sep 25
+                - text: ($4.702.400) y el más bajo
+                - strong [ref=e796]: Jul 26
+                - text: ($245.000) — esa diferencia es la huella de la
+                - strong [ref=e797]: estacionalidad
+                - text: (meses de mayor actividad de recargas y renovaciones). El promedio mensual histórico es $2.358.929; los últimos tres meses con actividad promedian $2.212.510,
+                - strong [ref=e798]: por debajo
+                - text: del promedio histórico — una pista temprana de hacia dónde se dirige la tendencia de corto plazo, antes de que se refleje en el cierre anual.
+        - generic [ref=e799]:
+          - generic [ref=e801]:
+            - generic [ref=e802]:
+              - heading "Ventas de licencias — mes a mes" [level=3] [ref=e803]
+              - paragraph [ref=e804]: Barras = ingresos por ventas de licencias (eje izq., con etiqueta $) · Línea azul = N° de ventas (eje der., con etiqueta de unidades)
+            - generic [ref=e805]:
+              - generic [ref=e806]:
+                - img [ref=e807]
+                - generic [ref=e809]: Año
+                - combobox "Año" [ref=e810]:
+                  - option "2026" [selected]
+                  - option "2025"
+                  - option "2024"
+                  - option "2023"
+                  - option "2022"
+              - generic [ref=e811]:
+                - generic [ref=e812]: Mes
+                - combobox "Mes" [ref=e813]:
+                  - option "Todo el año" [selected]
+                  - option "Ene"
+                  - option "Feb"
+                  - option "Mar"
+                  - option "Abr"
+                  - option "May"
+                  - option "Jun"
+                  - option "Jul"
+                  - option "Ago"
+                  - option "Sep"
+                  - option "Oct"
+                  - option "Nov"
+                  - option "Dic"
+          - generic [ref=e814]:
+            - generic [ref=e815]:
+              - generic [ref=e817]:
+                - generic [ref=e818]:
+                  - paragraph [ref=e819]: Ventas de licencias 2026
+                  - paragraph [ref=e820]: "306"
+                  - generic [ref=e821]:
+                    - generic [ref=e822]:
+                      - img [ref=e823]
+                      - text: "-59.1%"
+                    - generic [ref=e826]: vs. 2025
+                - img [ref=e828]
+              - generic [ref=e832]:
+                - generic [ref=e833]:
+                  - paragraph [ref=e834]: Ingresos del año
+                  - paragraph [ref=e835]: $21.135.396
+                  - generic [ref=e836]:
+                    - generic [ref=e837]:
+                      - img [ref=e838]
+                      - text: "-47.0%"
+                    - generic [ref=e841]: vs. 2025
+                - img [ref=e843]
+              - generic [ref=e846]:
+                - generic [ref=e847]:
+                  - paragraph [ref=e848]: Ticket promedio
+                  - paragraph [ref=e849]: $69.070
+                  - generic [ref=e851]: "promedio mensual: $3.019.342"
+                - img [ref=e853]
+              - generic [ref=e857]:
+                - generic [ref=e858]:
+                  - paragraph [ref=e859]: Mejor mes
+                  - paragraph [ref=e860]: Mar
+                  - generic [ref=e862]: $4.124.400 · 53 ventas
+                - img [ref=e864]
+            - generic [ref=e871]:
+              - list [ref=e873]:
+                - listitem [ref=e874]:
+                  - img "Ingresos legend icon" [ref=e875]
+                  - text: Ingresos
+                - listitem [ref=e877]:
+                  - img "N° de ventas legend icon" [ref=e878]
+                  - text: N° de ventas
+              - application [ref=e880]:
+                - generic [ref=e913]:
+                  - generic [ref=e914]:
+                    - generic [ref=e916]: Ene
+                    - generic [ref=e918]: Feb
+                    - generic [ref=e920]: Mar
+                    - generic [ref=e922]: Abr
+                    - generic [ref=e924]: May
+                    - generic [ref=e926]: Jun
+                    - generic [ref=e928]: Jul
+                    - generic [ref=e930]: Ago
+                    - generic [ref=e932]: Sep
+                    - generic [ref=e934]: Oct
+                    - generic [ref=e936]: Nov
+                    - generic [ref=e938]: Dic
+                  - generic [ref=e939]:
+                    - generic [ref=e941]: "0"
+                    - generic [ref=e943]: 1.5M
+                    - generic [ref=e945]: 3.0M
+                    - generic [ref=e947]: 4.5M
+                    - generic [ref=e949]: 6.0M
+                  - generic [ref=e950]:
+                    - generic [ref=e952]: "0"
+                    - generic [ref=e954]: "25"
+                    - generic [ref=e956]: "50"
+                    - generic [ref=e958]: "75"
+                    - generic [ref=e960]: "98"
+                  - generic [ref=e961]:
+                    - generic [ref=e962]: "47"
+                    - generic [ref=e963]: "48"
+                    - generic [ref=e964]: "53"
+                    - generic [ref=e965]: "53"
+                    - generic [ref=e966]: "39"
+                    - generic [ref=e967]: "56"
+                    - generic [ref=e968]: "10"
+            - generic [ref=e969]:
+              - img [ref=e970]
+              - paragraph [ref=e972]:
+                - strong [ref=e973]: Resumen 2026
+                - text: ": se registraron"
+                - strong [ref=e974]: 306 ventas de licencias
+                - text: por un total de
+                - strong [ref=e975]: $21.135.396
+                - text: ", con un ticket promedio de $69.070 y un promedio mensual de $3.019.342 sobre 7 meses con actividad. El mes de mejor desempeño fue"
+                - strong [ref=e976]: Mar
+                - text: ($4.124.400 · 53 ventas) y el más bajo
+                - strong [ref=e977]: Jul
+                - text: ($245.000 · 10 ventas) — esa brecha marca la estacionalidad dentro del año. Frente a 2025, el ingreso por ventas de licencias varió -47.0% y el número de ventas -59.1%.
+                - strong [ref=e978]: Conclusión
+                - text: ": 2026 muestra una contracción frente a 2025 — conviene activar campañas de renovación/reactivación enfocadas en los meses de menor actividad (Jul) y revisar si la caída responde a estacionalidad o a un problema estructural (churn, competencia, precio)."
+        - generic [ref=e979]:
+          - generic [ref=e980]:
+            - generic [ref=e981]:
+              - heading "Composición del ingreso" [level=3] [ref=e982]
+              - paragraph [ref=e983]: Por tipo de transacción
+            - generic [ref=e984]:
+              - application [ref=e987]
+              - generic [ref=e988]:
+                - img [ref=e989]
+                - paragraph [ref=e991]:
+                  - strong [ref=e992]: Renovacion
+                  - text: domina la composición del ingreso con 68.9% ($89.406.688 en 2023 transacciones), seguido de
+                  - strong [ref=e993]: Activacion Pantalla
+                  - text: con 29.2%. Que las renovaciones encabecen la lista confirma que el ingreso es, en su mayoría,
+                  - strong [ref=e994]: recurrente y predecible
+                  - text: — la prioridad financiera es proteger esa base (retención) antes que invertir agresivamente en captar clientes nuevos.
+              - generic [ref=e995]:
+                - generic [ref=e996]:
+                  - generic [ref=e997]: Renovacion
+                  - generic [ref=e999]: 68.9%
+                - generic [ref=e1000]:
+                  - generic [ref=e1001]: Activacion Pantalla
+                  - generic [ref=e1003]: 29.2%
+                - generic [ref=e1004]:
+                  - generic [ref=e1005]: Cambio de Plan
+                  - generic [ref=e1007]: 1.8%
+                - generic [ref=e1008]:
+                  - generic [ref=e1009]: Activacion
+                  - generic [ref=e1011]: 0%
+                - generic [ref=e1012]:
+                  - generic [ref=e1013]: Cortesia
+                  - generic [ref=e1015]: 0%
+          - generic [ref=e1016]:
+            - generic [ref=e1017]:
+              - heading "Comparativo año a año" [level=3] [ref=e1018]
+              - paragraph [ref=e1019]: Ingresos, costos, margen y crecimiento
+            - table [ref=e1021]:
+              - rowgroup [ref=e1022]:
+                - row "Año Ingresos Costos Margen Crec. Ingresos" [ref=e1023]:
+                  - columnheader "Año" [ref=e1024]
+                  - columnheader "Ingresos" [ref=e1025]
+                  - columnheader "Costos" [ref=e1026]
+                  - columnheader "Margen" [ref=e1027]
+                  - columnheader "Crec. Ingresos" [ref=e1028]
+              - rowgroup [ref=e1029]:
+                - row "2022 $11.466.160 $5.262.565 54.1% —" [ref=e1030]:
+                  - cell "2022" [ref=e1031]:
+                    - generic [ref=e1032]: "2022"
+                  - cell "$11.466.160" [ref=e1033]
+                  - cell "$5.262.565" [ref=e1034]
+                  - cell "54.1%" [ref=e1035]
+                  - cell "—" [ref=e1036]
+                - row "2023 $22.406.010 $9.262.603 58.7% +95.4%" [ref=e1037]:
+                  - cell "2023" [ref=e1038]:
+                    - generic [ref=e1039]: "2023"
+                  - cell "$22.406.010" [ref=e1040]
+                  - cell "$9.262.603" [ref=e1041]
+                  - cell "58.7%" [ref=e1042]
+                  - cell "+95.4%" [ref=e1043]:
+                    - generic [ref=e1044]:
+                      - img [ref=e1045]
+                      - text: +95.4%
+                - row "2024 $34.835.659 $11.027.534 68.3% +55.5%" [ref=e1048]:
+                  - cell "2024" [ref=e1049]:
+                    - generic [ref=e1050]: "2024"
+                  - cell "$34.835.659" [ref=e1051]
+                  - cell "$11.027.534" [ref=e1052]
+                  - cell "68.3%" [ref=e1053]
+                  - cell "+55.5%" [ref=e1054]:
+                    - generic [ref=e1055]:
+                      - img [ref=e1056]
+                      - text: +55.5%
+                - row "2025 Mejor año histórico $39.897.866 $11.812.060 70.4% +14.5%" [ref=e1059]:
+                  - cell "2025 Mejor año histórico" [ref=e1060]:
+                    - generic [ref=e1061]:
+                      - text: "2025"
+                      - generic [ref=e1062]:
+                        - img [ref=e1063]
+                        - text: Mejor año histórico
+                  - cell "$39.897.866" [ref=e1069]
+                  - cell "$11.812.060" [ref=e1070]
+                  - cell "70.4%" [ref=e1071]
+                  - cell "+14.5%" [ref=e1072]:
+                    - generic [ref=e1073]:
+                      - img [ref=e1074]
+                      - text: +14.5%
+                - row "2026 Año en curso $21.135.396 $7.786.020 63.2% -47.0%" [ref=e1077]:
+                  - cell "2026 Año en curso" [ref=e1078]:
+                    - generic [ref=e1079]:
+                      - text: "2026"
+                      - generic [ref=e1080]:
+                        - img [ref=e1081]
+                        - text: Año en curso
+                  - cell "$21.135.396" [ref=e1084]
+                  - cell "$7.786.020" [ref=e1085]
+                  - cell "63.2%" [ref=e1086]
+                  - cell "-47.0%" [ref=e1087]:
+                    - generic [ref=e1088]:
+                      - img [ref=e1089]
+                      - text: "-47.0%"
+        - generic [ref=e1092]:
+          - generic [ref=e1093]:
+            - img [ref=e1095]
+            - generic [ref=e1097]:
+              - heading "Operaciones · Panel de control" [level=2] [ref=e1098]
+              - paragraph [ref=e1099]: Ocupación de capacidad instalada y clientes que requieren atención inmediata
+          - generic [ref=e1100]:
+            - generic [ref=e1101]:
+              - generic [ref=e1102]:
+                - generic [ref=e1103]:
+                  - heading "Ocupación de Cuentas Padre" [level=3] [ref=e1104]
+                  - generic [ref=e1105]: 100%
+                - generic [ref=e1108]:
+                  - generic [ref=e1109]: 282 ocupadas
+                  - generic [ref=e1110]: 0 libres
+                  - generic [ref=e1111]: 282 capacidad total
+              - table [ref=e1114]:
+                - rowgroup [ref=e1115]:
+                  - row "Cuenta Cap. Ocup. Uso" [ref=e1116]:
+                    - columnheader "Cuenta" [ref=e1117]
+                    - columnheader "Cap." [ref=e1118]
+                    - columnheader "Ocup." [ref=e1119]
+                    - columnheader "Uso" [ref=e1120]
+                - rowgroup [ref=e1121]:
+                  - row "M001 3 3 100%" [ref=e1122]:
+                    - cell "M001" [ref=e1123]
+                    - cell "3" [ref=e1124]
+                    - cell "3" [ref=e1125]
+                    - cell "100%" [ref=e1126]:
+                      - generic [ref=e1130]: 100%
+                  - row "M002 3 3 100%" [ref=e1131]:
+                    - cell "M002" [ref=e1132]
+                    - cell "3" [ref=e1133]
+                    - cell "3" [ref=e1134]
+                    - cell "100%" [ref=e1135]:
+                      - generic [ref=e1139]: 100%
+                  - row "M003 3 3 100%" [ref=e1140]:
+                    - cell "M003" [ref=e1141]
+                    - cell "3" [ref=e1142]
+                    - cell "3" [ref=e1143]
+                    - cell "100%" [ref=e1144]:
+                      - generic [ref=e1148]: 100%
+                  - row "M004 3 3 100%" [ref=e1149]:
+                    - cell "M004" [ref=e1150]
+                    - cell "3" [ref=e1151]
+                    - cell "3" [ref=e1152]
+                    - cell "100%" [ref=e1153]:
+                      - generic [ref=e1157]: 100%
+                  - row "M005 3 3 100%" [ref=e1158]:
+                    - cell "M005" [ref=e1159]
+                    - cell "3" [ref=e1160]
+                    - cell "3" [ref=e1161]
+                    - cell "100%" [ref=e1162]:
+                      - generic [ref=e1166]: 100%
+                  - row "M006 3 3 100%" [ref=e1167]:
+                    - cell "M006" [ref=e1168]
+                    - cell "3" [ref=e1169]
+                    - cell "3" [ref=e1170]
+                    - cell "100%" [ref=e1171]:
+                      - generic [ref=e1175]: 100%
+                  - row "M007 3 3 100%" [ref=e1176]:
+                    - cell "M007" [ref=e1177]
+                    - cell "3" [ref=e1178]
+                    - cell "3" [ref=e1179]
+                    - cell "100%" [ref=e1180]:
+                      - generic [ref=e1184]: 100%
+                  - row "M008 3 3 100%" [ref=e1185]:
+                    - cell "M008" [ref=e1186]
+                    - cell "3" [ref=e1187]
+                    - cell "3" [ref=e1188]
+                    - cell "100%" [ref=e1189]:
+                      - generic [ref=e1193]: 100%
+                  - row "M009 3 3 100%" [ref=e1194]:
+                    - cell "M009" [ref=e1195]
+                    - cell "3" [ref=e1196]
+                    - cell "3" [ref=e1197]
+                    - cell "100%" [ref=e1198]:
+                      - generic [ref=e1202]: 100%
+                  - row "M010 3 3 100%" [ref=e1203]:
+                    - cell "M010" [ref=e1204]
+                    - cell "3" [ref=e1205]
+                    - cell "3" [ref=e1206]
+                    - cell "100%" [ref=e1207]:
+                      - generic [ref=e1211]: 100%
+                  - row "M011 3 3 100%" [ref=e1212]:
+                    - cell "M011" [ref=e1213]
+                    - cell "3" [ref=e1214]
+                    - cell "3" [ref=e1215]
+                    - cell "100%" [ref=e1216]:
+                      - generic [ref=e1220]: 100%
+                  - row "M012 3 3 100%" [ref=e1221]:
+                    - cell "M012" [ref=e1222]
+                    - cell "3" [ref=e1223]
+                    - cell "3" [ref=e1224]
+                    - cell "100%" [ref=e1225]:
+                      - generic [ref=e1229]: 100%
+                  - row "M013 3 3 100%" [ref=e1230]:
+                    - cell "M013" [ref=e1231]
+                    - cell "3" [ref=e1232]
+                    - cell "3" [ref=e1233]
+                    - cell "100%" [ref=e1234]:
+                      - generic [ref=e1238]: 100%
+                  - row "M014 3 3 100%" [ref=e1239]:
+                    - cell "M014" [ref=e1240]
+                    - cell "3" [ref=e1241]
+                    - cell "3" [ref=e1242]
+                    - cell "100%" [ref=e1243]:
+                      - generic [ref=e1247]: 100%
+                  - row "M015 3 3 100%" [ref=e1248]:
+                    - cell "M015" [ref=e1249]
+                    - cell "3" [ref=e1250]
+                    - cell "3" [ref=e1251]
+                    - cell "100%" [ref=e1252]:
+                      - generic [ref=e1256]: 100%
+                  - row "M016 3 3 100%" [ref=e1257]:
+                    - cell "M016" [ref=e1258]
+                    - cell "3" [ref=e1259]
+                    - cell "3" [ref=e1260]
+                    - cell "100%" [ref=e1261]:
+                      - generic [ref=e1265]: 100%
+                  - row "M017 3 3 100%" [ref=e1266]:
+                    - cell "M017" [ref=e1267]
+                    - cell "3" [ref=e1268]
+                    - cell "3" [ref=e1269]
+                    - cell "100%" [ref=e1270]:
+                      - generic [ref=e1274]: 100%
+                  - row "M018 3 3 100%" [ref=e1275]:
+                    - cell "M018" [ref=e1276]
+                    - cell "3" [ref=e1277]
+                    - cell "3" [ref=e1278]
+                    - cell "100%" [ref=e1279]:
+                      - generic [ref=e1283]: 100%
+                  - row "M020 3 3 100%" [ref=e1284]:
+                    - cell "M020" [ref=e1285]
+                    - cell "3" [ref=e1286]
+                    - cell "3" [ref=e1287]
+                    - cell "100%" [ref=e1288]:
+                      - generic [ref=e1292]: 100%
+                  - row "M022 3 3 100%" [ref=e1293]:
+                    - cell "M022" [ref=e1294]
+                    - cell "3" [ref=e1295]
+                    - cell "3" [ref=e1296]
+                    - cell "100%" [ref=e1297]:
+                      - generic [ref=e1301]: 100%
+                  - row "M023 3 3 100%" [ref=e1302]:
+                    - cell "M023" [ref=e1303]
+                    - cell "3" [ref=e1304]
+                    - cell "3" [ref=e1305]
+                    - cell "100%" [ref=e1306]:
+                      - generic [ref=e1310]: 100%
+                  - row "M024 3 3 100%" [ref=e1311]:
+                    - cell "M024" [ref=e1312]
+                    - cell "3" [ref=e1313]
+                    - cell "3" [ref=e1314]
+                    - cell "100%" [ref=e1315]:
+                      - generic [ref=e1319]: 100%
+                  - row "M025 3 3 100%" [ref=e1320]:
+                    - cell "M025" [ref=e1321]
+                    - cell "3" [ref=e1322]
+                    - cell "3" [ref=e1323]
+                    - cell "100%" [ref=e1324]:
+                      - generic [ref=e1328]: 100%
+                  - row "M026 3 3 100%" [ref=e1329]:
+                    - cell "M026" [ref=e1330]
+                    - cell "3" [ref=e1331]
+                    - cell "3" [ref=e1332]
+                    - cell "100%" [ref=e1333]:
+                      - generic [ref=e1337]: 100%
+                  - row "M027 3 3 100%" [ref=e1338]:
+                    - cell "M027" [ref=e1339]
+                    - cell "3" [ref=e1340]
+                    - cell "3" [ref=e1341]
+                    - cell "100%" [ref=e1342]:
+                      - generic [ref=e1346]: 100%
+                  - row "M028 3 3 100%" [ref=e1347]:
+                    - cell "M028" [ref=e1348]
+                    - cell "3" [ref=e1349]
+                    - cell "3" [ref=e1350]
+                    - cell "100%" [ref=e1351]:
+                      - generic [ref=e1355]: 100%
+                  - row "M029 3 3 100%" [ref=e1356]:
+                    - cell "M029" [ref=e1357]
+                    - cell "3" [ref=e1358]
+                    - cell "3" [ref=e1359]
+                    - cell "100%" [ref=e1360]:
+                      - generic [ref=e1364]: 100%
+                  - row "M030 3 3 100%" [ref=e1365]:
+                    - cell "M030" [ref=e1366]
+                    - cell "3" [ref=e1367]
+                    - cell "3" [ref=e1368]
+                    - cell "100%" [ref=e1369]:
+                      - generic [ref=e1373]: 100%
+                  - row "M031 3 3 100%" [ref=e1374]:
+                    - cell "M031" [ref=e1375]
+                    - cell "3" [ref=e1376]
+                    - cell "3" [ref=e1377]
+                    - cell "100%" [ref=e1378]:
+                      - generic [ref=e1382]: 100%
+                  - row "M032 3 3 100%" [ref=e1383]:
+                    - cell "M032" [ref=e1384]
+                    - cell "3" [ref=e1385]
+                    - cell "3" [ref=e1386]
+                    - cell "100%" [ref=e1387]:
+                      - generic [ref=e1391]: 100%
+            - generic [ref=e1392]:
+              - generic [ref=e1393]:
+                - generic [ref=e1394]:
+                  - heading "Clientes en riesgo de churn" [level=3] [ref=e1395]
+                  - generic [ref=e1396]:
+                    - generic [ref=e1397]: 8 vencidos
+                    - generic [ref=e1398]: 7 por vencer
+                - paragraph [ref=e1399]: Pantallas con fin real vencido o a ≤ 8 días según el Planificador — ordenados por LTV histórico
+              - generic [ref=e1400]:
+                - table [ref=e1402]:
+                  - rowgroup [ref=e1403]:
+                    - row "Cliente Nickname LTV Vence Estado" [ref=e1404]:
+                      - columnheader "Cliente" [ref=e1405]
+                      - columnheader "Nickname" [ref=e1406]
+                      - columnheader "LTV" [ref=e1407]
+                      - columnheader "Vence" [ref=e1408]
+                      - columnheader "Estado" [ref=e1409]
+                  - rowgroup [ref=e1410]:
+                    - row "Daniela Cifuentes Daniela 6 (Fernando) $4.222.000 2026-07-07 Vence en 1d Por vencer" [ref=e1411]:
+                      - cell "Daniela Cifuentes" [ref=e1412]
+                      - cell "Daniela 6 (Fernando)" [ref=e1413]
+                      - cell "$4.222.000" [ref=e1414]
+                      - cell "2026-07-07 Vence en 1d" [ref=e1415]:
+                        - text: 2026-07-07
+                        - generic [ref=e1416]: Vence en 1d
+                      - cell "Por vencer" [ref=e1417]:
+                        - generic [ref=e1418]:
+                          - img [ref=e1419]
+                          - text: Por vencer
+                    - row "Miguel Bohorques Migue B4 Hermana $1.995.000 2026-07-09 Vence en 3d Por vencer" [ref=e1422]:
+                      - cell "Miguel Bohorques" [ref=e1423]
+                      - cell "Migue B4 Hermana" [ref=e1424]
+                      - cell "$1.995.000" [ref=e1425]
+                      - cell "2026-07-09 Vence en 3d" [ref=e1426]:
+                        - text: 2026-07-09
+                        - generic [ref=e1427]: Vence en 3d
+                      - cell "Por vencer" [ref=e1428]:
+                        - generic [ref=e1429]:
+                          - img [ref=e1430]
+                          - text: Por vencer
+                    - row "Andres Chirinos Andres Chirinos $1.612.000 2026-07-06 Vence hoy Vencido" [ref=e1433]:
+                      - cell "Andres Chirinos" [ref=e1434]
+                      - cell "Andres Chirinos" [ref=e1435]
+                      - cell "$1.612.000" [ref=e1436]
+                      - cell "2026-07-06 Vence hoy" [ref=e1437]:
+                        - text: 2026-07-06
+                        - generic [ref=e1438]: Vence hoy
+                      - cell "Vencido" [ref=e1439]:
+                        - generic [ref=e1440]:
+                          - img [ref=e1441]
+                          - text: Vencido
+                    - row "George Ospina George1 $1.537.510 2026-07-01 Venció hace 5d Vencido" [ref=e1443]:
+                      - cell "George Ospina" [ref=e1444]
+                      - cell "George1" [ref=e1445]
+                      - cell "$1.537.510" [ref=e1446]
+                      - cell "2026-07-01 Venció hace 5d" [ref=e1447]:
+                        - text: 2026-07-01
+                        - generic [ref=e1448]: Venció hace 5d
+                      - cell "Vencido" [ref=e1449]:
+                        - generic [ref=e1450]:
+                          - img [ref=e1451]
+                          - text: Vencido
+                    - row "Ricardo Peña Acropolis 1 $1.160.000 2026-07-06 Vence hoy Vencido" [ref=e1453]:
+                      - cell "Ricardo Peña" [ref=e1454]
+                      - cell "Acropolis 1" [ref=e1455]
+                      - cell "$1.160.000" [ref=e1456]
+                      - cell "2026-07-06 Vence hoy" [ref=e1457]:
+                        - text: 2026-07-06
+                        - generic [ref=e1458]: Vence hoy
+                      - cell "Vencido" [ref=e1459]:
+                        - generic [ref=e1460]:
+                          - img [ref=e1461]
+                          - text: Vencido
+                    - row "Andres Becerra Andres Becerra Usa 1 $990.000 2026-07-06 Vence hoy Vencido" [ref=e1463]:
+                      - cell "Andres Becerra" [ref=e1464]
+                      - cell "Andres Becerra Usa 1" [ref=e1465]
+                      - cell "$990.000" [ref=e1466]
+                      - cell "2026-07-06 Vence hoy" [ref=e1467]:
+                        - text: 2026-07-06
+                        - generic [ref=e1468]: Vence hoy
+                      - cell "Vencido" [ref=e1469]:
+                        - generic [ref=e1470]:
+                          - img [ref=e1471]
+                          - text: Vencido
+                    - row "Silvia Moyano Silvia-jhon $765.000 2026-07-09 Vence en 3d Por vencer" [ref=e1473]:
+                      - cell "Silvia Moyano" [ref=e1474]
+                      - cell "Silvia-jhon" [ref=e1475]
+                      - cell "$765.000" [ref=e1476]
+                      - cell "2026-07-09 Vence en 3d" [ref=e1477]:
+                        - text: 2026-07-09
+                        - generic [ref=e1478]: Vence en 3d
+                      - cell "Por vencer" [ref=e1479]:
+                        - generic [ref=e1480]:
+                          - img [ref=e1481]
+                          - text: Por vencer
+                    - row "Veronica Reinozo Veronica Reinozo $710.700 2026-07-02 Venció hace 4d Vencido" [ref=e1484]:
+                      - cell "Veronica Reinozo" [ref=e1485]
+                      - cell "Veronica Reinozo" [ref=e1486]
+                      - cell "$710.700" [ref=e1487]
+                      - cell "2026-07-02 Venció hace 4d" [ref=e1488]:
+                        - text: 2026-07-02
+                        - generic [ref=e1489]: Venció hace 4d
+                      - cell "Vencido" [ref=e1490]:
+                        - generic [ref=e1491]:
+                          - img [ref=e1492]
+                          - text: Vencido
+                    - row "Fermin Diaz Tio Fermin $540.000 2026-07-04 Venció hace 2d Vencido" [ref=e1494]:
+                      - cell "Fermin Diaz" [ref=e1495]
+                      - cell "Tio Fermin" [ref=e1496]
+                      - cell "$540.000" [ref=e1497]
+                      - cell "2026-07-04 Venció hace 2d" [ref=e1498]:
+                        - text: 2026-07-04
+                        - generic [ref=e1499]: Venció hace 2d
+                      - cell "Vencido" [ref=e1500]:
+                        - generic [ref=e1501]:
+                          - img [ref=e1502]
+                          - text: Vencido
+                    - row "Jhon Villakiran Jhon Villakiran 2 $460.000 2026-07-06 Vence hoy Vencido" [ref=e1504]:
+                      - cell "Jhon Villakiran" [ref=e1505]
+                      - cell "Jhon Villakiran 2" [ref=e1506]
+                      - cell "$460.000" [ref=e1507]
+                      - cell "2026-07-06 Vence hoy" [ref=e1508]:
+                        - text: 2026-07-06
+                        - generic [ref=e1509]: Vence hoy
+                      - cell "Vencido" [ref=e1510]:
+                        - generic [ref=e1511]:
+                          - img [ref=e1512]
+                          - text: Vencido
+                    - row "Cristian Sanchez Cristian Sanchez 2 $450.000 2026-07-10 Vence en 4d Por vencer" [ref=e1514]:
+                      - cell "Cristian Sanchez" [ref=e1515]
+                      - cell "Cristian Sanchez 2" [ref=e1516]
+                      - cell "$450.000" [ref=e1517]
+                      - cell "2026-07-10 Vence en 4d" [ref=e1518]:
+                        - text: 2026-07-10
+                        - generic [ref=e1519]: Vence en 4d
+                      - cell "Por vencer" [ref=e1520]:
+                        - generic [ref=e1521]:
+                          - img [ref=e1522]
+                          - text: Por vencer
+                    - row "Alejandro Bernal Alejandro Bernal $360.000 2026-07-04 Venció hace 2d Vencido" [ref=e1525]:
+                      - cell "Alejandro Bernal" [ref=e1526]
+                      - cell "Alejandro Bernal" [ref=e1527]
+                      - cell "$360.000" [ref=e1528]
+                      - cell "2026-07-04 Venció hace 2d" [ref=e1529]:
+                        - text: 2026-07-04
+                        - generic [ref=e1530]: Venció hace 2d
+                      - cell "Vencido" [ref=e1531]:
+                        - generic [ref=e1532]:
+                          - img [ref=e1533]
+                          - text: Vencido
+                    - row "Maria Teresa Villegas Maria Teresa Villegas $165.000 2026-07-13 Vence en 7d Por vencer" [ref=e1535]:
+                      - cell "Maria Teresa Villegas" [ref=e1536]
+                      - cell "Maria Teresa Villegas" [ref=e1537]
+                      - cell "$165.000" [ref=e1538]
+                      - cell "2026-07-13 Vence en 7d" [ref=e1539]:
+                        - text: 2026-07-13
+                        - generic [ref=e1540]: Vence en 7d
+                      - cell "Por vencer" [ref=e1541]:
+                        - generic [ref=e1542]:
+                          - img [ref=e1543]
+                          - text: Por vencer
+                    - row "Wilson Urmendez Wilson Urmen esp $90.000 2026-07-10 Vence en 4d Por vencer" [ref=e1546]:
+                      - cell "Wilson Urmendez" [ref=e1547]
+                      - cell "Wilson Urmen esp" [ref=e1548]
+                      - cell "$90.000" [ref=e1549]
+                      - cell "2026-07-10 Vence en 4d" [ref=e1550]:
+                        - text: 2026-07-10
+                        - generic [ref=e1551]: Vence en 4d
+                      - cell "Por vencer" [ref=e1552]:
+                        - generic [ref=e1553]:
+                          - img [ref=e1554]
+                          - text: Por vencer
+                    - row "Jorge Ospina Jorge Ospina $15.000 2026-07-09 Vence en 3d Por vencer" [ref=e1557]:
+                      - cell "Jorge Ospina" [ref=e1558]
+                      - cell "Jorge Ospina" [ref=e1559]
+                      - cell "$15.000" [ref=e1560]
+                      - cell "2026-07-09 Vence en 3d" [ref=e1561]:
+                        - text: 2026-07-09
+                        - generic [ref=e1562]: Vence en 3d
+                      - cell "Por vencer" [ref=e1563]:
+                        - generic [ref=e1564]:
+                          - img [ref=e1565]
+                          - text: Por vencer
+                - generic [ref=e1568]:
+                  - img [ref=e1569]
+                  - text: "Valor total en riesgo:"
+                  - generic [ref=e1571]: $15.072.210
+        - generic [ref=e1572]:
+          - generic [ref=e1573]:
+            - img [ref=e1575]
+            - generic [ref=e1577]:
+              - heading "Análisis económico-financiero" [level=2] [ref=e1578]
+              - paragraph [ref=e1579]: Lectura experta del comportamiento del negocio a partir de los datos actuales
+          - generic [ref=e1580]:
+            - generic [ref=e1583]:
+              - generic [ref=e1584]:
+                - heading "Crecimiento estructural (CAGR)" [level=4] [ref=e1585]
+                - generic [ref=e1586]: Favorable
+              - paragraph [ref=e1587]: Entre 2022 y 2025 los ingresos crecieron a una tasa compuesta anual (CAGR) de 51.5%, pasando de $11.466.160 a $39.897.866. Es una expansión muy acelerada, típica de una etapa de captación agresiva de mercado.
+            - generic [ref=e1590]:
+              - generic [ref=e1591]:
+                - heading "Crecimiento del último año cerrado (2025)" [level=4] [ref=e1592]
+                - generic [ref=e1593]: Favorable
+              - paragraph [ref=e1594]:
+                - text: Los ingresos crecieron 14.5% frente a 2024 ($34.835.659 → $39.897.866), mientras que los costos lo hicieron en 7.1%. Se observa una
+                - strong [ref=e1595]: desaceleración
+                - text: "respecto al ciclo de crecimiento anterior — la curva de adopción empieza a madurar y el negocio entra en una fase de consolidación más que de expansión explosiva. Lo más relevante: el ingreso creció más rápido que el costo, lo que"
+                - strong [ref=e1596]: amplía el margen operativo
+                - text: — apalancamiento operativo positivo.
+            - generic [ref=e1599]:
+              - generic [ref=e1600]:
+                - heading "Comparativo año corrido — Ene–Jul 2026 vs. 2025" [level=4] [ref=e1601]
+                - generic [ref=e1602]: A vigilar
+              - paragraph [ref=e1603]:
+                - text: En el mismo periodo (Ene–Jul), los ingresos pasaron de $22.235.800 a $21.135.396 (-4.9%), mientras que los costos pasaron de $8.838.212 a $7.786.020 (-11.9%). Se mantiene una
+                - strong [ref=e1604]: "\"tijera\" favorable de 7.0 puntos"
+                - text: ": el ingreso crece más rápido que el costo, lo que sostiene o mejora el margen bruto del periodo. Es la dinámica que conviene proteger — cualquier inversión adicional en adquisición de clientes tiene, hoy, un retorno marginal positivo sobre el margen."
+            - generic [ref=e1607]:
+              - generic [ref=e1608]:
+                - heading "Estructura de márgenes y unit economics" [level=4] [ref=e1609]
+                - generic [ref=e1610]: Favorable
+              - paragraph [ref=e1611]:
+                - text: El margen bruto histórico es de 65.2% ($84.590.308 sobre $129.741.091 de ingresos, frente a $45.150.783 de costo de pantallas/cuentas). Es un margen alto, propio de un modelo de reventa de licencias digitales con muy bajo costo marginal por usuario adicional. El ticket promedio por transacción es de $52.891, y el 82.5% de las ventas corresponden a
+                - strong [ref=e1612]: renovaciones
+                - text: (vs. 29.2% de activaciones nuevas). Esta proporción confirma que el negocio vive principalmente de su
+                - strong [ref=e1613]: base instalada
+                - text: — la prioridad estratégica debería ser la retención (reducir churn) más que la adquisición pura, porque cada punto de churn cuesta proporcionalmente más que un punto de nueva activación.
+            - generic [ref=e1616]:
+              - generic [ref=e1617]:
+                - heading "Riesgo de cancelación (churn) y solidez de la base" [level=4] [ref=e1618]
+                - generic [ref=e1619]: A vigilar
+              - paragraph [ref=e1620]:
+                - text: La tasa de cancelación de suscripciones es de 30.5% sobre el universo histórico activo+cancelado, y se registraron 30 bajas en 2026 (frente a 40 en 2025). Este nivel de churn es
+                - strong [ref=e1621]: alto para un negocio de suscripción
+                - text: "— cada cliente que se cancela debe ser reemplazado por uno nuevo solo para mantener el ingreso plano, lo que castiga el crecimiento neto y eleva el costo efectivo de adquisición. Recomendación: instrumentar alertas tempranas de vencimiento (el Planificador ya identifica cuentas próximas a vencer) y campañas de retención proactivas antes del corte del servicio."
+            - generic [ref=e1624]:
+              - generic [ref=e1625]:
+                - heading "Lectura ejecutiva y recomendaciones" [level=4] [ref=e1626]
+                - generic [ref=e1627]: Recomendación
+              - paragraph [ref=e1628]:
+                - strong [ref=e1629]: Diagnóstico
+                - text: ": el negocio consolidó una base rentable (margen 65.2%, markup de 187.4% sobre el costo, CAGR histórico 51.5%), con un punto de equilibrio de apenas 854 ventas frente a un volumen muy superior ya alcanzado, pero muestra señales de"
+                - strong [ref=e1630]: desaceleración en el periodo más reciente
+                - text: ", con el costo presionando el margen relativo y un momentum de ventas de -8.6% mes a mes."
+                - strong [ref=e1631]: "Cuatro palancas priorizadas:"
+                - text: "1."
+                - strong [ref=e1632]: Retención sobre adquisición
+                - text: — con 82.5% del ingreso viniendo de renovaciones y un churn de 30.5%, reducir la fuga de clientes existentes tiene mayor ROI marginal que captar clientes nuevos. 2.
+                - strong [ref=e1633]: Eficiencia de costo unitario
+                - text: — el costo de pantallas creció 7.1% el último año cerrado; negociar mejores condiciones de recarga/credenciales (TRM, volumen) protege directamente el margen bruto y el markup de 187.4%. 3.
+                - strong [ref=e1634]: Gestión del riesgo de concentración
+                - text: — el 20% de los clientes aporta 48.7% del ingreso (ARPU de $491.444); diversificar la base y fidelizar a los clientes "ancla" con planes anuales reduce la exposición a una caída súbita de ingreso. 4.
+                - strong [ref=e1635]: Estacionalidad y caja
+                - text: — con 306 ventas registradas en lo corrido de 2026 y un momentum reciente de -8.6% mes a mes, conviene proyectar el flujo de caja mensual (ingresos por renovación son recurrentes y predecibles) para anticipar capital de trabajo en los meses de mayor actividad de recargas.
+  - generic [ref=e1636]: "25"
