@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Package, TrendingUp, CheckCircle, Wallet, Activity } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, LabelList } from 'recharts'
 import { formatCurrency } from '../../utils/excelUtils'
+import { KpiCard } from '../../components/ui/KpiCard'
 import api from '../../config/api'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 
@@ -19,42 +20,8 @@ const CSS = `
   .iv-orb-2 { animation: iv-orb-2 11s ease-in-out infinite }
 `
 
-function DeviceCard({ icon: Icon, label, value, sub, variant }) {
-  const isSolid = variant === 'solid'
-  const isOutline = variant === 'outline'
-  
-  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
-    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? 'bg-indigo-50 border border-indigo-200' : 'border border-slate-200 shadow-sm'}
-    hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50`
-
-  const topBorder = isSolid 
-    ? 'linear-gradient(90deg, #6366f1, #4f46e5)'
-    : 'linear-gradient(90deg, #818cf880, #6366f180)'
-
-  return (
-    <div className={containerClass}>
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
-      <div className="p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? 'text-indigo-600' : 'text-slate-400'}`}>
-            {label}
-          </p>
-          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
-            {value}
-          </p>
-          {sub && (
-            <p className={`text-xs mt-2 font-medium ${isOutline ? 'text-indigo-600' : 'text-slate-500'}`}>
-              {sub}
-            </p>
-          )}
-        </div>
-        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? 'bg-indigo-50 text-indigo-600' : 'bg-indigo-50 text-indigo-600'}`}>
-          <Icon size={22} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// DeviceCard → KpiCard global (dark Huashu)
+const DeviceCard = (props) => <KpiCard {...props} tone="indigo" />
 
 export default function AnalisisInventarioPage() {
   const [inventario, setInventario] = useState([])

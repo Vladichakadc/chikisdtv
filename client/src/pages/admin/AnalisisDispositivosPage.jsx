@@ -7,6 +7,7 @@ import {
 import api from '../../config/api'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
+import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
 
@@ -28,49 +29,11 @@ const CSS = `
 
 // ─── Helpers de UI ────────────────────────────────────────────────────────────
 
-function StatCard({ icon: Icon, label, value, sub, color = 'indigo', onClick }) {
-  const interactive = typeof onClick === 'function'
-  
-  let grad = 'linear-gradient(135deg, #94a3b8, #64748b)'
-  let lightGrad = 'linear-gradient(135deg, #f8fafc, #f1f5f9)'
-  let iconCol = '#64748b'
-
-  if (color === 'indigo') { grad = 'linear-gradient(135deg, #6366f1, #4f46e5)'; lightGrad = 'rgba(99,102,241,0.1)'; iconCol = '#6366f1' }
-  else if (color === 'emerald') { grad = 'linear-gradient(135deg, #10b981, #059669)'; lightGrad = 'rgba(16,185,129,0.1)'; iconCol = '#10b981' }
-  else if (color === 'orange') { grad = 'linear-gradient(135deg, #f97316, #ea580c)'; lightGrad = 'rgba(249,115,22,0.1)'; iconCol = '#ea580c' }
-  else if (color === 'violet') { grad = 'linear-gradient(135deg, #8b5cf6, #7c3aed)'; lightGrad = 'rgba(139,92,246,0.1)'; iconCol = '#8b5cf6' }
-
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        'relative bg-white rounded-2xl border border-slate-200 overflow-hidden select-none',
-        interactive ? 'cursor-pointer disp-kpi' : ''
-      )}
-      {...(interactive ? {
-        role: 'button', tabIndex: 0,
-        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
-      } : {})}
-    >
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: grad }} />
-      <div className="p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{label}</p>
-          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none truncate">{value}</p>
-          {sub && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{sub}</p>}
-          {interactive && (
-            <p className="text-[11px] font-bold text-indigo-500 mt-3 inline-flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity">
-              <Lightbulb size={12} /> ¿Cómo se calcula?
-            </p>
-          )}
-        </div>
-        <div className="p-2.5 rounded-xl shrink-0" style={{ background: lightGrad }}>
-          <Icon size={20} style={{ color: iconCol }} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// StatCard → KpiCard global (dark Huashu)
+// color prop: indigo | emerald | orange | violet → mapped to tone
+const COLOR_TO_TONE = { indigo: 'indigo', emerald: 'emerald', orange: 'orange', violet: 'purple' }
+const StatCard = ({ color = 'indigo', ...props }) =>
+  <KpiCard {...props} tone={COLOR_TO_TONE[color] || 'indigo'} />
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e', '#8b5cf6']
 

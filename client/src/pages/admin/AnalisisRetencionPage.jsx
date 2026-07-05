@@ -10,6 +10,7 @@ import {
 import api from '../../config/api'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
+import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
 
 const CSS = `
@@ -45,45 +46,14 @@ function SmartTag({ tone = 'info', icon: Icon = Sparkles, children }) {
   )
 }
 
-function BiCard({ icon: Icon, label, value, sub, variant = 'light', tag, onClick }) {
-  const styles = {
-    solid:   'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-orange-200',
-    light:   'bg-white border-2 border-orange-200 text-orange-700',
-    outline: 'bg-orange-50 border border-orange-300 text-orange-800',
-  }
-  const iconBg = {
-    solid: 'bg-white/20', light: 'bg-orange-100', outline: 'bg-orange-200/60',
-  }
-  const interactive = typeof onClick === 'function'
-  return (
-    <div
-      className={`${styles[variant]} rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 ${interactive ? 'cursor-pointer' : ''}`}
-      {...(interactive ? {
-        role: 'button', tabIndex: 0, onClick,
-        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
-      } : {})}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`${iconBg[variant]} rounded-lg p-2`}>
-          <Icon size={18} className={variant === 'solid' ? 'text-white' : 'text-orange-500'} />
-        </div>
-        <p className={`text-xs font-semibold uppercase tracking-wide ${variant === 'solid' ? 'text-white/80' : 'text-gray-500'}`}>
-          {label}
-        </p>
-      </div>
-      <p className="text-2xl font-bold mt-1">{value}</p>
-      {tag && <div className="mt-1.5"><SmartTag tone={tag.tone}>{tag.text}</SmartTag></div>}
-      {sub && (
-        <p className={`text-xs mt-2 leading-relaxed ${variant === 'solid' ? 'text-white/70' : 'text-gray-400'}`}>
-          {sub}
-        </p>
-      )}
-      {interactive && (
-        <p className={`text-xs font-semibold mt-1.5 ${variant === 'solid' ? 'text-white/90' : 'text-brand-primary'}`}>¿Cómo se calcula?</p>
-      )}
-    </div>
-  )
-}
+// BiCard → KpiCard global (dark Huashu)
+// tag prop se muestra como sub adicional cuando no hay sub
+const BiCard = ({ tag, sub, ...props }) =>
+  <KpiCard
+    {...props}
+    tone="orange"
+    sub={sub || (tag ? tag.text : undefined)}
+  />
 
 function ChartInsight({ text }) {
   if (!text) return null

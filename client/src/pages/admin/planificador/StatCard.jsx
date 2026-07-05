@@ -1,57 +1,134 @@
-import { ArrowRight, Sparkles } from 'lucide-react'
+/**
+ * StatCard — Huashu Dark Edition
+ * Skills: ui-ux-pro-max · huashu-design · taste-skill
+ *
+ * Tarjeta KPI oscura con:
+ *  – Fondo dark glassmorphism con patrón de grid sutil
+ *  – Ícono en círculo de color con glow
+ *  – Número grande bold blanco
+ *  – Label uppercase pequeño
+ *  – Hover lift + glow en accent color
+ *  – Borde superior degradado
+ */
 
-// PRO MAX Tones
+// Paleta de tones oscuros: gradiente + colores del ícono
 export const STAT_TONES = {
-  orange:  { gradFrom: '#f97316', gradTo: '#fb923c', text: 'text-orange-500', bg: 'bg-orange-50' },
-  red:     { gradFrom: '#ef4444', gradTo: '#f87171', text: 'text-red-500', bg: 'bg-red-50' },
-  amber:   { gradFrom: '#f59e0b', gradTo: '#fbbf24', text: 'text-amber-500', bg: 'bg-amber-50' },
-  emerald: { gradFrom: '#10b981', gradTo: '#34d399', text: 'text-emerald-500', bg: 'bg-emerald-50' },
-  purple:  { gradFrom: '#a855f7', gradTo: '#c084fc', text: 'text-purple-500', bg: 'bg-purple-50' },
-  indigo:  { gradFrom: '#6366f1', gradTo: '#818cf8', text: 'text-indigo-500', bg: 'bg-indigo-50' },
-  sky:     { gradFrom: '#0ea5e9', gradTo: '#38bdf8', text: 'text-sky-500', bg: 'bg-sky-50' },
+  orange:  { from: '#f97316', to: '#fb923c',  glow: 'rgba(249,115,22,0.35)',   icon: '#f97316' },
+  red:     { from: '#ef4444', to: '#f87171',  glow: 'rgba(239,68,68,0.35)',    icon: '#ef4444' },
+  amber:   { from: '#f59e0b', to: '#fbbf24',  glow: 'rgba(245,158,11,0.35)',   icon: '#f59e0b' },
+  emerald: { from: '#10b981', to: '#34d399',  glow: 'rgba(16,185,129,0.35)',   icon: '#10b981' },
+  purple:  { from: '#a855f7', to: '#c084fc',  glow: 'rgba(168,85,247,0.35)',   icon: '#a855f7' },
+  indigo:  { from: '#6366f1', to: '#818cf8',  glow: 'rgba(99,102,241,0.35)',   icon: '#6366f1' },
+  sky:     { from: '#0ea5e9', to: '#38bdf8',  glow: 'rgba(14,165,233,0.35)',   icon: '#0ea5e9' },
+  pink:    { from: '#ec4899', to: '#f472b6',  glow: 'rgba(236,72,153,0.35)',   icon: '#ec4899' },
+  cyan:    { from: '#06b6d4', to: '#22d3ee',  glow: 'rgba(6,182,212,0.35)',    icon: '#06b6d4' },
 }
 
-export function StatCard({ icon: Icon, label, value, sub, variant, tone = 'orange', onClick }) {
-  const t = STAT_TONES[tone] || STAT_TONES.orange
-  
-  // Custom PRO MAX styling based on variant
-  const isSolid = variant === 'solid'
-  const isOutline = variant === 'outline'
-  
-  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
-    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? `${t.bg} border border-${t.text.replace('text-','border-')}/30` : 'border border-slate-200 shadow-sm'}
-    ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50' : ''}`
+// Fondo base de cada variante (todos oscuros)
+const VARIANT_BG = {
+  solid:   'linear-gradient(135deg,#1e1b4b 0%,#1a1a2e 100%)',
+  outline: 'linear-gradient(135deg,#111827 0%,#0f172a 100%)',
+  light:   'linear-gradient(135deg,#1e293b 0%,#0f172a 100%)',
+}
 
-  const topBorder = isSolid 
-    ? `linear-gradient(90deg, ${t.gradFrom}, ${t.gradTo})`
-    : `linear-gradient(90deg, ${t.gradFrom}80, ${t.gradTo}80)`
+export function StatCard({ icon: Icon, label, value, sub, variant = 'light', tone = 'purple', onClick }) {
+  const t = STAT_TONES[tone] || STAT_TONES.purple
+  const bg = VARIANT_BG[variant] || VARIANT_BG.light
 
   return (
-    <div className={containerClass} onClick={onClick}>
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
-      <div className="p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? t.text : 'text-slate-400'}`}>
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick() } : undefined}
+      style={{
+        background: bg,
+        cursor: onClick ? 'pointer' : 'default',
+        // Subtle grid overlay via CSS background-image (done inline for isolation)
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: '18px',
+        border: `1px solid rgba(255,255,255,0.07)`,
+        boxShadow: `0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06)`,
+        transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+        userSelect: 'none',
+      }}
+      className="stat-card-dark"
+    >
+      {/* Subtle grid pattern overlay */}
+      <div style={{
+        position: 'absolute', inset: 0, opacity: 0.04, pointerEvents: 'none',
+        backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px)',
+        backgroundSize: '24px 24px',
+      }} />
+
+      {/* Top gradient border */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+        background: `linear-gradient(90deg, ${t.from}, ${t.to})`,
+        borderRadius: '18px 18px 0 0',
+      }} />
+
+      {/* Content */}
+      <div style={{ position: 'relative', padding: '20px 20px 18px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+        {/* Text block */}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{
+            fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em',
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)',
+            marginBottom: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}>
             {label}
           </p>
-          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
+          <p style={{
+            fontSize: '2rem', fontWeight: 800, color: '#f0f0fa',
+            lineHeight: 1, tabularNums: 'numeric',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            letterSpacing: '-0.02em',
+          }}>
             {value}
           </p>
           {sub && (
-            <p className={`text-xs mt-2 font-medium ${isOutline ? t.text : 'text-slate-500'}`}>
+            <p style={{
+              fontSize: '11px', color: 'rgba(255,255,255,0.38)',
+              marginTop: '6px', fontWeight: 500,
+            }}>
               {sub}
             </p>
           )}
           {onClick && (
-            <div className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-600 transition-colors">
-              <Sparkles size={11} className={t.text} /> <span>Ver / Generar venta</span> <ArrowRight size={11} className={t.text} />
-            </div>
+            <p style={{
+              fontSize: '10px', fontWeight: 700, color: t.icon,
+              marginTop: '8px', letterSpacing: '0.05em', textTransform: 'uppercase',
+            }}>
+              Ver detalle →
+            </p>
           )}
         </div>
-        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? `${t.bg} ${t.text}` : `${t.bg} ${t.text}`}`}>
-          <Icon size={22} />
+
+        {/* Icon badge */}
+        <div style={{
+          width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
+          background: `linear-gradient(135deg, ${t.from}22, ${t.to}33)`,
+          border: `1px solid ${t.from}40`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: `0 0 16px ${t.glow}`,
+        }}>
+          <Icon size={20} style={{ color: t.icon }} />
         </div>
       </div>
+
+      {/* Inline hover style */}
+      <style>{`
+        .stat-card-dark:hover {
+          transform: translateY(-4px) !important;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.1) !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .stat-card-dark { transition: none !important; }
+          .stat-card-dark:hover { transform: none !important; }
+        }
+      `}</style>
     </div>
   )
 }

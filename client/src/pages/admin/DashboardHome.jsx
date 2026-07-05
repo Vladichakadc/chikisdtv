@@ -14,6 +14,7 @@ import { useUi } from '../../context/UiContext'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
+import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
 import { calcDias, getRowVariant, diasLabel } from './planificador/rowHelpers'
@@ -49,52 +50,16 @@ const CSS = `
 // ─── Stat card (KPIs operativos) ─────────────────────────────────────────────
 // Al hacer clic abre el modal explicativo del cálculo (con acceso al módulo fuente).
 
-function StatCard({ icon: Icon, title, value, color, subtitle, onClick }) {
-  const interactive = typeof onClick === 'function'
-  
-  // Extract tailwind color string to map to gradients
-  let grad = 'linear-gradient(135deg, #94a3b8, #64748b)'
-  let lightGrad = 'linear-gradient(135deg, #f8fafc, #f1f5f9)'
-  let iconCol = '#64748b'
-  
-  if (color?.includes('brand-primary') || color?.includes('orange')) { grad = 'linear-gradient(135deg, #f97316, #ea580c)'; lightGrad = 'rgba(249,115,22,0.1)'; iconCol = '#ea580c' }
-  else if (color?.includes('blue')) { grad = 'linear-gradient(135deg, #0ea5e9, #3b82f6)'; lightGrad = 'rgba(14,165,233,0.1)'; iconCol = '#0ea5e9' }
-  else if (color?.includes('green')) { grad = 'linear-gradient(135deg, #10b981, #059669)'; lightGrad = 'rgba(16,185,129,0.1)'; iconCol = '#10b981' }
-  else if (color?.includes('purple')) { grad = 'linear-gradient(135deg, #a855f7, #7e22ce)'; lightGrad = 'rgba(168,85,247,0.1)'; iconCol = '#a855f7' }
-  else if (color?.includes('amber')) { grad = 'linear-gradient(135deg, #f59e0b, #d97706)'; lightGrad = 'rgba(245,158,11,0.1)'; iconCol = '#f59e0b' }
-  else if (color?.includes('red')) { grad = 'linear-gradient(135deg, #ef4444, #dc2626)'; lightGrad = 'rgba(239,68,68,0.1)'; iconCol = '#ef4444' }
-
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        'relative bg-white rounded-2xl border border-slate-200 overflow-hidden select-none',
-        interactive ? 'cursor-pointer dash-kpi' : ''
-      )}
-      {...(interactive ? {
-        role: 'button',
-        tabIndex: 0,
-        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
-      } : {})}
-    >
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: grad }} />
-      <div className="p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold tracking-[.14em] uppercase text-slate-400 mb-2">{title}</p>
-          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none">{value}</p>
-          {subtitle && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{subtitle}</p>}
-          {interactive && (
-            <p className="text-[11px] font-bold text-indigo-500 mt-3 inline-flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity">
-              <Lightbulb size={12} /> ¿Cómo se calcula?
-            </p>
-          )}
-        </div>
-        <div className="p-2.5 rounded-xl shrink-0" style={{ background: lightGrad }}>
-          <Icon size={20} style={{ color: iconCol }} />
-        </div>
-      </div>
-    </div>
-  )
+// StatCard → KpiCard global (dark Huashu)
+// El Dashboard usa `color` (clase Tailwind) — lo mapeamos a tone
+const COLOR_MAP = {
+  'brand-primary': 'orange', orange: 'orange',
+  blue: 'sky', green: 'emerald',
+  purple: 'purple', amber: 'amber', red: 'red',
+}
+function StatCard({ icon, title, value, color, subtitle, onClick }) {
+  const tone = Object.entries(COLOR_MAP).find(([k]) => color?.includes(k))?.[1] || 'indigo'
+  return <KpiCard icon={icon} label={title} value={value} sub={subtitle} tone={tone} onClick={onClick} />
 }
 
 // ─── Narrativas de las gráficas que permanecen en el Dashboard ───────────────

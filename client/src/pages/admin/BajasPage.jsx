@@ -3,6 +3,7 @@ import { useUi } from '../../context/UiContext'
 import { Plus, Pencil, Trash2, X, Search, UserX, Tv, ArrowDownCircle, BarChart3, Calendar, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
+import { KpiCard } from '../../components/ui/KpiCard'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { Button } from '../../components/ui/Button'
@@ -45,47 +46,8 @@ const CSS = `
   }
 `
 
-function BajaCard({ icon: Icon, label, value, sub, variant, onClick }) {
-  const isSolid = variant === 'solid'
-  const isOutline = variant === 'outline'
-  
-  const containerClass = `relative bg-white rounded-2xl overflow-hidden select-none transition-all duration-300
-    ${isSolid ? 'shadow-md border border-slate-100' : isOutline ? 'bg-rose-50 border border-rose-200' : 'border border-slate-200 shadow-sm'}
-    ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/50' : ''}`
-
-  const topBorder = isSolid 
-    ? 'linear-gradient(90deg, #f43f5e, #e11d48)'
-    : 'linear-gradient(90deg, #fb718580, #f43f5e80)'
-
-  return (
-    <div className={containerClass} onClick={onClick}>
-      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: topBorder }} />
-      <div className="p-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={`text-[10px] font-bold tracking-[.14em] uppercase mb-1 ${isOutline ? 'text-rose-500' : 'text-slate-400'}`}>
-            {label}
-          </p>
-          <p className="text-3xl font-extrabold text-slate-800 tabular-nums leading-none mt-1">
-            {value}
-          </p>
-          {sub && (
-            <p className={`text-xs mt-2 font-medium ${isOutline ? 'text-rose-500' : 'text-slate-500'}`}>
-              {sub}
-            </p>
-          )}
-          {onClick && (
-            <div className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors">
-              <span>¿Cómo se calcula?</span>
-            </div>
-          )}
-        </div>
-        <div className={`p-2.5 rounded-xl shrink-0 ${isSolid ? 'bg-rose-50 text-rose-500' : 'bg-rose-50 text-rose-500'}`}>
-          <Icon size={22} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// BajaCard → KpiCard global (dark Huashu)
+const BajaCard = (props) => <KpiCard {...props} tone="rose" />
 
 // Columnas de la tabla
 const TABLE_COLUMNS = [
