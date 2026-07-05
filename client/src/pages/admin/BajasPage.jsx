@@ -118,9 +118,17 @@ function SortIcon({ sortKey, sortCol, sortDir }) {
 
 export default function BajasPage() {
   const { showToast } = useUi()
-  const { data: bajas, loading, reload: load } = useApiResource('/admin/bajas')
-
-
+  const { data: bajas = [], loading, reload: load } = useApiResource('/admin/bajas')
+  
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState(EMPTY)
+  const [showForm, setShowForm] = useState(false)
+  const [search, setSearch] = useState('')
+  const [sortCol, setSortCol] = useState('fechaBaja')
+  const [sortDir, setSortDir] = useState('desc')
+  const [nicknames, setNicknames] = useState([])
+  const [nicknameEditMode, setNicknameEditMode] = useState(false)
+  const [explain, setExplain] = useState(null)
   const openNew = async () => {
     setEditing(null)
     setForm(EMPTY)
