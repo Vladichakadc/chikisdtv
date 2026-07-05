@@ -32,35 +32,119 @@ import { DaysChip } from './planificador/TableBits'
 const DIAS_ALERTA_CP = 30
 
 const CSS = `
-  @keyframes pl-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
-  @keyframes pl-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
-  @keyframes pl-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
-  @keyframes pl-fade-in { from { opacity:0 } to { opacity:1 } }
+  @keyframes pl-fade-up  { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes pl-fade-in  { from { opacity:0 } to { opacity:1 } }
   @keyframes pl-scale-in { from { opacity:0; transform:scale(.94) translateY(10px) } to { opacity:1; transform:scale(1) translateY(0) } }
+  @keyframes pl-orb-1    { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
+  @keyframes pl-orb-2    { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  @keyframes pl-shimmer  { from { background-position:-200% 0 } to { background-position:200% 0 } }
 
   .pl-a1 { animation: pl-fade-up .45s cubic-bezier(.22,1,.36,1) both }
   .pl-a2 { animation: pl-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
-  
+  .pl-a3 { animation: pl-fade-up .45s cubic-bezier(.22,1,.36,1) .12s both }
+  .pl-a4 { animation: pl-fade-up .45s cubic-bezier(.22,1,.36,1) .18s both }
+
   .pl-orb-1 { animation: pl-orb-1 8s ease-in-out infinite }
   .pl-orb-2 { animation: pl-orb-2 11s ease-in-out infinite }
-  
+
+  /* ── CTA primario (Actualizar) ── */
   .pl-cta {
     background: linear-gradient(135deg, #a855f7, #ec4899);
     box-shadow: 0 4px 18px rgba(168,85,247,.4);
     transition: all .22s ease; border: none;
   }
-  .pl-cta:hover { box-shadow: 0 7px 24px rgba(168,85,247,.55); transform: translateY(-2px) }
-  
-  .pl-btn-ghost { transition: all .2s ease; border: 1px solid rgba(255,255,255,.2); background: transparent; }
+  .pl-cta:hover  { box-shadow: 0 7px 24px rgba(168,85,247,.55); transform: translateY(-2px) }
+  .pl-cta:active { transform: translateY(0) }
+
+  /* ── Botones ghost del hero ── */
+  .pl-btn-ghost {
+    transition: all .2s ease;
+    border: 1px solid rgba(255,255,255,.2);
+    background: transparent;
+  }
   .pl-btn-ghost:hover { background: rgba(255,255,255,.1) }
 
+  /* ── Glassmorphism — panel de filtros y widgets ── */
+  .pl-glass {
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(168,85,247,0.12);
+    border-radius: 18px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9);
+    transition: box-shadow .25s ease, border-color .25s ease;
+  }
+  .pl-glass:hover { border-color: rgba(168,85,247,0.22); box-shadow: 0 8px 32px rgba(168,85,247,0.1), inset 0 1px 0 rgba(255,255,255,0.9) }
+
+  /* ── Input de búsqueda ── */
+  .pl-search {
+    background: rgba(255,255,255,0.85);
+    border: 1.5px solid rgba(168,85,247,0.15);
+    border-radius: 12px;
+    transition: all .2s ease;
+  }
+  .pl-search:focus { outline: none; border-color: #a855f7; box-shadow: 0 0 0 3px rgba(168,85,247,0.15); background: #fff }
+
+  /* ── Select de filtro ── */
+  .pl-select {
+    background: rgba(255,255,255,0.85);
+    border: 1.5px solid rgba(168,85,247,0.15);
+    border-radius: 12px;
+    transition: all .2s ease;
+    cursor: pointer;
+  }
+  .pl-select:focus { outline: none; border-color: #a855f7; box-shadow: 0 0 0 3px rgba(168,85,247,0.15) }
+
+  /* ── Card de capacidad ── */
+  .pl-capacity-card {
+    background: linear-gradient(135deg, rgba(248,246,255,0.95) 0%, rgba(245,240,255,0.95) 100%);
+    border: 1px solid rgba(168,85,247,0.18);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(168,85,247,0.07);
+  }
+  .pl-capacity-card .cap-header {
+    background: linear-gradient(90deg, rgba(168,85,247,0.08), rgba(236,72,153,0.06));
+    border-bottom: 1px solid rgba(168,85,247,0.12);
+  }
+
+  /* ── Card de advertencia (inconsistencias) ── */
+  .pl-warning-card {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 1px solid rgba(245,158,11,0.35);
+    border-radius: 18px;
+    box-shadow: 0 2px 12px rgba(245,158,11,0.1);
+  }
+
+  /* ── Tabla filas ── */
+  .pl-row { transition: background .15s ease }
+  .pl-row:hover td { background: rgba(168,85,247,0.04) }
+
+  /* ── Overlays y modales ── */
   .pl-overlay { animation: pl-fade-in .2s ease both }
   .pl-confirm { animation: pl-scale-in .22s cubic-bezier(.22,1,.36,1) both }
 
+  /* ── Skeleton ── */
+  .pl-skeleton {
+    background: linear-gradient(90deg,#f1f5f9 25%,#ede9fe 50%,#f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: pl-shimmer 1.6s infinite;
+    border-radius: 6px;
+  }
+
+  /* ── Botón Estatus Cliente activo ── */
+  .pl-estatus-btn-active {
+    background: linear-gradient(135deg,#a855f7,#ec4899);
+    color: white;
+    box-shadow: 0 4px 14px rgba(168,85,247,0.35);
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .pl-a1, .pl-a2, .pl-orb-1, .pl-orb-2, .pl-overlay, .pl-confirm { animation: none !important; transition: none !important }
+    .pl-a1,.pl-a2,.pl-a3,.pl-a4,
+    .pl-orb-1,.pl-orb-2,.pl-overlay,.pl-confirm,.pl-skeleton { animation: none !important; transition: none !important }
   }
 `
+
 
 // ─── Labels de campo para el diff de sincronización ──────────────────────────
 
@@ -678,8 +762,9 @@ export default function PlanificadorPage() {
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-primary mx-auto mb-3" />
-        <p className="text-gray-500 text-sm">Cargando planificador…</p>
+        <div className="pl-skeleton w-48 h-3 mx-auto mb-4 rounded-full" />
+        <div className="pl-skeleton w-32 h-2 mx-auto rounded-full" />
+        <p className="text-purple-400 text-sm mt-4 font-medium">Cargando planificador…</p>
       </div>
     </div>
   )
@@ -785,7 +870,7 @@ export default function PlanificadorPage() {
 
       {/* Aviso: pantallas con ID de cuenta desalineado del prefijo de su ID de pantalla */}
       {data?.inconsistencias?.length > 0 && (
-        <Card className="p-4 mb-4 border-amber-300 bg-amber-50">
+        <div className="pl-warning-card p-4 mb-4">
           <div className="flex items-start gap-3">
             <AlertTriangle size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
@@ -818,13 +903,13 @@ export default function PlanificadorPage() {
               </ul>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="pl-a2 grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard icon={Tv}           label="Cuentas totales"  value={stats.cuentas}       variant="solid"   sub={`${stats.total} pantallas`}
           onClick={() => setExplain({
             title: 'Cuentas totales', value: stats.cuentas, icon: Tv,
@@ -846,7 +931,7 @@ export default function PlanificadorPage() {
       </div>
 
       {/* Indicadores financieros y de negocio — haz clic para ver el detalle accionable y generar ventas */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="pl-a3 grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StatCard icon={XCircle}    label="Vencidas"            value={stats.vencidas}                variant="outline" tone="red"     sub="Requieren acción inmediata"
           onClick={() => setActivePanel('vencido')} />
         <StatCard icon={Wallet}     label="Cuentas que deben"   value={stats.deudores}                variant="outline" tone="amber"   sub="Pendientes de cobro"
@@ -882,7 +967,7 @@ export default function PlanificadorPage() {
           {data?.capacidadPorCuenta?.length > 0 && (
             <button
               onClick={() => setShowCapacidad(p => !p)}
-              className="mt-2 flex items-center gap-1.5 text-xs text-gray-400 hover:text-brand-accent transition-colors"
+              className="mt-2 flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-700 font-medium transition-colors"
             >
               <ChevronDown size={12} className={cn('transition-transform', showCapacidad && 'rotate-180')} />
               {showCapacidad ? 'Ocultar capacidad por cuenta padre' : 'Ver capacidad por cuenta padre'}
@@ -893,12 +978,12 @@ export default function PlanificadorPage() {
 
       {/* Widget colapsable de capacidad por cuenta padre */}
       {data?.capacidadPorCuenta?.length > 0 && showCapacidad && (
-        <Card className="overflow-hidden mb-4">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-            <span className="text-sm font-semibold text-brand-accent">Capacidad por cuenta padre</span>
+        <div className="pl-capacity-card mb-4">
+          <div className="cap-header flex items-center justify-between px-5 py-3">
+            <span className="text-sm font-bold text-purple-700 tracking-wide">Capacidad por cuenta padre</span>
             <button
               onClick={() => setShowCapacidad(false)}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded"
+              className="text-purple-400 hover:text-purple-700 p-1 rounded-lg transition-colors"
             >
               <ChevronDown size={15} className="rotate-180" />
             </button>
@@ -951,25 +1036,25 @@ export default function PlanificadorPage() {
               </tbody>
             </table>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Filters */}
-      <Card className="p-4 mb-3">
+      <div className="pl-glass pl-a3 p-4 mb-4">
         <div className="flex flex-col sm:flex-row gap-3 items-center">
           <div className="flex-1 relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por nombre, apellido, cuenta, nickname, ID…"
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+              className="pl-search w-full pl-9 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400"
             />
           </div>
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+            className="pl-select px-3 py-2.5 text-sm text-gray-800"
           >
             <option value="ALL">Todos los estados</option>
             <option value="vigente">Vigente</option>
@@ -978,21 +1063,21 @@ export default function PlanificadorPage() {
             <option value="vencido">Vencido</option>
             <option value="libre">Libre</option>
           </select>
-          <span className="text-sm text-gray-400 whitespace-nowrap">{rows.length} filas</span>
+          <span className="text-sm text-purple-400 whitespace-nowrap font-semibold">{rows.length} filas</span>
           <button
             onClick={() => setShowEstatusPanel(p => !p)}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+              'flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap',
               showEstatusPanel
-                ? 'bg-brand-accent text-white shadow-sm'
-                : 'border border-gray-200 bg-white text-gray-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'
+                ? 'pl-estatus-btn-active'
+                : 'border border-purple-200 bg-white/80 text-purple-700 hover:bg-purple-50 hover:border-purple-400'
             )}
           >
             <Users size={14} />
             Estatus Cliente
           </button>
         </div>
-      </Card>
+      </div>
 
       {/* Panel Estatus Cliente — overlay flotante */}
       {showEstatusPanel && (
