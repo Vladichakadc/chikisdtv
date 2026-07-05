@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.1.1",
+    "@fontsource/plus-jakarta-sans": "^5.1.0",
     "axios": "^1.6.8",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",
