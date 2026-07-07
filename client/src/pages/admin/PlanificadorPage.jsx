@@ -28,6 +28,7 @@ import {
   calcDias, getRowVariant, ROW_BG, estadoBadgeVariant, getPlanSortVal,
 } from './planificador/rowHelpers'
 import { DaysChip } from './planificador/TableBits'
+import { RankingAhorroMensual } from './planificador/RankingAhorroMensual'
 
 const DIAS_ALERTA_CP = 30
 
@@ -453,6 +454,7 @@ export default function PlanificadorPage() {
   const [showCpPanel, setShowCpPanel]           = useState(false)
   const [cpPanelVariante, setCpPanelVariante]   = useState('vencida')
   const [showCapacidad, setShowCapacidad]       = useState(false)
+  const [showRanking, setShowRanking]           = useState(true)
 
   // Guarda una "foto" del estado actual antes de aplicar un cambio, para poder deshacerlo
   const snapshotBeforeChange = () => {
@@ -947,6 +949,29 @@ export default function PlanificadorPage() {
             comoSeCalcula: `**(${stats.asignadas} asignadas ÷ ${stats.total} pantallas) × 100**. El Planificador es la fuente oficial de capacidad: el panel de Ocupación del Dashboard y el de Cuentas Padre usan esta misma base, así todo coincide.`,
             origen: 'Filas del Planificador (asignadas = con nombre o nickname distinto de "libre").',
           })} />
+      </div>
+
+      {/* ── RANKING DE AHORRO MENSUAL ── */}
+      <div className="pl-a3 mb-4">
+        {/* Toggle header */}
+        <button
+          onClick={() => setShowRanking(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 16px', borderRadius: 12, marginBottom: 10,
+            background: 'rgba(124,58,237,0.12)',
+            border: '1px solid rgba(124,58,237,0.25)',
+            color: '#a78bfa', fontSize: 12, fontWeight: 700,
+            cursor: 'pointer', transition: 'all .2s ease',
+          }}
+        >
+          <span style={{ fontSize: 14 }}>🏆</span>
+          Ranking de Ahorro Mensual
+          {showRanking ? <ChevronDown size={13} /> : <ChevronDown size={13} style={{ transform: 'rotate(-90deg)' }} />}
+        </button>
+        {showRanking && (
+          <RankingAhorroMensual pantallas={data?.pantallas ?? []} />
+        )}
       </div>
 
       {/* Alertas de Cuentas Padre — visibles cuando hay vencidas o en alerta */}
