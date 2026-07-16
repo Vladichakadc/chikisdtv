@@ -121,6 +121,54 @@ const REFERENCIAS_CONOCIDAS = [
 // (siguen existiendo en registros históricos, pero no se ofrecen para equipos nuevos)
 const REFERENCIAS_EXCLUIDAS = new Set(['watch-onn-china', 'onn tv box 4k', 'onn streaming stick']);
 
+// ─── Cruce con Ventas de Equipos ─────────────────────────────────────────────
+// Canoniza nombres de dispositivo para cruzar `tipoFire` (ventas) con
+// `descripcion` (inventario): minúsculas, sin acentos ni separadores, más un
+// mapa de alias para nombres históricos que refieren al mismo equipo físico
+// ("Fire TV 4KMAX" ≡ "Fire TV 4K MAX" ≡ "FireTV Stick 4K Max").
+const DEVICE_ALIAS = {
+  watchonn4kchina:  'watchonnchina',
+  firetvstickhd:    'firetvhd',
+  firetvsticklite:  'firetvlite',
+  firetvstick4k:    'firetv4k',
+  firetvstick4kmax: 'firetv4kmax',
+};
+
+function canonDevice(nombre) {
+  const base = (nombre ?? '')
+    .toString()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  return DEVICE_ALIAS[base] || base;
+}
+
+// GET /inventario-equipos/disponibles?tipo=<nombre de dispositivo>
+// Unidades del inventario que se pueden vender: con serie, sin venta asociada
+// (serie ↔ VentaEquipo.serial) y no marcadas como vendidas. Si viene `tipo`,
+// filtra por nombre de dispositivo canonizado.
+router.get('/inventario-equipos/disponibles', asyncHandler(async (req, res) => {
+  const items = await InventarioEquipo.findAll({
+    where: { serie: { [Op.ne]: null } },
+    include: [{ model: VentaEquipo, as: 'venta', attributes: ['idVM'], required: false }],
+    order: [['idInventario', 'ASC']],
+  });
+
+  const tipoCanon = canonDevice(req.query.tipo);
+  const disponibles = items
+    .filter(i => !i.venta && (i.estado || '').toLowerCase() !== 'vendido')
+    .filter(i => !tipoCanon || canonDevice(i.descripcion) === tipoCanon)
+    .map(i => ({
+      idInventario: i.idInventario,
+      serie: i.serie,
+      descripcion: i.descripcion,
+      precioSugerido: i.precioSugerido,
+      costoUniCOP: i.costoUniCOP,
+    }));
+
+  res.json({ disponibles });
+}));
+
 router.get('/inventario-equipos/referencias', asyncHandler(async (_req, res) => {
   const [inv, ventas] = await Promise.all([
     InventarioEquipo.findAll({ attributes: ['descripcion'], raw: true }),

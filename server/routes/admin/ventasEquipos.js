@@ -143,10 +143,10 @@ async function importVentasEquipos() {
 const EQUIPO_STRING_FIELDS = [
   'idVM', 'customerId', 'nombre', 'apellido', 'sku', 'tipoFire', 'idPantalla', 'serial',
   'nickname', 'cuentaId', 'cuenta', 'estado', 'cortesia', 'anio', 'mes', 'medioPago',
-  'tipoPago', 'tipoPlan', 'tipoPantalla', 'cuentaDedicada',
+  'tipoPago', 'tipoPlan', 'tipoPantalla', 'cuentaDedicada', 'debe',
 ];
 const EQUIPO_INT_FIELDS = ['pantallas', 'itemQuantity'];
-const EQUIPO_FLOAT_FIELDS = ['precioVenta', 'costo'];
+const EQUIPO_FLOAT_FIELDS = ['precioVenta', 'costo', 'saldoDebe'];
 const EQUIPO_DATE_FIELDS = ['fecha', 'fechaAlta'];
 
 function sanitizeVentaBody(body) {
@@ -166,6 +166,13 @@ function sanitizeVentaBody(body) {
   for (const f of EQUIPO_DATE_FIELDS) {
     if (body[f] === undefined) continue;
     d[f] = (body[f] || '').toString().trim() || null;
+  }
+
+  // Coherencia del saldo pendiente: `debe` se normaliza a SI/NO y el monto
+  // solo existe cuando la venta quedó debiendo — si no, se limpia.
+  if (d.debe !== undefined) {
+    d.debe = (d.debe || '').toUpperCase() === 'SI' ? 'SI' : 'NO';
+    if (d.debe === 'NO') d.saldoDebe = null;
   }
 
   // Auto-calcular año, mes y garantía a partir de la fecha (YYYY-MM-DD)

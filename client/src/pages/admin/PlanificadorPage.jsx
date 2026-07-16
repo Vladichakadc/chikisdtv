@@ -27,7 +27,7 @@ import { EditModal } from './planificador/EditModal'
 import {
   calcDias, getRowVariant, ROW_BG, estadoBadgeVariant, getPlanSortVal,
 } from './planificador/rowHelpers'
-import { DaysChip } from './planificador/TableBits'
+import { MonthsChip } from './planificador/TableBits'
 
 const DIAS_ALERTA_CP = 30
 
@@ -1167,7 +1167,7 @@ export default function PlanificadorPage() {
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Tipo Plan</th>
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Ini. Real</th>
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Fin Real</th>
-                  <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Días R.</th>
+                  <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Mes R.</th>
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Estado R.</th>
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Alerta R.</th>
                   <th className="sticky top-0 z-10 bg-slate-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Debe</th>
@@ -1206,7 +1206,7 @@ export default function PlanificadorPage() {
                       </td>
                       <td className="px-3 py-2 text-gray-700 whitespace-nowrap border-b border-gray-100">{row.inicioReal ? formatDate(row.inicioReal) : '—'}</td>
                       <td className="px-3 py-2 text-gray-700 whitespace-nowrap border-b border-gray-100">{row.duracionReal ? formatDate(row.duracionReal) : '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap border-b border-gray-100"><DaysChip dias={diasR} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap border-b border-gray-100"><MonthsChip dias={diasR} /></td>
                       <td className="px-3 py-2 whitespace-nowrap border-b border-gray-100">
                         {row.estadoReal ? <Badge variant={estadoBadgeVariant(row.estadoReal)}>{row.estadoReal}</Badge> : <span className="text-gray-300">—</span>}
                       </td>

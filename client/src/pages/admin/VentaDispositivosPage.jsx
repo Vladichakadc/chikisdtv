@@ -122,6 +122,7 @@ const COLS = [
   { key: 'fecha',       label: 'Fecha'      },
   { key: 'precioVenta', label: 'Precio'     },
   { key: 'costo',       label: 'Costo'      },
+  { key: 'saldoDebe',   label: 'Debe'       },
   { key: 'medioPago',   label: 'Medio Pago' },
 ]
 
@@ -148,6 +149,7 @@ const EMPTY = {
   anio: '', mes: '', precioVenta: '', costo: '', medioPago: '',
   itemQuantity: 1, tipoPago: 'Venta', tipoPlan: '',
   tipoPantalla: '', cuentaDedicada: 'NO',
+  debe: 'NO', saldoDebe: '', precioSugerido: '',
 }
 
 const fmtCOP = (v) => (v == null || v === '' ? '—' : formatCurrency(v))
@@ -274,13 +276,16 @@ function DrawerSection({ children }) {
 /** Slide-in drawer form */
 function EquipoDrawer({
   editing, form, setForm, f,
-  skuOptions, medioPagoOptions, clienteOptions, pantallaOptions,
-  pickCliente, pickPantalla,
+  skuOptions, medioPagoOptions, clienteOptions, pantallaOptions, tipoOptions,
+  pickCliente, pickPantalla, pickSerial,
+  invDisponibles, invSeleccionado,
   onSubmit, onClose
 }) {
   const [saving, setSaving] = useState(false)
   const submit = async (e) => { e.preventDefault(); setSaving(true); await onSubmit(e); setSaving(false) }
   const garantia = computeGarantia(form.fecha)
+  const toggleDebe = (checked) =>
+    setForm(prev => ({ ...prev, debe: checked ? 'SI' : 'NO', saldoDebe: checked ? prev.saldoDebe : '' }))
 
   return (
     <>
@@ -354,23 +359,10 @@ function EquipoDrawer({
                 <FieldLabel>Tipo de Dispositivo</FieldLabel>
                 <select value={form.tipoFire} onChange={f('tipoFire')} className={selectCls}>
                   <option value="">Seleccionar equipo…</option>
-                  {form.tipoFire && !['FireTV Stick','FireTV Stick 4K','FireTV Stick 4K Max','FireTV Cube','FireTV TV',
-                    'Watch ONN 4K Original','Watch ONN 4K China','Watch ONN HD Original',
-                    'Smart TV (Android/Google)','Smart TV (Samsung/LG/Roku)','PC / Web','Celular / Tablet','Otro',
-                  ].includes(form.tipoFire) && <option value={form.tipoFire}>{form.tipoFire} (actual)</option>}
-                  <option>FireTV Stick</option>
-                  <option>FireTV Stick 4K</option>
-                  <option>FireTV Stick 4K Max</option>
-                  <option>FireTV Cube</option>
-                  <option>FireTV TV</option>
-                  <option>Watch ONN 4K Original</option>
-                  <option>Watch ONN 4K China</option>
-                  <option>Watch ONN HD Original</option>
-                  <option>Smart TV (Android/Google)</option>
-                  <option>Smart TV (Samsung/LG/Roku)</option>
-                  <option>PC / Web</option>
-                  <option>Celular / Tablet</option>
-                  <option>Otro</option>
+                  {form.tipoFire && !tipoOptions.includes(form.tipoFire) && (
+                    <option value={form.tipoFire}>{form.tipoFire} (actual)</option>
+                  )}
+                  {tipoOptions.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
@@ -383,8 +375,26 @@ function EquipoDrawer({
               </div>
               <div>
                 <FieldLabel>Serial del equipo</FieldLabel>
-                <input value={form.serial || ''} onChange={f('serial')} placeholder="Serial físico"
-                  className={`${inputCls} font-mono`} />
+                {invDisponibles.length > 0 ? (
+                  <>
+                    <select value={form.serial || ''} onChange={(e) => pickSerial(e.target.value)}
+                      className={`${selectCls} font-mono`}>
+                      <option value="">Seleccionar serial en bodega…</option>
+                      {form.serial && !invDisponibles.some(i => i.serie === form.serial) && (
+                        <option value={form.serial}>{form.serial} (actual)</option>
+                      )}
+                      {invDisponibles.map(i => (
+                        <option key={i.idInventario} value={i.serie}>{i.serie} · {i.idInventario}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-indigo-500">
+                      {invDisponibles.length} unidad(es) en bodega para este dispositivo
+                    </p>
+                  </>
+                ) : (
+                  <input value={form.serial || ''} onChange={f('serial')} placeholder="Serial físico"
+                    className={`${inputCls} font-mono`} />
+                )}
               </div>
 
               {/* Garantía visual pill */}
@@ -445,6 +455,16 @@ function EquipoDrawer({
                   ))}
                 </select>
               </div>
+              {invSeleccionado && (
+                <div className="col-span-2">
+                  <FieldLabel>Precio sugerido (COP) — Inventario {invSeleccionado.idInventario}</FieldLabel>
+                  <CurrencyInput value={form.precioSugerido} onChange={f('precioSugerido')} decimals={0}
+                    className="border-indigo-200 focus:ring-indigo-400 text-sm rounded-xl" />
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Si lo modificas, se actualiza en Inventario Equipos al guardar la venta.
+                  </p>
+                </div>
+              )}
               <div>
                 <FieldLabel>Precio Venta</FieldLabel>
                 <CurrencyInput value={form.precioVenta} onChange={f('precioVenta')} decimals={0}
@@ -464,6 +484,27 @@ function EquipoDrawer({
                   )}
                   {medioPagoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+              </div>
+
+              {/* Saldo pendiente: el toggle "Debe" habilita el campo de monto */}
+              <div className={`col-span-2 rounded-xl border px-3 py-3 transition-colors
+                ${form.debe === 'SI' ? 'border-amber-200 bg-amber-50/60' : 'border-slate-100 bg-slate-50/60'}`}>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={form.debe === 'SI'}
+                    onChange={(e) => toggleDebe(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-400" />
+                  <span className="text-sm font-semibold text-slate-700">Debe — ¿quedó saldo pendiente?</span>
+                  {form.debe === 'SI' && (
+                    <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-amber-600">saldo pendiente</span>
+                  )}
+                </label>
+                {form.debe === 'SI' && (
+                  <div className="mt-3">
+                    <FieldLabel>Saldo que debe (COP)</FieldLabel>
+                    <CurrencyInput value={form.saldoDebe} onChange={f('saldoDebe')} decimals={0}
+                      className="border-amber-200 focus:ring-amber-400 text-sm rounded-xl" />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -512,6 +553,9 @@ export default function VentaDispositivosPage() {
   const [deleteTarget, setDeleteTarget] = useState(null) // { idVM }
   const [nicknames, setNicknames]         = useState([])
   const [clientesTabla, setClientesTabla] = useState([])
+  const [invDisponibles, setInvDisponibles]   = useState([]) // seriales en bodega para el tipo elegido
+  const [invSeleccionado, setInvSeleccionado] = useState(null) // unidad de inventario ligada al serial elegido
+  const [referencias, setReferencias]         = useState([])  // vocabulario unificado de dispositivos (inventario + ventas + catálogo)
 
   /* ── Loaders ── */
   const load = async () => {
@@ -523,11 +567,28 @@ export default function VentaDispositivosPage() {
       setNicknames(resNicks.data || [])
       const resClientes = await api.get('/admin/clients/tabla-clientes')
       setClientesTabla(resClientes.data || [])
+      // Nombres de dispositivo alineados con Inventario Equipos: así el tipo
+      // elegido en la venta cruza directo con las descripciones del inventario.
+      const resRefs = await api.get('/admin/inventario-equipos/referencias')
+      setReferencias(resRefs.data?.referencias || [])
     } catch (e) { setError(e.response?.data?.error || e.message) }
     finally     { setLoading(false) }
   }
 
   useEffect(() => { load() }, [])
+
+  // Seriales del inventario para el tipo de dispositivo elegido en el drawer.
+  // La validación/normalización de nombres (Fire TV 4KMAX ≡ Fire TV 4K MAX,
+  // Watch-onn-china ≡ Watch ONN 4K China…) vive en el endpoint
+  // /inventario-equipos/disponibles; aquí solo se consume.
+  useEffect(() => {
+    if (!showForm || !form.tipoFire) { setInvDisponibles([]); return }
+    let cancelado = false
+    api.get('/admin/inventario-equipos/disponibles', { params: { tipo: form.tipoFire } })
+      .then(({ data }) => { if (!cancelado) setInvDisponibles(data.disponibles || []) })
+      .catch(() => { if (!cancelado) setInvDisponibles([]) })
+    return () => { cancelado = true }
+  }, [showForm, form.tipoFire])
 
   /* ── Sort ── */
   const handleSort = (key) => {
@@ -573,9 +634,24 @@ export default function VentaDispositivosPage() {
     })
   }
 
+  // Al elegir un serial del inventario: fija el serial, trae el precio sugerido
+  // (editable) y prellena precio de venta y costo si aún están vacíos.
+  const pickSerial = (serie) => {
+    const item = invDisponibles.find(i => i.serie === serie) || null
+    setInvSeleccionado(item)
+    setForm(prev => ({
+      ...prev,
+      serial: serie || '',
+      precioSugerido: item?.precioSugerido ?? prev.precioSugerido,
+      precioVenta: prev.precioVenta || (item?.precioSugerido ?? ''),
+      costo: prev.costo || (item?.costoUniCOP != null ? Math.round(item.costoUniCOP) : ''),
+    }))
+  }
+
   /* ── Open / Close ── */
   const openNew = async () => {
     setEditing(null)
+    setInvSeleccionado(null)
     const now = new Date()
     const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
     setForm({ ...EMPTY, fecha: todayStr(), anio: String(now.getFullYear()), mes: months[now.getMonth()] })
@@ -586,7 +662,7 @@ export default function VentaDispositivosPage() {
     } catch (e) { console.error(e) }
   }
 
-  const openEdit = (row) => { setEditing(row); setForm({ ...EMPTY, ...row }); setShowForm(true) }
+  const openEdit = (row) => { setEditing(row); setInvSeleccionado(null); setForm({ ...EMPTY, ...row }); setShowForm(true) }
 
   /* ── CRUD ── */
   const handleSubmit = async (e) => {
@@ -601,6 +677,21 @@ export default function VentaDispositivosPage() {
         setRows(prev => [data, ...prev])
         showToast('Venta creada correctamente.', 'success')
       }
+
+      // Si el precio sugerido del inventario se editó en el formulario,
+      // se persiste en inventario_equipos (recalcula utilidad y ganancia).
+      if (invSeleccionado && form.precioSugerido !== '' &&
+          Number(form.precioSugerido) !== Number(invSeleccionado.precioSugerido)) {
+        try {
+          await api.put(`/admin/inventario-equipos/${invSeleccionado.idInventario}`, {
+            precioSugerido: Number(form.precioSugerido),
+          })
+          showToast(`Precio sugerido de ${invSeleccionado.idInventario} actualizado en el inventario.`, 'success')
+        } catch (e2) {
+          showToast(`La venta se guardó, pero no se pudo actualizar el precio sugerido: ${e2.response?.data?.error || e2.message}`, 'error')
+        }
+      }
+
       setShowForm(false)
     } catch (e) { showToast(e.response?.data?.error || e.message, 'error') }
   }
@@ -637,6 +728,15 @@ export default function VentaDispositivosPage() {
     MEDIOS_PAGO.forEach(m => extras.delete(m))
     return [...MEDIOS_PAGO, ...[...extras].sort((a, b) => a.localeCompare(b))]
   }, [rows])
+
+  // Tipos de dispositivo: referencias unificadas (inventario + ventas + catálogo)
+  // más las opciones genéricas que no son hardware de bodega.
+  const tipoOptions = useMemo(() => {
+    const genericas = ['Smart TV (Android/Google)', 'Smart TV (Samsung/LG/Roku)', 'PC / Web', 'Celular / Tablet', 'Otro']
+    const set = new Set(referencias)
+    genericas.forEach(g => set.delete(g))
+    return [...set, ...genericas]
+  }, [referencias])
 
   const clienteOptions = useMemo(() =>
     [...clientesTabla].filter(c => c.customerId)
@@ -721,6 +821,10 @@ export default function VentaDispositivosPage() {
         return <span className="font-semibold text-indigo-700 whitespace-nowrap">{fmtCOP(v)}</span>
       case 'costo':
         return <span className="text-slate-500 whitespace-nowrap">{fmtCOP(v)}</span>
+      case 'saldoDebe':
+        return row.debe === 'SI' && v
+          ? <span className="font-semibold text-red-600 whitespace-nowrap">{fmtCOP(v)}</span>
+          : <span className="text-slate-300">—</span>
       case 'fecha':
         return <span className="text-xs text-slate-500 whitespace-nowrap">{v ? formatDate(v) : '—'}</span>
       case 'nombre':
@@ -953,8 +1057,12 @@ export default function VentaDispositivosPage() {
           medioPagoOptions={medioPagoOptions}
           clienteOptions={clienteOptions}
           pantallaOptions={pantallaOptions}
+          tipoOptions={tipoOptions}
           pickCliente={pickCliente}
           pickPantalla={pickPantalla}
+          pickSerial={pickSerial}
+          invDisponibles={invDisponibles}
+          invSeleccionado={invSeleccionado}
           onSubmit={handleSubmit}
           onClose={() => setShowForm(false)}
         />

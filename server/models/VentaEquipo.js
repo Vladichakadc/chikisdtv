@@ -29,6 +29,8 @@ const VentaEquipo = sequelize.define('VentaEquipo', {
   tipoPlan:       DataTypes.STRING,
   tipoPantalla:   DataTypes.STRING,
   cuentaDedicada: DataTypes.STRING,
+  debe:           DataTypes.STRING,   // "SI" / "NO" — la venta quedó con saldo pendiente
+  saldoDebe:      DataTypes.FLOAT,    // monto COP que el cliente aún debe (solo si debe = SI)
 }, { tableName: 'ventas_equipos', timestamps: true });
 
 module.exports = VentaEquipo;
