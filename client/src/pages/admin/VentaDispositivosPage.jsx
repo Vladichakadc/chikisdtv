@@ -21,6 +21,7 @@ import {
   ChevronUp, ChevronDown, ChevronsUpDown,
   AlertTriangle, Package, Activity, TrendingUp,
   Shield, ShieldOff, CheckCircle2, XCircle,
+  Wallet, PiggyBank, Receipt,
 } from 'lucide-react'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
@@ -791,7 +792,18 @@ export default function VentaDispositivosPage() {
     const ingresos = searched.reduce((s, r) => s + (Number(r.precioVenta) || 0), 0)
     const firetv   = searched.filter(r => (r.tipoFire || '').toLowerCase().includes('fire')).length
     const onn      = searched.filter(r => (r.tipoFire || '').toLowerCase().includes('onn')).length
-    return { total, ingresos, firetv, onn }
+    // ── Indicadores económico-financieros (mismo universo filtrado que la tabla) ──
+    const costoTotal     = searched.reduce((s, r) => s + (Number(r.costo) || 0), 0)
+    const utilidad       = ingresos - costoTotal
+    const margenPct      = ingresos > 0 ? (utilidad / ingresos) * 100 : null
+    const ticketPromedio = total > 0 ? ingresos / total : 0
+    const ventasConDeuda = searched.filter(r => r.debe === 'SI' && Number(r.saldoDebe) > 0)
+    const saldoPorCobrar = ventasConDeuda.reduce((s, r) => s + (Number(r.saldoDebe) || 0), 0)
+    return {
+      total, ingresos, firetv, onn,
+      costoTotal, utilidad, margenPct, ticketPromedio,
+      conDeuda: ventasConDeuda.length, saldoPorCobrar,
+    }
   }, [searched])
 
   const filtered = useMemo(() => {
@@ -934,6 +946,50 @@ export default function VentaDispositivosPage() {
               queEs: 'Cuántos de los equipos vendidos son ONN (alternativa Walmart).',
               comoSeCalcula: 'Registros cuyo tipo de dispositivo contiene "onn".',
               origen: 'Campo tipo de dispositivo.',
+            })}
+          />
+        </div>
+
+        {/* ── KPI CARDS ECONÓMICO-FINANCIERAS ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard icon={Wallet} label="Costo Equipos" value={fmtCOP(stats.costoTotal)} loading={loading}
+            tone="amber" delay={6}
+            sub="Inversión en lo vendido"
+            onClick={() => setExplain({
+              title: 'Costo Equipos', value: fmtCOP(stats.costoTotal), icon: Wallet,
+              queEs: 'Cuánto costó comprar los equipos que aparecen vendidos en la tabla (con los filtros activos).',
+              comoSeCalcula: 'Suma del campo costo de cada venta visible. El costo por unidad viene del inventario o del registro histórico del Excel.',
+              origen: 'Campo costo de cada venta de este módulo; se prellena desde Inventario Equipos al elegir un serial.',
+            })}
+          />
+          <KpiCard icon={PiggyBank} label="Utilidad Bruta" value={fmtCOP(stats.utilidad)} loading={loading}
+            tone={stats.utilidad >= 0 ? 'emerald' : 'red'} delay={6}
+            sub={stats.margenPct != null ? `Margen ${stats.margenPct.toFixed(1)}% sobre ingresos` : 'Sin ingresos registrados'}
+            onClick={() => setExplain({
+              title: 'Utilidad Bruta', value: fmtCOP(stats.utilidad), icon: PiggyBank,
+              queEs: 'La ganancia del negocio de hardware: lo recaudado menos lo que costaron los equipos.',
+              comoSeCalcula: 'Ingresos Equipos − Costo Equipos, sobre las ventas visibles. El margen es utilidad ÷ ingresos. No descuenta gastos operativos (eso vive en el EBITDA de Análisis Financiero).',
+              origen: 'Campos precio de venta y costo de cada registro de este módulo.',
+            })}
+          />
+          <KpiCard icon={Receipt} label="Ticket Promedio" value={fmtCOP(Math.round(stats.ticketPromedio))} loading={loading}
+            tone="sky" delay={6}
+            sub="Ingreso por equipo vendido"
+            onClick={() => setExplain({
+              title: 'Ticket Promedio', value: fmtCOP(Math.round(stats.ticketPromedio)), icon: Receipt,
+              queEs: 'Cuánto se recauda en promedio por cada equipo vendido — útil para fijar precios y comparar contra el precio sugerido del inventario.',
+              comoSeCalcula: 'Ingresos Equipos ÷ Total Equipos, sobre las ventas visibles.',
+              origen: 'Campos precio de venta de este módulo.',
+            })}
+          />
+          <KpiCard icon={AlertTriangle} label="Saldo por Cobrar" value={fmtCOP(stats.saldoPorCobrar)} loading={loading}
+            tone="red" delay={6}
+            sub={stats.conDeuda > 0 ? `${stats.conDeuda} venta(s) con deuda activa` : 'Sin deudas pendientes'}
+            onClick={() => setExplain({
+              title: 'Saldo por Cobrar', value: fmtCOP(stats.saldoPorCobrar), icon: AlertTriangle,
+              queEs: 'Plata que los clientes todavía deben por equipos entregados — cartera pendiente del negocio de hardware.',
+              comoSeCalcula: 'Suma del campo "Saldo que debe" de las ventas marcadas con Debe = SI. Al saldar una deuda, desmarca Debe en la venta y este total baja solo.',
+              origen: 'Campos debe y saldoDebe de cada venta de este módulo (columna "Debe" de la tabla).',
             })}
           />
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, X, Search, Tv, CheckCircle, XCircle, Package, RefreshCw, Wallet, TrendingUp, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Search, Tv, CheckCircle, XCircle, Package, RefreshCw, Wallet, TrendingUp, ChevronDown, Banknote, PiggyBank, Tag, Percent } from 'lucide-react'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
 import { Card, CardBody } from '../../components/ui/Card'
@@ -104,7 +104,26 @@ export default function DevicesPage() {
     const enBodega = inventario.length - vendidos
     const inversion = inventario.reduce((s, r) => s + (Number(r.costoTotalCOP) || 0), 0)
     const gananciaPotencial = inventario.filter(r => !esVendido(r)).reduce((s, r) => s + (Number(r.ganancia) || 0), 0)
-    return { unidades, enBodega, vendidos, inversion, gananciaPotencial }
+
+    // ── Indicadores económico-financieros ──────────────────────────────────
+    // Capital inmovilizado: costo de las unidades que siguen en bodega.
+    const bodega = inventario.filter(r => !esVendido(r))
+    const capitalBodega = bodega.reduce((s, r) => s + (Number(r.costoTotalCOP) || 0), 0)
+    // Valor de venta en bodega: lo que se recuperaría vendiendo todo a precio sugerido.
+    const valorVentaBodega = bodega.reduce((s, r) => s + ((Number(r.precioSugerido) || 0) * (Number(r.cantidad) || 1)), 0)
+    // Realizado: unidades ya vendidas con venta asociada (serie ↔ VentaEquipo.serial).
+    // Usa el precio de venta REAL de la venta, no el sugerido del inventario.
+    const conVenta = inventario.filter(r => r.venta && r.venta.precioVenta != null)
+    const ingresosRealizados = conVenta.reduce((s, r) => s + (Number(r.venta.precioVenta) || 0), 0)
+    const costoRealizado = conVenta.reduce((s, r) => s + (Number(r.costoUniCOP) || 0), 0)
+    const gananciaRealizada = ingresosRealizados - costoRealizado
+    const margenRealizado = ingresosRealizados > 0 ? (gananciaRealizada / ingresosRealizados) * 100 : null
+
+    return {
+      unidades, enBodega, vendidos, inversion, gananciaPotencial,
+      capitalBodega, valorVentaBodega,
+      unidadesConVenta: conVenta.length, ingresosRealizados, gananciaRealizada, margenRealizado,
+    }
   }, [inventario])
 
   const estadosInv = useMemo(
@@ -547,7 +566,17 @@ export default function DevicesPage() {
             <KpiCard icon={TrendingUp}  label="Ganancia Potencial" value={formatCurrency(invStats.gananciaPotencial)} loading={loading} tone={DEV_TONE_MAP['fuchsia'] || 'pink'}   delay={5} sub="A precio sugerido" />
           </div>
 
-
+          {/* ── Indicadores económico-financieros: bodega vs realizado ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <KpiCard icon={Banknote}  label="Capital en Bodega"   value={formatCurrency(invStats.capitalBodega)} loading={loading} tone="orange" delay={6}
+              sub={invStats.inversion > 0 ? `${((invStats.capitalBodega / invStats.inversion) * 100).toFixed(0)}% de la inversión inmovilizada` : 'Sin inversión registrada'} />
+            <KpiCard icon={Tag}       label="Valor Venta Bodega"  value={formatCurrency(invStats.valorVentaBodega)} loading={loading} tone="sky" delay={6}
+              sub="Recuperable a precio sugerido" />
+            <KpiCard icon={PiggyBank} label="Ganancia Realizada"  value={formatCurrency(invStats.gananciaRealizada)} loading={loading} tone={invStats.gananciaRealizada >= 0 ? 'teal' : 'red'} delay={6}
+              sub={invStats.unidadesConVenta > 0 ? `${invStats.unidadesConVenta} unidad(es) vendidas a precio real` : 'Aún sin ventas cruzadas'} />
+            <KpiCard icon={Percent}   label="Margen Realizado"    value={invStats.margenRealizado != null ? `${invStats.margenRealizado.toFixed(1)}%` : '—'} loading={loading} tone="emerald" delay={6}
+              sub={invStats.margenRealizado != null ? `Sobre ${formatCurrency(invStats.ingresosRealizados)} recaudados` : 'Se calcula al vender del inventario'} />
+          </div>
         </>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
