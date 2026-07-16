@@ -132,10 +132,24 @@ async function importVentasEquipos() {
     });
   }
 
-  await VentaEquipo.destroy({ where: {} });
-  await VentaEquipo.bulkCreate(records, { ignoreDuplicates: true });
-  console.log(`[IMPORT EXCEL] Importados ${records.length} registros de Ventas FireTV`);
-  return records.length;
+  // La base de datos es la fuente de verdad de ventas_equipos, no el Excel:
+  // el import es aditivo, nunca destructivo. Solo se insertan los idVM del
+  // Excel que todavía no existen en la BD; los registros ya guardados —con
+  // ediciones manuales de pantalla, estado, deuda, precio— nunca se tocan.
+  // (Antes esta función hacía destroy({where:{}}) + bulkCreate, borrando y
+  // recreando TODA la tabla en cada corrida — perdía cualquier dato manual.)
+  const existentes = new Set(
+    (await VentaEquipo.findAll({ attributes: ['idVM'], raw: true })).map(r => r.idVM)
+  );
+  const nuevos = records.filter(r => !existentes.has(r.idVM));
+
+  if (nuevos.length > 0) {
+    await VentaEquipo.bulkCreate(nuevos, { ignoreDuplicates: true });
+    console.log(`[IMPORT EXCEL] ${nuevos.length} registro(s) nuevo(s) agregados desde el Excel (BD es la fuente de verdad — no se sobreescribió nada existente).`);
+  } else {
+    console.log('[IMPORT EXCEL] Sin registros nuevos que importar — la BD ya contiene todo el Excel.');
+  }
+  return nuevos.length;
 }
 
 // ─── Helpers CRUD ─────────────────────────────────────────────────────────────
