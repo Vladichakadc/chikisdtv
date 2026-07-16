@@ -696,12 +696,20 @@ export default function VentaDispositivosPage() {
     } catch (e) { showToast(e.response?.data?.error || e.message, 'error') }
   }
 
+  // La base de datos es la fuente de verdad: este botón solo AGREGA al sistema
+  // los registros del Excel que todavía no existan (por ID de Venta). Nunca
+  // borra ni sobreescribe lo que ya está guardado — a diferencia del
+  // comportamiento anterior, es seguro usarlo en cualquier momento.
   const handleImport = async () => {
-    if (!confirm('Esto reemplaza TODOS los registros con los datos del Excel. ¿Continuar?')) return
     setLoading(true)
     try {
       const { data } = await api.post('/admin/payments/ventas-equipos/import')
-      showToast(`Se importaron ${data.imported} registros desde el Excel.`, 'success')
+      showToast(
+        data.imported > 0
+          ? `Se agregaron ${data.imported} registro(s) nuevo(s) del Excel. Los existentes no se modificaron.`
+          : 'La base de datos ya tiene todos los registros del Excel — no había nada nuevo que agregar.',
+        'success'
+      )
       await load()
     } catch (e) { showToast(e.response?.data?.error || e.message, 'error'); setLoading(false) }
   }
@@ -872,10 +880,10 @@ export default function VentaDispositivosPage() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={handleImport}
+              <button onClick={handleImport} title="Agrega los registros del Excel que aún no estén en la base de datos. No borra ni modifica nada existente."
                 className="iv-btn-ghost shrink-0 px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80
                            flex items-center gap-2 transition-colors">
-                <RotateCcw size={15} /> Recargar Excel
+                <RotateCcw size={15} /> Importar del Excel
               </button>
               <button onClick={openNew} id="new-equipo-btn" data-testid="new-equipo-btn"
                 className="iv-cta shrink-0 px-5 py-3 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
