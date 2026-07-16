@@ -1,9 +1,10 @@
 // scratch_reimport_ventas_firetv.js
-// Recarga completa del módulo Venta Dispositivos desde Tablas/1-orders_table_Ventas_Firetv2024.xlsx.
+// Backfill puntual de ventas_equipos desde Tablas/1-orders_table_Ventas_Firetv2024.xlsx.
 // Pasos: (1) backup de database.sqlite, (2) agrega la columna `garantia` a ventas_equipos
-// si falta (el Excel ganó esa columna), (3) reimporta TODO (destroy + bulkCreate) usando
-// importVentasEquipos() de routes/admin/ventasEquipos, que ahora también enriquece
-// nombre/apellido desde tabla_clientes. Uso: node scratch_reimport_ventas_firetv.js
+// si falta (ya cubierto también por ensureVentasEquiposSchema en cada arranque del server),
+// (3) llama a importVentasEquipos() de routes/admin/ventasEquipos — la BD es la fuente de
+// verdad: esa función solo AGREGA los idVM del Excel que aún no existan, nunca borra ni
+// sobreescribe registros existentes. Uso: node scratch_reimport_ventas_firetv.js
 const fs = require('fs');
 const path = require('path');
 const sequelize = require('./server/config/database');
