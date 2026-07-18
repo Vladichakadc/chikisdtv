@@ -54,6 +54,524 @@ const CSS = `
 
 // ─── KPI card (con clic → modal explicativo) ────────────────────────────────
 
+// ─── Gráfico de Concentración (curva de Lorenz/Pareto) ───────────────────────
+
+// Puntos clave donde se colocan etiquetas de anotación (20 %, 50 %, 80 %)
+const PARETO_HITOS = [20, 50, 80]
+
+// Tooltip enriquecido: muestra la brecha entre la curva real y la diagonal
+function ParetoTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const real = payload.find(p => p.dataKey === 'pctIngresos')?.value ?? null
+  const brecha = real != null ? (real - label).toFixed(1) : null
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.97)',
+      border: '1px solid #fed7aa',
+      borderRadius: 10,
+      padding: '10px 14px',
+      fontSize: 12,
+      boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
+      minWidth: 210,
+    }}>
+      <p style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+        {label}% de los clientes
+      </p>
+      {real != null && (
+        <p style={{ color: '#f97316', fontWeight: 600 }}>
+          📊 Ingreso acumulado: <strong>{real}%</strong>
+        </p>
+      )}
+      {brecha != null && Number(brecha) > 0 && (
+        <p style={{ color: '#6b7280', marginTop: 4 }}>
+          ↑ {brecha}pts sobre distribución equitativa
+        </p>
+      )}
+      <p style={{ color: '#94a3b8', marginTop: 3 }}>
+        Línea punteada: distribución ideal (igual para todos)
+      </p>
+    </div>
+  )
+}
+
+// Dot personalizado: resalta los hitos clave con un círculo naranja + etiqueta
+function ParetoCustomDot({ cx, cy, payload }) {
+  if (!PARETO_HITOS.includes(payload?.pctClientes)) return null
+  const ingreso = payload?.pctIngresos
+  if (ingreso == null) return null
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={6} fill="#f97316" stroke="#fff" strokeWidth={2.5} />
+      {/* Etiqueta: ingreso % sobre el punto */}
+      <text
+        x={cx}
+        y={cy - 12}
+        textAnchor="middle"
+        fontSize={11}
+        fontWeight={700}
+        fill="#ea580c"
+        stroke="#fff"
+        strokeWidth={3}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      >
+        {ingreso}%
+      </text>
+    </g>
+  )
+}
+
+function ParetoChart({ data }) {
+  if (!data?.length) return (
+    <div style={{ height: 290, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 13 }}>
+      Sin datos de concentración disponibles
+    </div>
+  )
+  return (
+    <ResponsiveContainer width="100%" height={290}>
+      <ComposedChart data={data} margin={{ top: 20, right: 24, left: 4, bottom: 4 }}>
+        <defs>
+          <linearGradient id="paretoFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%"  stopColor="#f97316" stopOpacity={0.30} />
+            <stop offset="95%" stopColor="#f97316" stopOpacity={0.03} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.45} />
+        <XAxis
+          dataKey="pctClientes"
+          tickFormatter={(v) => `${v}%`}
+          tick={{ fontSize: 11, fill: '#78716c' }}
+          label={{ value: '% de clientes', position: 'insideBottomRight', offset: -4, fontSize: 11, fill: '#9ca3af' }}
+        />
+        <YAxis
+          tickFormatter={(v) => `${v}%`}
+          domain={[0, 100]}
+          tick={{ fontSize: 11, fill: '#78716c' }}
+          label={{ value: '% ingreso acum.', angle: -90, position: 'insideLeft', offset: 8, fontSize: 11, fill: '#9ca3af' }}
+        />
+        <Tooltip content={<ParetoTooltip />} />
+        <Legend
+          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+          formatter={(value) => <span style={{ color: '#374151' }}>{value}</span>}
+        />
+        {/* Línea de referencia en el 20% de clientes — regla Pareto */}
+        <ReferenceLine
+          x={20}
+          stroke="#a855f7"
+          strokeDasharray="4 3"
+          strokeWidth={1.5}
+          label={{
+            value: 'Pareto 80/20',
+            position: 'top',
+            fontSize: 10,
+            fontWeight: 700,
+            fill: '#a855f7',
+            offset: 4,
+          }}
+        />
+        {/* Área: curva de concentración real */}
+        <Area
+          type="monotone"
+          dataKey="pctIngresos"
+          name="Ingreso acumulado"
+          stroke="#f97316"
+          strokeWidth={2.5}
+          fill="url(#paretoFill)"
+          dot={<ParetoCustomDot />}
+          activeDot={{ r: 7, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }}
+        />
+        {/* Línea diagonal: distribución perfectamente equitativa */}
+        <Line
+          type="monotone"
+          dataKey="pctClientes"
+          name="Distribución equitativa"
+          stroke="#94a3b8"
+          strokeWidth={1.5}
+          strokeDasharray="5 5"
+          dot={false}
+          activeDot={false}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ─── Gráfico de Productividad por pantalla ───────────────────────────────────
+
+const PROD_COLORES = {
+  Ingreso: { bar: '#f97316', gradId: 'prodIngreso', dark: '#ea580c' },
+  Costo:   { bar: '#94a3b8', gradId: 'prodCosto',   dark: '#64748b' },
+  Margen:  { bar: '#16a34a', gradId: 'prodMargen',  dark: '#15803d' },
+}
+
+function ProductividadTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const item = payload[0]
+  const v = item?.value ?? 0
+  const margenPct = label === 'Margen' && payload[0]?.payload?.ingreso > 0
+    ? ((v / payload[0]?.payload?.ingreso) * 100).toFixed(1)
+    : null
+  const desc = {
+    Ingreso: 'Promedio histórico de ingresos generados por cada pantalla activa',
+    Costo:   'Costo promedio por pantalla (recargas + impuestos)',
+    Margen:  'Lo que queda por pantalla después de cubrir costos',
+  }
+  const color = PROD_COLORES[label]?.dark ?? '#374151'
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.97)',
+      border: `1px solid ${color}40`,
+      borderLeft: `3px solid ${color}`,
+      borderRadius: 10,
+      padding: '10px 14px',
+      fontSize: 12,
+      boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
+      minWidth: 230,
+    }}>
+      <p style={{ fontWeight: 700, color, marginBottom: 5 }}>{label} por pantalla</p>
+      <p style={{ color: '#1e293b', fontSize: 15, fontWeight: 700 }}>{formatCurrency(v)}</p>
+      {margenPct && (
+        <p style={{ color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+          {margenPct}% de margen sobre el ingreso
+        </p>
+      )}
+      <p style={{ color: '#9ca3af', marginTop: 6, lineHeight: 1.5 }}>{desc[label]}</p>
+    </div>
+  )
+}
+
+function ProductividadChart({ kpis }) {
+  const ingreso = kpis.ingresoPorPantalla ?? 0
+  const costo   = kpis.costoPorPantalla   ?? 0
+  const margen  = ingreso - costo
+  const margenPct = ingreso > 0 ? (margen / ingreso) * 100 : 0
+
+  const data = [
+    { concepto: 'Ingreso', valor: ingreso, ingreso },
+    { concepto: 'Costo',   valor: costo,   ingreso },
+    { concepto: 'Margen',  valor: margen,  ingreso },
+  ]
+
+  // Semáforo de eficiencia
+  const eficiencia = margenPct >= 60
+    ? { color: '#16a34a', bg: '#dcfce7', texto: 'Unidad muy rentable', emoji: '🟢' }
+    : margenPct >= 40
+    ? { color: '#ca8a04', bg: '#fef9c3', texto: 'Margen saludable',    emoji: '🟡' }
+    : { color: '#dc2626', bg: '#fee2e2', texto: 'Margen ajustado',     emoji: '🔴' }
+
+  // Renderizador de etiqueta doble: valor + porcentaje del ingreso
+  const renderLabel = (props) => {
+    const { x, y, width, height, value, index } = props
+    if (!value) return null
+    const pct = ingreso > 0 ? ((value / ingreso) * 100).toFixed(0) : null
+    const labelX = x + width + 8
+    const labelY = y + height / 2
+    const colors = ['#ea580c', '#475569', '#15803d']
+    return (
+      <g>
+        <text
+          x={labelX} y={labelY - 5}
+          dominantBaseline="central"
+          fontSize={12} fontWeight={700}
+          fill={colors[index] ?? '#374151'}
+          stroke="#fff" strokeWidth={3} strokeLinejoin="round" paintOrder="stroke"
+        >
+          {formatCurrency(value)}
+        </text>
+        {pct && (
+          <text
+            x={labelX} y={labelY + 10}
+            dominantBaseline="central"
+            fontSize={10} fontWeight={600}
+            fill="#9ca3af"
+          >
+            {index === 0 ? '100%' : `${pct}% del ingreso`}
+          </text>
+        )}
+      </g>
+    )
+  }
+
+  return (
+    <div>
+      {/* Badge de eficiencia */}
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        background: eficiencia.bg, border: `1px solid ${eficiencia.color}30`,
+        borderRadius: 20, padding: '4px 12px', marginBottom: 12, fontSize: 12,
+      }}>
+        <span>{eficiencia.emoji}</span>
+        <span style={{ fontWeight: 700, color: eficiencia.color }}>{eficiencia.texto}</span>
+        <span style={{ color: '#6b7280' }}>·</span>
+        <span style={{ color: eficiencia.color, fontWeight: 600 }}>{margenPct.toFixed(1)}% margen</span>
+        <span style={{ color: '#6b7280' }}>·</span>
+        <span style={{ color: '#6b7280' }}>{kpis.totalPantallas} pantallas activas</span>
+      </div>
+
+      {/* Mini gauge de margen */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#9ca3af', marginBottom: 3 }}>
+          <span>Margen sobre ingreso</span>
+          <span style={{ fontWeight: 700, color: eficiencia.color }}>{margenPct.toFixed(1)}%</span>
+        </div>
+        <div style={{ background: '#f1f5f9', borderRadius: 6, height: 6, overflow: 'hidden' }}>
+          <div style={{
+            width: `${Math.min(margenPct, 100)}%`,
+            height: '100%',
+            borderRadius: 6,
+            background: `linear-gradient(90deg, ${eficiencia.color}aa, ${eficiencia.color})`,
+            transition: 'width 0.6s ease',
+          }} />
+        </div>
+      </div>
+
+      <ResponsiveContainer width="100%" height={210}>
+        <ComposedChart
+          data={data}
+          layout="vertical"
+          margin={{ top: 6, right: 160, left: 10, bottom: 6 }}
+        >
+          <defs>
+            <linearGradient id="prodIngreso" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#f97316" stopOpacity={0.85} />
+              <stop offset="100%" stopColor="#fb923c" stopOpacity={1} />
+            </linearGradient>
+            <linearGradient id="prodCosto" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#64748b" stopOpacity={0.70} />
+              <stop offset="100%" stopColor="#94a3b8" stopOpacity={1} />
+            </linearGradient>
+            <linearGradient id="prodMargen" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#16a34a" stopOpacity={0.85} />
+              <stop offset="100%" stopColor="#22c55e" stopOpacity={1} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} horizontal={false} />
+          <XAxis
+            type="number"
+            tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
+            tick={{ fontSize: 11, fill: '#78716c' }}
+            label={{ value: 'Valor promedio por pantalla', position: 'insideBottomRight', offset: -4, fontSize: 10, fill: '#9ca3af' }}
+          />
+          <YAxis
+            type="category"
+            dataKey="concepto"
+            tick={{ fontSize: 12, fill: '#374151', fontWeight: 700 }}
+            width={62}
+          />
+          <Tooltip content={<ProductividadTooltip />} cursor={{ fill: 'rgba(249,115,22,0.06)' }} />
+          <Bar dataKey="valor" radius={[0, 8, 8, 0]} barSize={38}>
+            {data.map((entry) => (
+              <Cell
+                key={entry.concepto}
+                fill={`url(#${PROD_COLORES[entry.concepto]?.gradId ?? 'prodIngreso'})`}
+              />
+            ))}
+            <LabelList dataKey="valor" content={renderLabel} />
+          </Bar>
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ─── EBITDA mensual de licencias y margen ──────────────────────────────────
+function EbitdaMensualTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const ebitda = payload.find(p => p.dataKey === 'ebitda')?.value
+  const margen = payload.find(p => p.dataKey === 'margenEbitdaPct')?.value
+  const positivo = ebitda >= 0
+  return (
+    <div style={{ background:'rgba(255,255,255,0.97)', border:`1px solid ${positivo?'#10b981':'#ef4444'}40`, borderLeft:`3px solid ${positivo?'#10b981':'#ef4444'}`, borderRadius:10, padding:'10px 14px', fontSize:12, boxShadow:'0 4px 20px rgba(0,0,0,0.10)', minWidth:210 }}>
+      <p style={{ fontWeight:700, color:'#1e293b', marginBottom:6 }}>{label}</p>
+      {ebitda != null && <p style={{ color: positivo?'#16a34a':'#dc2626', fontWeight:700, fontSize:14 }}>{positivo?'':'-'}{formatCurrency(Math.abs(ebitda))} EBITDA</p>}
+      {margen != null && <p style={{ color:'#8b5cf6', fontWeight:600, marginTop:4 }}>{margen.toFixed(1)}% margen</p>}
+      <p style={{ color:'#9ca3af', marginTop:5 }}>{positivo ? 'El negocio cubre todos sus costos operativos este mes.' : 'Los costos superan los ingresos este mes.'}</p>
+    </div>
+  )
+}
+function EbitdaMensualChart({ data }) {
+  if (!data?.length) return <div style={{ height:290, display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', fontSize:13 }}>Sin datos disponibles</div>
+  const maxEbitda = Math.max(...data.map(d => d.ebitda ?? 0))
+  const maxMes = data.find(d => d.ebitda === maxEbitda)
+  return (
+    <ResponsiveContainer width="100%" height={290}>
+      <ComposedChart data={data} margin={{ top:20, right:48, left:4, bottom:4 }}>
+        <defs>
+          <linearGradient id="ebitdaPos" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity={0.9}/>
+            <stop offset="100%" stopColor="#34d399" stopOpacity={0.75}/>
+          </linearGradient>
+          <linearGradient id="ebitdaNeg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ef4444" stopOpacity={0.85}/>
+            <stop offset="100%" stopColor="#f87171" stopOpacity={0.7}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis dataKey="label" tick={{ fontSize:10, fill:'#78716c' }} label={{ value:'Mes', position:'insideBottomRight', offset:-4, fontSize:10, fill:'#9ca3af' }}/>
+        <YAxis yAxisId="cop" tickFormatter={fmtM} tick={{ fontSize:10, fill:'#78716c' }} width={60} label={{ value:'EBITDA (COP)', angle:-90, position:'insideLeft', offset:8, fontSize:10, fill:'#9ca3af' }}/>
+        <YAxis yAxisId="pct" orientation="right" tickFormatter={v=>`${v}%`} tick={{ fontSize:10, fill:'#8b5cf6' }} width={44}/>
+        <Tooltip content={<EbitdaMensualTooltip />} />
+        <Legend wrapperStyle={{ fontSize:12 }} formatter={v => <span style={{ color:'#374151' }}>{v}</span>}/>
+        <ReferenceLine yAxisId="cop" y={0} stroke="#94a3b8" strokeDasharray="4 2" strokeWidth={1.5}/>
+        <Bar yAxisId="cop" dataKey="ebitda" name="EBITDA licencias" radius={[4,4,0,0]}>
+          {data.map((m,i) => <Cell key={i} fill={m.ebitda >= 0 ? 'url(#ebitdaPos)' : 'url(#ebitdaNeg)'} />)}
+        </Bar>
+        <Line yAxisId="pct" dataKey="margenEbitdaPct" name="Margen %" stroke="#8b5cf6" strokeWidth={2.5} dot={false} connectNulls activeDot={{ r:5, fill:'#8b5cf6', stroke:'#fff', strokeWidth:2 }}/>
+      </ComposedChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ─── Estructura anual: ingresos, OPEX y EBITDA ───────────────────────────
+function EstructuraAnualTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const ingresos = payload.find(p => p.dataKey === 'ingresos')?.value
+  const opex     = payload.find(p => p.dataKey === 'opex')?.value
+  const ebitda   = payload.find(p => p.dataKey === 'ebitda')?.value
+  const margenPct = (ingresos && ebitda) ? ((ebitda/ingresos)*100).toFixed(1) : null
+  return (
+    <div style={{ background:'rgba(255,255,255,0.97)', border:'1px solid #fed7aa', borderLeft:'3px solid #f97316', borderRadius:10, padding:'10px 14px', fontSize:12, boxShadow:'0 4px 20px rgba(0,0,0,0.10)', minWidth:230 }}>
+      <p style={{ fontWeight:700, color:'#1e293b', marginBottom:6 }}>Ejercicio {label}</p>
+      {ingresos != null && <p style={{ color:'#f97316', fontWeight:600 }}>📥 Ingresos: <strong>{formatCurrency(ingresos)}</strong></p>}
+      {opex != null && <p style={{ color:'#64748b', fontWeight:600, marginTop:2 }}>💸 OPEX: <strong>{formatCurrency(opex)}</strong></p>}
+      {ebitda != null && <p style={{ color:'#10b981', fontWeight:700, marginTop:4, fontSize:13 }}>✅ EBITDA: <strong>{formatCurrency(ebitda)}</strong></p>}
+      {margenPct && <p style={{ color:'#9ca3af', marginTop:4 }}>Margen EBITDA: {margenPct}%</p>}
+    </div>
+  )
+}
+function EstructuraAnualLabelTop({ x, y, width, value }) {
+  if (!value) return null
+  return (
+    <text x={x+width/2} y={y-5} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ea580c" stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">
+      {fmtM(value)}
+    </text>
+  )
+}
+function EstructuraAnualChart({ data }) {
+  if (!data?.length) return <div style={{ height:270, display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', fontSize:13 }}>Sin datos anuales</div>
+  return (
+    <ResponsiveContainer width="100%" height={270}>
+      <ComposedChart data={data} margin={{ top:28, right:12, left:4, bottom:4 }}>
+        <defs>
+          <linearGradient id="gradIngreso" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f97316" stopOpacity={0.95}/>
+            <stop offset="100%" stopColor="#fb923c" stopOpacity={0.80}/>
+          </linearGradient>
+          <linearGradient id="gradOpex" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#cbd5e1" stopOpacity={0.6}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis dataKey="anio" tick={{ fontSize:11, fill:'#374151', fontWeight:600 }}/>
+        <YAxis tickFormatter={fmtM} tick={{ fontSize:10, fill:'#78716c' }} width={60} label={{ value:'COP', angle:-90, position:'insideLeft', offset:8, fontSize:10, fill:'#9ca3af' }}/>
+        <Tooltip content={<EstructuraAnualTooltip />}/>
+        <Legend wrapperStyle={{ fontSize:12 }} formatter={v => <span style={{ color:'#374151' }}>{v}</span>}/>
+        <Bar dataKey="ingresos" name="Ingresos licencias" fill="url(#gradIngreso)" radius={[4,4,0,0]}>
+          <LabelList dataKey="ingresos" content={EstructuraAnualLabelTop} />
+        </Bar>
+        <Bar dataKey="opex" name="OPEX" fill="url(#gradOpex)" radius={[4,4,0,0]}/>
+        <Line dataKey="ebitda" name="EBITDA" stroke="#10b981" strokeWidth={2.5} dot={{ r:4, fill:'#10b981', stroke:'#fff', strokeWidth:2 }} activeDot={{ r:6 }}
+          label={({ x, y, value }) => value ? (<text x={x} y={y-10} textAnchor="middle" fontSize={10} fontWeight={700} fill="#059669" stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">{fmtM(value)}</text>) : null}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ─── Flujo de caja acumulado ───────────────────────────────────────────────────
+function FlujoCajaTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const v = payload[0]?.value ?? 0
+  const positivo = v >= 0
+  return (
+    <div style={{ background:'rgba(255,255,255,0.97)', border:`1px solid ${positivo?'#10b981':'#ef4444'}40`, borderLeft:`3px solid ${positivo?'#10b981':'#ef4444'}`, borderRadius:10, padding:'10px 14px', fontSize:12, boxShadow:'0 4px 20px rgba(0,0,0,0.10)', minWidth:220 }}>
+      <p style={{ fontWeight:700, color:'#1e293b', marginBottom:6 }}>{label}</p>
+      <p style={{ color: positivo?'#16a34a':'#dc2626', fontWeight:700, fontSize:14 }}>Acumulado: {positivo?'':'-'}{formatCurrency(Math.abs(v))}</p>
+      <p style={{ color:'#9ca3af', marginTop:5 }}>{positivo ? 'El negocio lleva superávit acumulado hasta este mes.' : 'El negocio aún está en zona de déficit acumulado.'}</p>
+    </div>
+  )
+}
+function FlujoCajaChart({ data }) {
+  if (!data?.length) return <div style={{ height:270, display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', fontSize:13 }}>Sin datos de flujo</div>
+  const ultimoVal = data[data.length - 1]?.flujoAcumulado ?? 0
+  const positivo = ultimoVal >= 0
+  const colorLinea = positivo ? '#10b981' : '#ef4444'
+  const colorFill  = positivo ? '#10b981' : '#ef4444'
+  return (
+    <ResponsiveContainer width="100%" height={270}>
+      <AreaChart data={data} margin={{ top:20, right:16, left:4, bottom:4 }}>
+        <defs>
+          <linearGradient id="gradFlujoLic" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={colorFill} stopOpacity={0.30}/>
+            <stop offset="100%" stopColor={colorFill} stopOpacity={0.02}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis dataKey="label" tick={{ fontSize:10, fill:'#78716c' }} interval="preserveStartEnd" label={{ value:'Mes', position:'insideBottomRight', offset:-4, fontSize:10, fill:'#9ca3af' }}/>
+        <YAxis tickFormatter={fmtM} tick={{ fontSize:10, fill:'#78716c' }} width={62} label={{ value:'Acumulado (COP)', angle:-90, position:'insideLeft', offset:8, fontSize:10, fill:'#9ca3af' }}/>
+        <Tooltip content={<FlujoCajaTooltip />}/>
+        <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 2" strokeWidth={1.5} label={{ value:'Punto de equilibrio', position:'insideTopLeft', fontSize:10, fill:'#94a3b8' }}/>
+        <Area dataKey="flujoAcumulado" name="Flujo acumulado" stroke={colorLinea} strokeWidth={2.5} fill="url(#gradFlujoLic)" dot={false} activeDot={{ r:5, fill:colorLinea, stroke:'#fff', strokeWidth:2 }}/>
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ─── Exposición cambiaria: TRM vs OPEX mensual ──────────────────────────────
+function TrmOpexTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const opex = payload.find(p => p.dataKey === 'opex')?.value
+  const trm  = payload.find(p => p.dataKey === 'trmPromedio')?.value
+  return (
+    <div style={{ background:'rgba(255,255,255,0.97)', border:'1px solid #bfdbfe', borderLeft:'3px solid #3b82f6', borderRadius:10, padding:'10px 14px', fontSize:12, boxShadow:'0 4px 20px rgba(0,0,0,0.10)', minWidth:230 }}>
+      <p style={{ fontWeight:700, color:'#1e293b', marginBottom:6 }}>{label}</p>
+      {opex != null && <p style={{ color:'#64748b', fontWeight:600 }}>💸 OPEX (recargas): <strong>{formatCurrency(opex)}</strong></p>}
+      {trm != null && <p style={{ color:'#3b82f6', fontWeight:700, marginTop:4 }}>💱 TRM promedio: <strong>${Number(trm).toLocaleString('es-CO')}</strong></p>}
+      {trm != null && <p style={{ color:'#9ca3af', marginTop:5 }}>Cuando la TRM sube, cada crédito cuesta más pesos aunque el precio en USD no varíe.</p>}
+    </div>
+  )
+}
+function TrmOpexChart({ data }) {
+  if (!data?.length) return <div style={{ height:260, display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', fontSize:13 }}>Sin datos cambiarios</div>
+  // Calcular variación TRM para el badge
+  const primera = data.find(d => d.trmPromedio)
+  const ultima  = [...data].reverse().find(d => d.trmPromedio)
+  const varTrm  = (primera && ultima && primera !== ultima) ? ((ultima.trmPromedio - primera.trmPromedio) / primera.trmPromedio) * 100 : null
+  const trmRiesgo = varTrm != null
+    ? (varTrm > 5  ? { color:'#dc2626', bg:'#fee2e2', texto:`TRM +${varTrm.toFixed(1)}% — riesgo cambiario alto`, emoji:'🔴' }
+      : varTrm < -5 ? { color:'#16a34a', bg:'#dcfce7', texto:`TRM ${varTrm.toFixed(1)}% — viento a favor`, emoji:'🟢' }
+      : { color:'#ca8a04', bg:'#fef9c3', texto:`TRM ${varTrm >= 0 ? '+' : ''}${varTrm.toFixed(1)}% — estable`, emoji:'🟡' })
+    : null
+  return (
+    <div>
+      {trmRiesgo && (
+        <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:trmRiesgo.bg, border:`1px solid ${trmRiesgo.color}30`, borderRadius:20, padding:'4px 12px', marginBottom:12, fontSize:12 }}>
+          <span>{trmRiesgo.emoji}</span>
+          <span style={{ fontWeight:700, color:trmRiesgo.color }}>{trmRiesgo.texto}</span>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={240}>
+        <ComposedChart data={data} margin={{ top:10, right:60, left:4, bottom:4 }}>
+          <defs>
+            <linearGradient id="gradOpexTrm" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.75}/>
+              <stop offset="100%" stopColor="#cbd5e1" stopOpacity={0.55}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="label" tick={{ fontSize:10, fill:'#78716c' }} interval="preserveStartEnd"/>
+          <YAxis yAxisId="opex" tickFormatter={fmtM} tick={{ fontSize:10, fill:'#78716c' }} width={60} label={{ value:'OPEX (COP)', angle:-90, position:'insideLeft', offset:8, fontSize:10, fill:'#9ca3af' }}/>
+          <YAxis yAxisId="trm" orientation="right" tickFormatter={v=>`$${v.toLocaleString('es-CO')}`} tick={{ fontSize:10, fill:'#3b82f6' }} width={58} domain={['auto','auto']} label={{ value:'TRM ($)', angle:90, position:'insideRight', offset:8, fontSize:10, fill:'#3b82f6' }}/>
+          <Tooltip content={<TrmOpexTooltip />}/>
+          <Legend wrapperStyle={{ fontSize:12 }} formatter={v => <span style={{ color:'#374151' }}>{v}</span>}/>
+          <Bar yAxisId="opex" dataKey="opex" name="OPEX (recargas)" fill="url(#gradOpexTrm)" radius={[3,3,0,0]}/>
+          <Line yAxisId="trm" dataKey="trmPromedio" name="TRM promedio" stroke="#3b82f6" strokeWidth={2.5} dot={false} connectNulls activeDot={{ r:5, fill:'#3b82f6', stroke:'#fff', strokeWidth:2 }}/>
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
 
 // ─── Narrativa experta EBITDA ────────────────────────────────────────────────
 
@@ -435,34 +953,18 @@ export default function AnalisisFinancieroPage() {
             />
           </div>
 
-          {/* ─── Gráfico 1: EBITDA mensual + margen ─────────────────────── */}
+          {/* ─── Gráfico 1: EBITDA mensual + margen ───────────────────────── */}
           <Card>
             <CardHeader>
               <CardTitle>EBITDA mensual de licencias y margen</CardTitle>
               <p className="text-sm text-gray-400 mt-0.5">Barras: EBITDA de suscripciones (COP). Línea: margen EBITDA % — solo ingresos de licencias menos OPEX</p>
             </CardHeader>
             <CardBody>
-              <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={serieLicencias} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                  <YAxis yAxisId="cop" tickFormatter={fmtM} tick={{ fontSize: 10 }} width={58} />
-                  <YAxis yAxisId="pct" orientation="right" tickFormatter={v => `${v}%`} tick={{ fontSize: 10 }} width={40} />
-                  <Tooltip formatter={(v, name) => name === 'Margen %' ? [`${v}%`, name] : tooltipMoney(v, name)} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <ReferenceLine yAxisId="cop" y={0} stroke="#94a3b8" />
-                  <Bar yAxisId="cop" dataKey="ebitda" name="EBITDA licencias" radius={[3, 3, 0, 0]}>
-                    {serieLicencias.map((m, i) => (
-                      <Cell key={i} fill={m.ebitda >= 0 ? '#10b981' : '#ef4444'} />
-                    ))}
-                  </Bar>
-                  <Line yAxisId="pct" dataKey="margenEbitdaPct" name="Margen %" stroke="#8b5cf6" strokeWidth={2} dot={false} connectNulls />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <EbitdaMensualChart data={serieLicencias} />
             </CardBody>
           </Card>
 
-          {/* ─── Gráfico 2 + 3 ─────────────────────────────────────────── */}
+          {/* ─── Gráficos 2 + 3 ────────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
@@ -470,18 +972,7 @@ export default function AnalisisFinancieroPage() {
                 <p className="text-sm text-gray-400 mt-0.5">La brecha entre la barra naranja y la gris es el EBITDA de la línea TV</p>
               </CardHeader>
               <CardBody>
-                <ResponsiveContainer width="100%" height={260}>
-                  <ComposedChart data={serieAnualLicencias} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="anio" tick={{ fontSize: 11 }} />
-                    <YAxis tickFormatter={fmtM} tick={{ fontSize: 10 }} width={58} />
-                    <Tooltip formatter={tooltipMoney} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="ingresos" name="Ingresos licencias" fill="#f97316" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="opex" name="OPEX" fill="#94a3b8" radius={[3, 3, 0, 0]} />
-                    <Line dataKey="ebitda" name="EBITDA" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                <EstructuraAnualChart data={serieAnualLicencias} />
               </CardBody>
             </Card>
 
@@ -491,27 +982,12 @@ export default function AnalisisFinancieroPage() {
                 <p className="text-sm text-gray-400 mt-0.5">Suma corrida del EBITDA mensual de suscripciones</p>
               </CardHeader>
               <CardBody>
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={serieLicencias} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradFlujoLic" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                    <YAxis tickFormatter={fmtM} tick={{ fontSize: 10 }} width={58} />
-                    <Tooltip formatter={tooltipMoney} />
-                    <ReferenceLine y={0} stroke="#94a3b8" />
-                    <Area dataKey="flujoAcumulado" name="Flujo acumulado" stroke="#10b981" strokeWidth={2} fill="url(#gradFlujoLic)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <FlujoCajaChart data={serieLicencias} />
               </CardBody>
             </Card>
           </div>
 
-          {/* ─── Gráfico 4: TRM vs OPEX ─────────────────────────────────── */}
+          {/* ─── Gráfico 4: TRM vs OPEX ──────────────────────────────────────── */}
           {trmSerie.length >= 2 && (
             <Card>
               <CardHeader>
@@ -519,18 +995,7 @@ export default function AnalisisFinancieroPage() {
                 <p className="text-sm text-gray-400 mt-0.5">Las recargas se pagan en dólares — cuando la TRM (línea azul) sube, cada crédito cuesta más pesos</p>
               </CardHeader>
               <CardBody>
-                <ResponsiveContainer width="100%" height={240}>
-                  <ComposedChart data={trmSerie} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                    <YAxis yAxisId="opex" tickFormatter={fmtM} tick={{ fontSize: 10 }} width={58} />
-                    <YAxis yAxisId="trm" orientation="right" tickFormatter={v => `$${v.toLocaleString('es-CO')}`} tick={{ fontSize: 10 }} width={54} domain={['auto', 'auto']} />
-                    <Tooltip formatter={(v, name) => name === 'TRM promedio' ? [`$${Number(v).toLocaleString('es-CO')}`, name] : tooltipMoney(v, name)} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar yAxisId="opex" dataKey="opex" name="OPEX (recargas)" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
-                    <Line yAxisId="trm" dataKey="trmPromedio" name="TRM promedio" stroke="#3b82f6" strokeWidth={2} dot={false} connectNulls />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                <TrmOpexChart data={trmSerie} />
               </CardBody>
             </Card>
           )}
@@ -554,6 +1019,19 @@ export default function AnalisisFinancieroPage() {
                     queEs: 'Cuánto "multiplica" cada peso invertido en costo.',
                     comoSeCalcula: '**(Ganancia ÷ Costos) × 100**.',
                     origen: 'Ganancia histórica (Pagos − Costo Pantalla) dividida entre los costos históricos.',
+                    detalle: {
+                      titulo: 'Detalle por año',
+                      columnas: ['Año', 'Ingresos', 'Costos', 'Ganancia', 'Markup'],
+                      filas: [
+                        ...bi.porAnio.map(a => [
+                          a.anio, formatCurrency(a.ingresos), formatCurrency(a.costos), formatCurrency(a.margen),
+                          a.costos > 0 ? `${((a.margen / a.costos) * 100).toFixed(1)}%` : '—',
+                        ]),
+                        ['Total histórico', formatCurrency(k.ingresosTotales), formatCurrency(k.costosTotales), formatCurrency(k.margenTotal), `${k.markupPct.toFixed(1)}%`],
+                      ],
+                      resaltarUltima: true,
+                      nota: 'El markup de la tarjeta es el histórico (ganancia total ÷ costos totales). Los años sin costos registrados no calculan markup.',
+                    },
                   })}
                 />
                 <BiCard
@@ -566,6 +1044,19 @@ export default function AnalisisFinancieroPage() {
                     queEs: 'Cuántas veces alcanza el ingreso para pagar todo el costo operativo.',
                     comoSeCalcula: '**Ingresos ÷ Costos**.',
                     origen: 'Ingresos históricos sobre costos históricos (Costo Pantalla).',
+                    detalle: {
+                      titulo: 'Detalle por año',
+                      columnas: ['Año', 'Ingresos', 'Costos', 'Cobertura'],
+                      filas: [
+                        ...bi.porAnio.map(a => [
+                          a.anio, formatCurrency(a.ingresos), formatCurrency(a.costos),
+                          a.costos > 0 ? `${(a.ingresos / a.costos).toFixed(2)}×` : '—',
+                        ]),
+                        ['Total histórico', formatCurrency(k.ingresosTotales), formatCurrency(k.costosTotales), `${k.coberturaCostos.toFixed(2)}×`],
+                      ],
+                      resaltarUltima: true,
+                      nota: 'Cobertura ≥ 1× significa que el ingreso de ese año pagó todo su costo operativo.',
+                    },
                   })}
                 />
                 <BiCard
@@ -578,6 +1069,27 @@ export default function AnalisisFinancieroPage() {
                     queEs: 'El número mínimo de ventas que el negocio necesita para no perder plata.',
                     comoSeCalcula: '**Costos totales ÷ ticket promedio**, redondeado hacia arriba.',
                     origen: 'Costos históricos (Costo Pantalla) y ticket promedio de las ventas (Pagos).',
+                    detalle: {
+                      titulo: 'Variables del cálculo, año por año',
+                      columnas: ['Año', 'Costos', 'Ticket prom.', 'Vtas. equilibrio', 'Vtas. reales'],
+                      filas: [
+                        ...bi.porAnio.map(a => {
+                          const ticket = a.numVentas > 0 ? Math.round(a.ingresos / a.numVentas) : null
+                          const eq = ticket > 0 ? Math.ceil(a.costos / ticket) : null
+                          return [
+                            a.anio, formatCurrency(a.costos),
+                            ticket != null ? formatCurrency(ticket) : '—',
+                            eq != null ? eq.toLocaleString('es-CO') : '—',
+                            a.numVentas.toLocaleString('es-CO'),
+                          ]
+                        }),
+                        ['Total histórico', formatCurrency(k.costosTotales), formatCurrency(k.ticketPromedio),
+                          k.puntoEquilibrioVentas.toLocaleString('es-CO'),
+                          bi.porAnio.reduce((s, a) => s + a.numVentas, 0).toLocaleString('es-CO')],
+                      ],
+                      resaltarUltima: true,
+                      nota: 'Cuando las ventas reales superan las de equilibrio, ese año cubrió sus costos y dejó margen.',
+                    },
                   })}
                 />
                 <BiCard
@@ -590,6 +1102,17 @@ export default function AnalisisFinancieroPage() {
                     queEs: 'Qué tan dependiente es el negocio de sus mejores clientes.',
                     comoSeCalcula: 'Se ordena el **20% superior** de clientes por ingreso y se calcula su % del total.',
                     origen: 'Ventas por cliente del módulo de **Pagos**.',
+                    detalle: {
+                      titulo: 'Ingreso acumulado por decil de clientes',
+                      columnas: ['% top de clientes', 'Nº clientes', '% del ingreso acumulado'],
+                      filas: bi.paretoIngresos.map(p => [
+                        `Top ${p.pctClientes}%`,
+                        Math.max(1, Math.round((p.pctClientes / 100) * k.numClientesCompradores)).toLocaleString('es-CO'),
+                        `${p.pctIngresos.toFixed(1)}%`,
+                      ]),
+                      nota: `El 20% top (${Math.ceil(k.numClientesCompradores * 0.2)} de ${k.numClientesCompradores} clientes) aporta el ${k.concentracionTop20Pct.toFixed(1)}% del ingreso histórico.`,
+                    },
+                    action: { label: 'Ver detalle por cliente', onClick: () => setShowArpuPanel(true) },
                   })}
                 />
                 <BiCard
@@ -610,6 +1133,19 @@ export default function AnalisisFinancieroPage() {
                     queEs: 'Cuánto ingreso ha producido, en promedio, cada pantalla en operación.',
                     comoSeCalcula: `**Ingresos históricos ÷ ${k.totalPantallas} pantallas activas**.`,
                     origen: 'Ingresos de Pagos divididos entre la suma de pantallas del Planificador.',
+                    detalle: {
+                      titulo: 'Variables del cálculo',
+                      columnas: ['Variable', 'Valor'],
+                      filas: [
+                        ['Ingresos históricos (Pagos)', formatCurrency(k.ingresosTotales)],
+                        ['Pantallas en operación (Planificador)', k.totalPantallas.toLocaleString('es-CO')],
+                        ['Ingreso por pantalla', formatCurrency(k.ingresoPorPantalla)],
+                        ['Costos históricos (Costo Pantalla)', formatCurrency(k.costosTotales)],
+                        ['Costo por pantalla', formatCurrency(k.costoPorPantalla)],
+                        ['Margen por pantalla', formatCurrency(k.ingresoPorPantalla - k.costoPorPantalla)],
+                      ],
+                      nota: 'Promedios históricos: ingreso y costo acumulados divididos entre las pantallas hoy en operación.',
+                    },
                     action: { label: 'Ver Planificador', onClick: () => navigate('/admin/planificador') },
                   })}
                 />
@@ -625,6 +1161,19 @@ export default function AnalisisFinancieroPage() {
                     queEs: 'El "velocímetro" del negocio: si los últimos meses vienen creciendo o cayendo.',
                     comoSeCalcula: 'Variación % del MRR de cada mes frente al anterior (últimos 7 meses), promediada.',
                     origen: 'Serie mensual de MRR normalizado (Pagos).',
+                    detalle: (() => {
+                      const meses = (bi.porMes || []).filter(m => m.mrr > 0).slice(-7)
+                      return {
+                        titulo: 'MRR mes a mes (los meses que promedia la tarjeta)',
+                        columnas: ['Mes', 'MRR', 'Variación vs mes anterior'],
+                        filas: meses.map((m, i) => {
+                          const prev = i > 0 ? meses[i - 1].mrr : null
+                          const varPct = prev > 0 ? ((m.mrr - prev) / prev) * 100 : null
+                          return [m.label, formatCurrency(m.mrr), varPct != null ? `${varPct > 0 ? '+' : ''}${varPct.toFixed(1)}%` : '—']
+                        }),
+                        nota: `El momentum (${k.momentumMrrPct > 0 ? '+' : ''}${k.momentumMrrPct.toFixed(1)}%) es el promedio de estas variaciones. MRR normaliza cada venta a su equivalente mensual según la duración del plan.`,
+                      }
+                    })(),
                   })}
                 />
                 <BiCard
@@ -636,6 +1185,17 @@ export default function AnalisisFinancieroPage() {
                     queEs: 'Qué porcentaje de las ventas son clientes que volvieron a pagar.',
                     comoSeCalcula: '**Ventas tipo "Renovación" ÷ total de ventas × 100**.',
                     origen: 'Campo tipo de pago de cada venta (módulo Pagos).',
+                    detalle: {
+                      titulo: 'Desglose por tipo de venta',
+                      columnas: ['Tipo', 'Ventas', 'Ingresos', '% del ingreso'],
+                      filas: (bi.tipoPago || []).map(t => [
+                        t.tipo,
+                        t.cantidad.toLocaleString('es-CO'),
+                        formatCurrency(t.total),
+                        `${t.pctTotal.toFixed(1)}%`,
+                      ]),
+                      nota: `La tasa de la tarjeta (${k.tasaRenovacionPct.toFixed(1)}%) se calcula por número de transacciones, no por ingresos.`,
+                    },
                     action: { label: 'Ver Análisis Retención', onClick: () => navigate('/admin/retencion') },
                   })}
                 />
@@ -649,23 +1209,7 @@ export default function AnalisisFinancieroPage() {
                     <p className="text-sm text-gray-400 mt-0.5">% del ingreso acumulado según el % de clientes (curva de Lorenz) — la brecha mide el riesgo de dependencia</p>
                   </CardHeader>
                   <CardBody>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <ComposedChart data={bi.paretoIngresos} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="paretoFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#f97316" stopOpacity={0.35} />
-                            <stop offset="95%" stopColor="#f97316" stopOpacity={0.02} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                        <XAxis dataKey="pctClientes" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#78716c' }} />
-                        <YAxis tickFormatter={(v) => `${v}%`} domain={[0, 100]} tick={{ fontSize: 11, fill: '#78716c' }} />
-                        <Tooltip formatter={(v, name) => [`${v}%`, name]} labelFormatter={(v) => `${v}% de los clientes`} />
-                        <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Area type="monotone" dataKey="pctIngresos" name="% del ingreso acumulado" stroke="#f97316" strokeWidth={2.5} fill="url(#paretoFill)" />
-                        <Line type="monotone" dataKey="pctClientes" name="Distribución equitativa" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
+                    <ParetoChart data={bi.paretoIngresos} />
                     <ChartInsight text={narrarPareto(bi.paretoIngresos, k)} />
                   </CardBody>
                 </Card>
@@ -676,28 +1220,7 @@ export default function AnalisisFinancieroPage() {
                     <p className="text-sm text-gray-400 mt-0.5">Ingreso, costo y margen promedio por cada una de las {k.totalPantallas} pantallas en operación</p>
                   </CardHeader>
                   <CardBody>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <ComposedChart
-                        data={[
-                          { concepto: 'Ingreso', valor: k.ingresoPorPantalla },
-                          { concepto: 'Costo', valor: k.costoPorPantalla },
-                          { concepto: 'Margen', valor: k.ingresoPorPantalla - k.costoPorPantalla },
-                        ]}
-                        layout="vertical"
-                        margin={{ top: 10, right: 70, left: 10, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} horizontal={false} />
-                        <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 11, fill: '#78716c' }} />
-                        <YAxis type="category" dataKey="concepto" tick={{ fontSize: 12, fill: '#78716c', fontWeight: 600 }} width={70} />
-                        <Tooltip formatter={(v) => formatCurrency(v)} />
-                        <Bar dataKey="valor" radius={[0, 6, 6, 0]} barSize={32}>
-                          <Cell fill="#f97316" />
-                          <Cell fill="#94a3b8" />
-                          <Cell fill="#16a34a" />
-                          <LabelList dataKey="valor" position="right" formatter={(v) => formatCurrency(v)} style={{ ...LABEL_STYLE, fontSize: 12 }} />
-                        </Bar>
-                      </ComposedChart>
-                    </ResponsiveContainer>
+                    <ProductividadChart kpis={k} />
                     <ChartInsight text={narrarProductividad(k)} />
                   </CardBody>
                 </Card>
