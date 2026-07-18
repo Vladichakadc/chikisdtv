@@ -1,4 +1,4 @@
-import { X, HelpCircle, Calculator, Database, ArrowRight } from 'lucide-react'
+import { X, HelpCircle, Calculator, Database, ArrowRight, Table2 } from 'lucide-react'
 import { Button } from './Button'
 
 // Modal explicativo de un KPI: qué significa, cómo se calcula (en lenguaje
@@ -10,6 +10,13 @@ import { Button } from './Button'
 //   queEs: string,
 //   comoSeCalcula: string,        // admite **negrilla** con dobles asteriscos
 //   origen: string,
+//   detalle: {                    // opcional: desglose del cálculo en tabla
+//     titulo: string,             //   p. ej. "Detalle por año"
+//     columnas: string[],         //   encabezados; la 1ª va a la izquierda
+//     filas: string[][],          //   celdas ya formateadas (moneda, %, …)
+//     resaltarUltima: boolean,    //   true → última fila en negrilla (TOTAL)
+//     nota: string,               //   pie de tabla aclaratorio
+//   },
 //   action: { label, onClick }    // opcional: "Ver módulo…"
 // }
 
@@ -28,7 +35,7 @@ function Section({ icon: Icon, label, children }) {
       <div className="bg-orange-100 text-orange-600 rounded-lg p-2 h-fit flex-shrink-0">
         <Icon size={15} />
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-0.5">{label}</p>
         {children}
       </div>
@@ -36,9 +43,45 @@ function Section({ icon: Icon, label, children }) {
   )
 }
 
+function DetalleTabla({ detalle }) {
+  if (!detalle?.filas?.length) return null
+  return (
+    <div className="mt-1 border border-orange-100 rounded-lg overflow-hidden">
+      <div className="max-h-60 overflow-y-auto overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-orange-50 text-orange-700 sticky top-0">
+              {detalle.columnas.map((c, i) => (
+                <th key={i} className={`px-2.5 py-1.5 font-semibold whitespace-nowrap ${i === 0 ? 'text-left' : 'text-right'}`}>{c}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {detalle.filas.map((fila, ri) => (
+              <tr
+                key={ri}
+                className={`border-t border-orange-50 ${detalle.resaltarUltima && ri === detalle.filas.length - 1
+                  ? 'bg-orange-50/70 font-bold text-gray-800'
+                  : 'text-gray-600'}`}
+              >
+                {fila.map((cell, ci) => (
+                  <td key={ci} className={`px-2.5 py-1.5 whitespace-nowrap ${ci === 0 ? 'text-left font-medium' : 'text-right tabular-nums'}`}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {detalle.nota && (
+        <p className="px-2.5 py-1.5 text-[11px] text-gray-400 bg-orange-50/40 border-t border-orange-50 leading-snug">{detalle.nota}</p>
+      )}
+    </div>
+  )
+}
+
 export function KpiExplainModal({ info, onClose }) {
   if (!info) return null
-  const { title, value, icon: Icon, queEs, comoSeCalcula, origen, action } = info
+  const { title, value, icon: Icon, queEs, comoSeCalcula, origen, detalle, action } = info
 
   return (
     // En móvil se comporta como bottom-sheet (desliza desde abajo, ancho completo);
@@ -48,7 +91,7 @@ export function KpiExplainModal({ info, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[88vh] sm:max-h-[90vh] flex flex-col animate-sheet-up"
+        className={`bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full ${detalle ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[88vh] sm:max-h-[90vh] flex flex-col animate-sheet-up`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Asa de arrastre — affordance de bottom-sheet, solo móvil */}
@@ -84,6 +127,11 @@ export function KpiExplainModal({ info, onClose }) {
           {comoSeCalcula && (
             <Section icon={Calculator} label="¿Cómo se calcula?">
               <RichText text={comoSeCalcula} />
+            </Section>
+          )}
+          {detalle && (
+            <Section icon={Table2} label={detalle.titulo || 'Detalle del cálculo'}>
+              <DetalleTabla detalle={detalle} />
             </Section>
           )}
           {origen && (
