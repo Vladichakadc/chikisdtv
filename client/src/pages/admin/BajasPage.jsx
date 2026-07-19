@@ -110,7 +110,9 @@ export default function BajasPage() {
   const openEdit = (b) => { setEditing(b); setForm({ ...b }); setNicknameEditMode(false); setShowForm(true) }
   const closeForm = () => { setShowForm(false); setNicknameEditMode(false) }
 
-  const handleNicknameSelect = (nick) => {
+  const [loadingVenta, setLoadingVenta] = useState(false)
+
+  const handleNicknameSelect = async (nick) => {
     if (!nick) { setForm(f => ({ ...f, nickname: '' })); return }
     const match = nicknames.find(n => n.nickname === nick)
     if (match) {
@@ -132,6 +134,32 @@ export default function BajasPage() {
       }))
     } else {
       setForm(f => ({ ...f, nickname: nick }))
+    }
+
+    // Buscar último pago (Venta) del nickname para obtener SKU y Tipo Fire TV
+    setLoadingVenta(true)
+    try {
+      const { data: venta } = await api.get(`/admin/bajas/last-venta/${encodeURIComponent(nick)}`)
+      if (venta) {
+        setForm(f => ({
+          ...f,
+          // El último pago tiene prioridad sobre los datos del planificador para dispositivo
+          sku:           venta.sku        || f.sku,
+          tipoFire:      venta.tipoFire   || f.tipoFire,
+          // Completar otros campos si aún están vacíos
+          nombre:        f.nombre        || venta.nombre        || '',
+          apellido:      f.apellido      || venta.apellido      || '',
+          customerId:    f.customerId    || venta.customerId    || '',
+          tipoPlan:      f.tipoPlan      || venta.tipoPlan      || '',
+          tipoPantalla:  f.tipoPantalla  || venta.tipoPantalla  || '',
+          cuentaDedicada: f.cuentaDedicada || venta.cuentaDedicada || '',
+          cortesia:      f.cortesia      || venta.cortesia      || '',
+        }))
+      }
+    } catch (e) {
+      console.warn('[BajasPage] No se pudo obtener la última venta para el nickname:', nick, e.message)
+    } finally {
+      setLoadingVenta(false)
     }
   }
 
@@ -464,7 +492,13 @@ export default function BajasPage() {
                             </option>
                           ))}
                         </select>
-                        <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-semibold">Al seleccionar se llenan los campos asociados</p>
+                        <p className="text-[10px] mt-1 uppercase tracking-wider font-semibold flex items-center gap-1.5"
+                           style={{ color: loadingVenta ? '#f43f5e' : '#9ca3af' }}>
+                          {loadingVenta && (
+                            <span className="inline-block w-2.5 h-2.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                          )}
+                          {loadingVenta ? 'Buscando último dispositivo…' : 'Al seleccionar se llenan los campos asociados'}
+                        </p>
                       </>
                     )}
                   </div>
@@ -476,9 +510,41 @@ export default function BajasPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2 text-sm font-semibold text-rose-700 border-b border-rose-100 pb-1 flex items-center gap-2">
                     <span>📺 Dispositivo</span>
+                    {loadingVenta && (
+                      <span className="flex items-center gap-1.5 text-xs font-normal text-rose-400">
+                        <span className="w-3 h-3 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                        Buscando…
+                      </span>
+                    )}
                   </div>
-                  <Input label="SKU" value={form.sku || ''} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-                  <Input label="Tipo Fire TV" value={form.tipoFire || ''} onChange={(e) => setForm({ ...form, tipoFire: e.target.value })} />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+                    <div className="relative">
+                      <input
+                        value={form.sku || ''}
+                        onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                        disabled={loadingVenta}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-rose-400 focus:border-rose-400 outline-none transition-all disabled:bg-gray-50 disabled:text-gray-400"
+                      />
+                      {loadingVenta && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Fire TV</label>
+                    <div className="relative">
+                      <input
+                        value={form.tipoFire || ''}
+                        onChange={(e) => setForm({ ...form, tipoFire: e.target.value })}
+                        disabled={loadingVenta}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-rose-400 focus:border-rose-400 outline-none transition-all disabled:bg-gray-50 disabled:text-gray-400"
+                      />
+                      {loadingVenta && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                      )}
+                    </div>
+                  </div>
                   <Select label="Devolución" value={form.devolucion || ''} onChange={(e) => setForm({ ...form, devolucion: e.target.value })}>
                     <option value="">--</option>
                     <option value="SI">SI</option>
