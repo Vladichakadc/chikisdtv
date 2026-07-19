@@ -1,0 +1,702 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e10]:
+          - generic [ref=e11]: ChikisdTV
+          - generic [ref=e12]: Panel Administrador
+        - button "Colapsar menú" [ref=e13] [cursor=pointer]
+      - navigation [ref=e18]:
+        - generic [ref=e19]:
+          - paragraph [ref=e20]: Principal
+          - generic [ref=e22]:
+            - generic [ref=e23]:
+              - link "Dashboard" [ref=e24] [cursor=pointer]:
+                - /url: /admin
+              - button "Contraer Dashboard" [expanded] [ref=e31] [cursor=pointer]
+            - generic [ref=e34]:
+              - link "Análisis Financiero" [ref=e35] [cursor=pointer]:
+                - /url: /admin/analisis-financiero
+              - link "Análisis Retención" [ref=e40] [cursor=pointer]:
+                - /url: /admin/retencion
+        - generic [ref=e47]:
+          - paragraph [ref=e48]: Operación
+          - generic [ref=e49]:
+            - link "Planificador" [ref=e52] [cursor=pointer]:
+              - /url: /admin/planificador
+            - link "Cuentas Padre" [ref=e60] [cursor=pointer]:
+              - /url: /admin/cuentas-padre
+            - generic [ref=e65]:
+              - generic [ref=e66]:
+                - link "Clientes" [ref=e67] [cursor=pointer]:
+                  - /url: /admin/clients
+                - button "Expandir Clientes" [ref=e74] [cursor=pointer]
+              - link "Análisis Demográfico" [ref=e78] [cursor=pointer]:
+                - /url: /admin/analisis-clientes
+            - link "Planes" [ref=e86] [cursor=pointer]:
+              - /url: /admin/plans
+            - link "Suscripciones" [ref=e94] [cursor=pointer]:
+              - /url: /admin/subscriptions
+            - generic [ref=e99]:
+              - generic [ref=e100]:
+                - link "Pagos" [ref=e101] [cursor=pointer]:
+                  - /url: /admin/payments
+                - button "Expandir Pagos" [ref=e105] [cursor=pointer]
+              - link "Análisis de Pagos" [ref=e109] [cursor=pointer]:
+                - /url: /admin/analisis-pagos
+            - generic [ref=e114]:
+              - generic [ref=e115]:
+                - link "Bajas" [ref=e116] [cursor=pointer]:
+                  - /url: /admin/bajas
+                - button "Expandir Bajas" [ref=e123] [cursor=pointer]
+              - link "Análisis de Bajas" [ref=e127] [cursor=pointer]:
+                - /url: /admin/analisis-bajas
+        - generic [ref=e133]:
+          - paragraph [ref=e134]: Equipos
+          - generic [ref=e135]:
+            - link "Costo Pantalla" [ref=e138] [cursor=pointer]:
+              - /url: /admin/costo-pantalla
+            - generic [ref=e142]:
+              - generic [ref=e143]:
+                - link "Venta Dispositivos" [ref=e144] [cursor=pointer]:
+                  - /url: /admin/ventas-dispositivos
+                - button "Expandir Venta Dispositivos" [ref=e149] [cursor=pointer]
+              - link "Análisis Dispositivos" [ref=e153] [cursor=pointer]:
+                - /url: /admin/analisis-dispositivos
+            - generic [ref=e159]:
+              - generic [ref=e160]:
+                - link "Inventario Equipos" [ref=e161] [cursor=pointer]:
+                  - /url: /admin/devices
+                - button "Expandir Inventario Equipos" [ref=e173] [cursor=pointer]
+              - link "Análisis Inventario" [ref=e177] [cursor=pointer]:
+                - /url: /admin/analisis-inventario
+      - generic [ref=e183]:
+        - generic [ref=e184]: A
+        - generic [ref=e185]:
+          - paragraph [ref=e186]: Administrador
+          - paragraph [ref=e187]: admin@chikisdtv.com
+        - button "Cerrar sesión" [ref=e189] [cursor=pointer]
+    - main [ref=e194]:
+      - generic [ref=e201]:
+        - generic [ref=e204]:
+          - generic [ref=e205]: Análisis Financiero
+          - heading "Rendimiento y EBITDA" [level=1] [ref=e209]
+          - paragraph [ref=e210]: EBITDA, rentabilidad, MRR y LTV — todos los valores en pesos colombianos (COP)
+        - generic [ref=e211]:
+          - button "Licencias · TV EBITDA · MRR · LTV" [ref=e212] [cursor=pointer]:
+            - generic [ref=e216]: Licencias · TV
+            - generic [ref=e217]: EBITDA · MRR · LTV
+          - button "Equipos 200 registros" [ref=e218] [cursor=pointer]:
+            - generic [ref=e223]: Equipos
+            - generic [ref=e224]: 200 registros
+        - generic [ref=e225]:
+          - generic [ref=e226]:
+            - paragraph [ref=e227]: Ingresos de licencias/suscripciones · OPEX excluido de equipos
+            - generic [ref=e231]:
+              - button "EBITDA histórico · licencias $86M Ingresos licencias − OPEX (recargas + 4x1000) ↑ +56.8% EBITDA excelente Ver detalle →" [ref=e232] [cursor=pointer]:
+                - generic [ref=e235]:
+                  - paragraph [ref=e236]: EBITDA histórico · licencias
+                  - paragraph [ref=e237]: $86M
+                  - generic [ref=e238]:
+                    - paragraph [ref=e239]: Ingresos licencias − OPEX (recargas + 4x1000)
+                    - generic [ref=e240]: ↑ +56.8%
+                  - generic [ref=e241]: EBITDA excelente
+                  - paragraph [ref=e243]: Ver detalle →
+              - button "Margen EBITDA · licencias 65.6% De cada $100 de licencias que entran ↑ +7.6% Margen premium Ver detalle →" [ref=e248] [cursor=pointer]:
+                - generic [ref=e251]:
+                  - paragraph [ref=e252]: Margen EBITDA · licencias
+                  - paragraph [ref=e253]: 65.6%
+                  - generic [ref=e254]:
+                    - paragraph [ref=e255]: De cada $100 de licencias que entran
+                    - generic [ref=e256]: ↑ +7.6%
+                  - generic [ref=e257]: Margen premium
+                  - paragraph [ref=e259]: Ver detalle →
+              - button [ref=e265] [cursor=pointer]:
+                - generic [ref=e268]:
+                  - paragraph [ref=e269]: OPEX ratio
+                  - paragraph [ref=e270]: 34.4%
+                  - paragraph [ref=e272]: "OPEX histórico: $45,2M"
+                  - generic [ref=e273]: Costo moderado
+                  - paragraph [ref=e275]: Ver detalle →
+              - button [ref=e280] [cursor=pointer]:
+                - generic [ref=e283]:
+                  - paragraph [ref=e284]: ROI sobre OPEX
+                  - paragraph [ref=e285]: 208%
+                  - paragraph [ref=e287]: "TIR no calculable: flujos siempre positivos"
+                  - generic [ref=e288]: Retorno excepcional
+                  - paragraph [ref=e290]: Ver detalle →
+          - generic [ref=e295]:
+            - 'button "EBITDA licencias · LTM $29,4M Margen LTM: 73.2% ↑ +56.8% LTM supera el histórico anualizado Ver detalle →" [ref=e296] [cursor=pointer]':
+              - generic [ref=e299]:
+                - paragraph [ref=e300]: EBITDA licencias · LTM
+                - paragraph [ref=e301]: $29,4M
+                - generic [ref=e302]:
+                  - paragraph [ref=e303]: "Margen LTM: 73.2%"
+                  - generic [ref=e304]: ↑ +56.8%
+                - generic [ref=e305]: LTM supera el histórico anualizado
+                - paragraph [ref=e307]: Ver detalle →
+            - button [ref=e311] [cursor=pointer]:
+              - generic [ref=e314]:
+                - paragraph [ref=e315]: EBITDA promedio mensual
+                - paragraph [ref=e316]: $1,6M
+                - paragraph [ref=e318]: Sobre meses con actividad registrada
+                - generic [ref=e319]: Rentable en promedio mensual
+                - paragraph [ref=e321]: Ver detalle →
+            - button [ref=e325] [cursor=pointer]:
+              - generic [ref=e328]:
+                - paragraph [ref=e329]: Payback
+                - paragraph [ref=e330]: Ene 22
+                - paragraph [ref=e332]: Mes 1 de operación
+                - generic [ref=e333]: Payback rápido (≤6 meses)
+                - paragraph [ref=e335]: Ver detalle →
+            - button [ref=e340] [cursor=pointer]:
+              - generic [ref=e343]:
+                - paragraph [ref=e344]: CAPEX registrado
+                - paragraph [ref=e345]: $0
+                - paragraph [ref=e347]: Negocio asset-light — sin inversión de capital registrada
+                - generic [ref=e348]: Modelo asset-light ✓
+                - paragraph [ref=e350]: Ver detalle →
+          - generic [ref=e354]:
+            - generic [ref=e355]:
+              - heading "EBITDA mensual de licencias y margen" [level=3] [ref=e356]
+              - paragraph [ref=e357]: "Barras: EBITDA de suscripciones (COP). Línea: margen EBITDA % — solo ingresos de licencias menos OPEX"
+            - generic [ref=e360]:
+              - list [ref=e362]:
+                - listitem [ref=e363]:
+                  - img "EBITDA licencias legend icon" [ref=e364]
+                  - generic [ref=e366]: EBITDA licencias
+                - listitem [ref=e367]:
+                  - img "Margen % legend icon" [ref=e368]
+                  - generic [ref=e370]: Margen %
+              - application [ref=e371]:
+                - generic [ref=e390]:
+                  - generic [ref=e391]:
+                    - generic [ref=e392]: Ene 22
+                    - generic [ref=e394]: Mar 22
+                    - generic [ref=e396]: May 22
+                    - generic [ref=e398]: Jul 22
+                    - generic [ref=e400]: Sep 22
+                    - generic [ref=e402]: Nov 22
+                    - generic [ref=e404]: Ene 23
+                    - generic [ref=e406]: Mar 23
+                    - generic [ref=e408]: May 23
+                    - generic [ref=e410]: Jul 23
+                    - generic [ref=e412]: Sep 23
+                    - generic [ref=e414]: Nov 23
+                    - generic [ref=e416]: Ene 24
+                    - generic [ref=e418]: Mar 24
+                    - generic [ref=e420]: May 24
+                    - generic [ref=e422]: Jul 24
+                    - generic [ref=e424]: Sep 24
+                    - generic [ref=e426]: Nov 24
+                    - generic [ref=e428]: Ene 25
+                    - generic [ref=e430]: Mar 25
+                    - generic [ref=e432]: May 25
+                    - generic [ref=e434]: Jul 25
+                    - generic [ref=e436]: Sep 25
+                    - generic [ref=e438]: Nov 25
+                    - generic [ref=e440]: Ene 26
+                    - generic [ref=e442]: Mar 26
+                    - generic [ref=e444]: May 26
+                    - generic [ref=e446]: Jul 26
+                  - generic [ref=e448]: Mes
+                  - generic [ref=e449]:
+                    - generic [ref=e450]: $-1,5M
+                    - generic [ref=e452]: $0
+                    - generic [ref=e454]: $1,5M
+                    - generic [ref=e456]: $3M
+                    - generic [ref=e458]: $4,5M
+                  - generic [ref=e460]: EBITDA (COP)
+                  - generic [ref=e461]:
+                    - generic [ref=e462]: "-170%"
+                    - generic [ref=e464]: "-85%"
+                    - generic [ref=e466]: 0%
+                    - generic [ref=e468]: 85%
+                    - generic [ref=e470]: 170%
+          - generic [ref=e472]:
+            - generic [ref=e473]:
+              - generic [ref=e474]:
+                - 'heading "Estructura anual: ingresos licencias, OPEX y EBITDA" [level=3] [ref=e475]'
+                - paragraph [ref=e476]: La brecha entre la barra naranja y la gris es el EBITDA de la línea TV
+              - generic [ref=e479]:
+                - list [ref=e481]:
+                  - listitem [ref=e482]:
+                    - img "EBITDA legend icon" [ref=e483]
+                    - generic [ref=e485]: EBITDA
+                  - listitem [ref=e486]:
+                    - img "Ingresos licencias legend icon" [ref=e487]
+                    - generic [ref=e489]: Ingresos licencias
+                  - listitem [ref=e490]:
+                    - img "OPEX legend icon" [ref=e491]
+                    - generic [ref=e493]: OPEX
+                - application [ref=e494]:
+                  - generic [ref=e517]:
+                    - generic [ref=e518]:
+                      - generic [ref=e519]: "2022"
+                      - generic [ref=e521]: "2023"
+                      - generic [ref=e523]: "2024"
+                      - generic [ref=e525]: "2025"
+                      - generic [ref=e527]: "2026"
+                    - generic [ref=e529]:
+                      - generic [ref=e530]: $0
+                      - generic [ref=e532]: $10M
+                      - generic [ref=e534]: $20M
+                      - generic [ref=e536]: $30M
+                      - generic [ref=e538]: $40M
+                    - generic [ref=e540]: COP
+            - generic [ref=e541]:
+              - generic [ref=e542]:
+                - heading "Flujo de caja acumulado · licencias" [level=3] [ref=e543]
+                - paragraph [ref=e544]: Suma corrida del EBITDA mensual de suscripciones
+              - application [ref=e548]:
+                - generic [ref=e567]:
+                  - generic [ref=e568]:
+                    - generic [ref=e569]: Ene 22
+                    - generic [ref=e571]: May 22
+                    - generic [ref=e573]: Sep 22
+                    - generic [ref=e575]: Dic 22
+                    - generic [ref=e577]: Abr 23
+                    - generic [ref=e579]: Jul 23
+                    - generic [ref=e581]: Oct 23
+                    - generic [ref=e583]: Feb 24
+                    - generic [ref=e585]: Jun 24
+                    - generic [ref=e587]: Oct 24
+                    - generic [ref=e589]: Feb 25
+                    - generic [ref=e591]: Jun 25
+                    - generic [ref=e593]: Oct 25
+                    - generic [ref=e595]: Feb 26
+                    - generic [ref=e597]: Jul 26
+                  - generic [ref=e599]: Mes
+                  - generic [ref=e600]:
+                    - generic [ref=e601]: $0
+                    - generic [ref=e603]: $25M
+                    - generic [ref=e605]: $50M
+                    - generic [ref=e607]: $75M
+                    - generic [ref=e609]: $100M
+                  - generic [ref=e611]: Acumulado (COP)
+                  - generic [ref=e612]: Punto de equilibrio
+          - generic [ref=e613]:
+            - generic [ref=e614]:
+              - 'heading "Exposición cambiaria: TRM vs OPEX mensual" [level=3] [ref=e615]'
+              - paragraph [ref=e616]: Las recargas se pagan en dólares — cuando la TRM (línea azul) sube, cada crédito cuesta más pesos
+            - generic [ref=e618]:
+              - generic [ref=e619]:
+                - generic [ref=e620]: 🟢
+                - generic [ref=e621]: TRM -10.2% — viento a favor
+              - generic [ref=e623]:
+                - list [ref=e625]:
+                  - listitem [ref=e626]:
+                    - img "OPEX (recargas) legend icon" [ref=e627]
+                    - generic [ref=e629]: OPEX (recargas)
+                  - listitem [ref=e630]:
+                    - img "TRM promedio legend icon" [ref=e631]
+                    - generic [ref=e633]: TRM promedio
+                - application [ref=e634]:
+                  - generic [ref=e653]:
+                    - generic [ref=e654]:
+                      - generic [ref=e655]: Ene 22
+                      - generic [ref=e657]: Abr 22
+                      - generic [ref=e659]: Jun 22
+                      - generic [ref=e661]: Jul 22
+                      - generic [ref=e663]: Sep 22
+                      - generic [ref=e665]: Nov 22
+                      - generic [ref=e667]: Feb 23
+                      - generic [ref=e669]: Abr 23
+                      - generic [ref=e671]: Jun 23
+                      - generic [ref=e673]: Ago 23
+                      - generic [ref=e675]: Oct 23
+                      - generic [ref=e677]: Nov 23
+                      - generic [ref=e679]: Feb 24
+                      - generic [ref=e681]: Mar 24
+                      - generic [ref=e683]: Abr 24
+                      - generic [ref=e685]: Jul 24
+                      - generic [ref=e687]: Ago 24
+                      - generic [ref=e689]: Oct 24
+                      - generic [ref=e691]: Nov 24
+                      - generic [ref=e693]: Ene 25
+                      - generic [ref=e695]: Feb 25
+                      - generic [ref=e697]: Mar 25
+                      - generic [ref=e699]: Jun 25
+                      - generic [ref=e701]: Jul 25
+                      - generic [ref=e703]: Ago 25
+                      - generic [ref=e705]: Sep 25
+                      - generic [ref=e707]: Oct 25
+                      - generic [ref=e709]: Ene 26
+                      - generic [ref=e711]: Feb 26
+                      - generic [ref=e713]: Mar 26
+                      - generic [ref=e715]: Abr 26
+                    - generic [ref=e717]:
+                      - generic [ref=e718]: $0
+                      - generic [ref=e720]: $1M
+                      - generic [ref=e722]: $2M
+                      - generic [ref=e724]: $3M
+                      - generic [ref=e726]: $4M
+                    - generic [ref=e728]: OPEX (COP)
+                    - generic [ref=e729]:
+                      - generic [ref=e730]: $3.500
+                      - generic [ref=e732]: $3.850
+                      - generic [ref=e734]: $4.200
+                      - generic [ref=e736]: $4.550
+                      - generic [ref=e738]: $4.900
+                    - generic [ref=e740]: TRM ($)
+          - generic [ref=e741]:
+            - generic [ref=e748]:
+              - heading "Rentabilidad y Ventas · Lectura financiera" [level=2] [ref=e749]
+              - paragraph [ref=e750]: Eficiencia, riesgo de cartera y productividad comercial
+            - generic [ref=e751]:
+              - button "Markup sobre el costo 190.4% Retorno sobre costo alto cada $1.000 de costo deja $1.904 de margen bruto ¿Cómo se calcula?" [ref=e752] [cursor=pointer]:
+                - generic [ref=e754]:
+                  - paragraph [ref=e755]: Markup sobre el costo
+                  - paragraph [ref=e756]: 190.4%
+                  - generic [ref=e757]: Retorno sobre costo alto
+                  - generic [ref=e761]: cada $1.000 de costo deja $1.904 de margen bruto
+                  - paragraph [ref=e763]: ¿Cómo se calcula?
+              - button "Cobertura de costos 2.90× Colchón financiero amplio veces que el ingreso operativo cubre el costo de pantallas/cuentas ¿Cómo se calcula?" [ref=e769] [cursor=pointer]:
+                - generic [ref=e771]:
+                  - paragraph [ref=e772]: Cobertura de costos
+                  - paragraph [ref=e773]: 2.90×
+                  - generic [ref=e774]: Colchón financiero amplio
+                  - generic [ref=e778]: veces que el ingreso operativo cubre el costo de pantallas/cuentas
+                  - paragraph [ref=e780]: ¿Cómo se calcula?
+              - button "Punto de equilibrio 849 ventas 2026 no alcanzó el umbral al ticket promedio de $53.188 para cubrir el costo total ¿Cómo se calcula?" [ref=e784] [cursor=pointer]:
+                - generic [ref=e786]:
+                  - paragraph [ref=e787]: Punto de equilibrio
+                  - paragraph [ref=e788]: 849 ventas
+                  - generic [ref=e789]: 2026 no alcanzó el umbral
+                  - generic [ref=e793]: al ticket promedio de $53.188 para cubrir el costo total
+                  - paragraph [ref=e795]: ¿Cómo se calcula?
+              - button "Concentración de cartera 49.2% Concentración moderada — vigilar del ingreso histórico lo aporta el 20% top de clientes (54 de 267) ¿Cómo se calcula?" [ref=e801] [cursor=pointer]:
+                - generic [ref=e803]:
+                  - paragraph [ref=e804]: Concentración de cartera
+                  - paragraph [ref=e805]: 49.2%
+                  - generic [ref=e806]: Concentración moderada — vigilar
+                  - generic [ref=e810]: del ingreso histórico lo aporta el 20% top de clientes (54 de 267)
+                  - paragraph [ref=e812]: ¿Cómo se calcula?
+              - button "ARPU · ingreso por cliente $491.039 ≈ 9.2 compras por cliente en su histórico promedio histórico sobre 267 clientes con compras registradas Ver detalle por cliente" [ref=e819] [cursor=pointer]:
+                - generic [ref=e821]:
+                  - paragraph [ref=e822]: ARPU · ingreso por cliente
+                  - paragraph [ref=e823]: $491.039
+                  - generic [ref=e824]: ≈ 9.2 compras por cliente en su histórico
+                  - generic [ref=e828]: promedio histórico sobre 267 clientes con compras registradas
+                  - paragraph [ref=e830]: Ver detalle por cliente
+              - button "Ingreso por pantalla $464.920 Unidad muy rentable (66% margen) costo por pantalla $160.109 · 282 pantallas en operación ¿Cómo se calcula?" [ref=e836] [cursor=pointer]:
+                - generic [ref=e838]:
+                  - paragraph [ref=e839]: Ingreso por pantalla
+                  - paragraph [ref=e840]: $464.920
+                  - generic [ref=e841]: Unidad muy rentable (66% margen)
+                  - generic [ref=e845]: costo por pantalla $160.109 · 282 pantallas en operación
+                  - paragraph [ref=e847]: ¿Cómo se calcula?
+              - 'button "Momentum MRR -1.7% Ritmo estable bruto: -2.8% ¿Cómo se calcula?" [ref=e852] [cursor=pointer]':
+                - generic [ref=e854]:
+                  - paragraph [ref=e855]: Momentum MRR
+                  - paragraph [ref=e856]: "-1.7%"
+                  - generic [ref=e857]: Ritmo estable
+                  - generic [ref=e861]: "bruto: -2.8%"
+                  - paragraph [ref=e863]: ¿Cómo se calcula?
+              - button "Renovaciones 82.4% del ingreso total · churn 30.5% ¿Cómo se calcula?" [ref=e868] [cursor=pointer]:
+                - generic [ref=e870]:
+                  - paragraph [ref=e871]: Renovaciones
+                  - paragraph [ref=e872]: 82.4%
+                  - generic [ref=e873]: del ingreso total · churn 30.5%
+                  - paragraph [ref=e875]: ¿Cómo se calcula?
+            - generic [ref=e882]:
+              - generic [ref=e883]:
+                - generic [ref=e884]:
+                  - heading "Concentración de ingresos por cliente" [level=3] [ref=e885]
+                  - paragraph [ref=e886]: "% del ingreso acumulado según el % de clientes (curva de Lorenz) — la brecha mide el riesgo de dependencia"
+                - generic [ref=e887]:
+                  - generic [ref=e889]:
+                    - list [ref=e891]:
+                      - listitem [ref=e892]:
+                        - img "Distribución equitativa legend icon" [ref=e893]
+                        - generic [ref=e895]: Distribución equitativa
+                      - listitem [ref=e896]:
+                        - img "Ingreso acumulado legend icon" [ref=e897]
+                        - generic [ref=e899]: Ingreso acumulado
+                    - application [ref=e900]:
+                      - generic [ref=e924]:
+                        - generic [ref=e925]: 48.7%
+                        - generic [ref=e928]: 81.6%
+                        - generic [ref=e931]: 96.9%
+                      - generic [ref=e934]:
+                        - generic [ref=e935]:
+                          - generic [ref=e936]: 10%
+                          - generic [ref=e938]: 20%
+                          - generic [ref=e940]: 30%
+                          - generic [ref=e942]: 40%
+                          - generic [ref=e944]: 50%
+                          - generic [ref=e946]: 60%
+                          - generic [ref=e948]: 70%
+                          - generic [ref=e950]: 80%
+                          - generic [ref=e952]: 90%
+                          - generic [ref=e954]: 100%
+                        - generic [ref=e956]: "% de clientes"
+                        - generic [ref=e957]:
+                          - generic [ref=e958]: 0%
+                          - generic [ref=e960]: 25%
+                          - generic [ref=e962]: 50%
+                          - generic [ref=e964]: 75%
+                          - generic [ref=e966]: 100%
+                        - generic [ref=e968]: "% ingreso acum."
+                        - generic [ref=e969]: Pareto 80/20
+                  - paragraph [ref=e973]:
+                    - text: Si la cartera estuviera repartida en partes iguales, el 20% de los clientes generaría el 20% del ingreso — esa es la diagonal punteada (distribución equitativa). En la realidad ese 20% genera
+                    - strong [ref=e974]: 48.7%
+                    - text: del ingreso,
+                    - strong [ref=e975]: +28.7 puntos por encima de la equidad
+                    - text: ", y solo la mitad de la cartera ya concentra 81.6%. La curva no se aleja demasiado de la diagonal: el ingreso está razonablemente repartido entre la base de clientes, lo que reduce el riesgo de que la salida de unos pocos golpee la caja de forma material."
+              - generic [ref=e976]:
+                - generic [ref=e977]:
+                  - heading "Productividad por pantalla" [level=3] [ref=e978]
+                  - paragraph [ref=e979]: Ingreso, costo y margen promedio por cada una de las 282 pantallas en operación
+                - generic [ref=e980]:
+                  - generic [ref=e981]:
+                    - generic [ref=e982]:
+                      - generic [ref=e983]: 🟢
+                      - generic [ref=e984]: Unidad muy rentable
+                      - generic [ref=e985]: ·
+                      - generic [ref=e986]: 65.6% margen
+                      - generic [ref=e987]: ·
+                      - generic [ref=e988]: 282 pantallas activas
+                    - generic [ref=e990]:
+                      - generic [ref=e991]: Margen sobre ingreso
+                      - generic [ref=e992]: 65.6%
+                    - application [ref=e997]:
+                      - generic [ref=e1008]:
+                        - generic [ref=e1009]:
+                          - generic [ref=e1010]: $0K
+                          - generic [ref=e1012]: $150K
+                          - generic [ref=e1014]: $300K
+                          - generic [ref=e1016]: $450K
+                          - generic [ref=e1018]: $600K
+                        - generic [ref=e1020]: Valor promedio por pantalla
+                        - generic [ref=e1021]:
+                          - generic [ref=e1022]: Ingreso
+                          - generic [ref=e1024]: Costo
+                          - generic [ref=e1026]: Margen
+                  - paragraph [ref=e1031]:
+                    - text: Cada una de las 282 pantallas activas produce, en promedio, $464.920 de ingreso y consume $160.109 de costo — dejando
+                    - strong [ref=e1032]: $304.811 de margen por pantalla
+                    - text: "(65.6% de su ingreso). Esta es la \"unidad económica\" más pequeña del negocio: si el costo por pantalla sube — por ejemplo, por variaciones en la TRM o en el precio de las credenciales — esta barra gris sería la primera en moverse, y el primer lugar donde se vería la presión sobre la rentabilidad."
+            - generic [ref=e1033]:
+              - generic [ref=e1034]:
+                - heading "Momentum de ventas — variación mensual de ingresos" [level=3] [ref=e1035]
+                - paragraph [ref=e1036]: "Variación % mes a mes de los últimos periodos con actividad (promedio: -2.8%)"
+              - generic [ref=e1037]:
+                - application [ref=e1040]:
+                  - generic [ref=e1052]:
+                    - generic [ref=e1053]:
+                      - generic [ref=e1054]: Ago 25
+                      - generic [ref=e1056]: Sep 25
+                      - generic [ref=e1058]: Oct 25
+                      - generic [ref=e1060]: Nov 25
+                      - generic [ref=e1062]: Dic 25
+                      - generic [ref=e1064]: Ene 26
+                      - generic [ref=e1066]: Feb 26
+                      - generic [ref=e1068]: Mar 26
+                      - generic [ref=e1070]: Abr 26
+                      - generic [ref=e1072]: May 26
+                      - generic [ref=e1074]: Jun 26
+                      - generic [ref=e1076]: Jul 26
+                    - generic [ref=e1078]:
+                      - generic [ref=e1079]: "-100%"
+                      - generic [ref=e1081]: "-50%"
+                      - generic [ref=e1083]: 0%
+                      - generic [ref=e1085]: 50%
+                      - generic [ref=e1087]: 100%
+                - paragraph [ref=e1092]:
+                  - text: De los últimos 12 meses con actividad, 6 cerraron en
+                  - strong [ref=e1093]: crecimiento
+                  - text: frente al mes anterior y 6 en
+                  - strong [ref=e1094]: caída
+                  - text: . El más reciente (Jul 26) varió -58.6%, y el promedio de esas variaciones — el "momentum" — es de -2.8% mensual. Un momentum negativo no es alarmante por sí solo si el histórico ya muestra estacionalidad (meses bajos seguidos de recuperación), pero si se sostiene dos o tres meses más, es la señal para activar acciones comerciales de reactivación (campañas de renovación, recuperación de cartera).
+          - generic [ref=e1095]:
+            - generic [ref=e1103]:
+              - heading "MRR · Ingreso Recurrente Mensual" [level=2] [ref=e1104]
+              - paragraph [ref=e1105]: Ingresos normalizados por duración de plan — corrige la distorsión de planes anuales y semestrales
+            - generic [ref=e1106]:
+              - button "MRR · Jul 26 $521.258 Base recurrente real ingreso recurrente mensual normalizado por duración de plan ¿Cómo se calcula?" [ref=e1107] [cursor=pointer]:
+                - generic [ref=e1109]:
+                  - paragraph [ref=e1110]: MRR · Jul 26
+                  - paragraph [ref=e1111]: $521.258
+                  - generic [ref=e1112]: Base recurrente real
+                  - generic [ref=e1116]: ingreso recurrente mensual normalizado por duración de plan
+                  - paragraph [ref=e1118]: ¿Cómo se calcula?
+              - button "ARR estimado $6.255.096 Proyección sostenida MRR × 12 — proyección anualizada del ingreso recurrente actual ¿Cómo se calcula?" [ref=e1123] [cursor=pointer]:
+                - generic [ref=e1125]:
+                  - paragraph [ref=e1126]: ARR estimado
+                  - paragraph [ref=e1127]: $6.255.096
+                  - generic [ref=e1128]: Proyección sostenida
+                  - generic [ref=e1132]: MRR × 12 — proyección anualizada del ingreso recurrente actual
+                  - paragraph [ref=e1134]: ¿Cómo se calcula?
+              - button "Crecimiento MRR · MoM -47.5% MRR en contracción variación del MRR normalizado respecto al mes anterior ¿Cómo se calcula?" [ref=e1139] [cursor=pointer]:
+                - generic [ref=e1141]:
+                  - paragraph [ref=e1142]: Crecimiento MRR · MoM
+                  - paragraph [ref=e1143]: "-47.5%"
+                  - generic [ref=e1144]: MRR en contracción
+                  - generic [ref=e1148]: variación del MRR normalizado respecto al mes anterior
+                  - paragraph [ref=e1150]: ¿Cómo se calcula?
+              - button "Momentum MRR (7 meses) -1.7% Ritmo MRR estable promedio MoM del MRR normalizado — señal de tendencia ¿Cómo se calcula?" [ref=e1155] [cursor=pointer]:
+                - generic [ref=e1157]:
+                  - paragraph [ref=e1158]: Momentum MRR (7 meses)
+                  - paragraph [ref=e1159]: "-1.7%"
+                  - generic [ref=e1160]: Ritmo MRR estable
+                  - generic [ref=e1164]: promedio MoM del MRR normalizado — señal de tendencia
+                  - paragraph [ref=e1166]: ¿Cómo se calcula?
+            - generic [ref=e1170]:
+              - generic [ref=e1171]:
+                - heading "Mix de planes por contribución al MRR histórico" [level=3] [ref=e1172]
+                - paragraph [ref=e1173]: Distribución del ingreso recurrente total generado, por tipo de plan
+              - generic [ref=e1174]:
+                - generic [ref=e1175]:
+                  - generic [ref=e1177]:
+                    - generic [ref=e1178]: Plan Mensual
+                    - generic [ref=e1179]:
+                      - text: $27.477.750 ·
+                      - strong [ref=e1180]: 65.3%
+                  - generic [ref=e1184]:
+                    - generic [ref=e1185]: Plan Semestral
+                    - generic [ref=e1186]:
+                      - text: $11.517.961 ·
+                      - strong [ref=e1187]: 27.4%
+                  - generic [ref=e1191]:
+                    - generic [ref=e1192]: Plan Anual
+                    - generic [ref=e1193]:
+                      - text: $2.859.740 ·
+                      - strong [ref=e1194]: 6.8%
+                  - generic [ref=e1198]:
+                    - generic [ref=e1199]: 3+1 Mundial
+                    - generic [ref=e1200]:
+                      - text: $105.000 ·
+                      - strong [ref=e1201]: 0.2%
+                  - generic [ref=e1205]:
+                    - generic [ref=e1206]: 7 MESES + 1 MES GRATIS
+                    - generic [ref=e1207]:
+                      - text: $100.000 ·
+                      - strong [ref=e1208]: 0.2%
+                - paragraph [ref=e1214]:
+                  - text: El
+                  - strong [ref=e1215]: MRR normalizado de Jul 26 es $521.258
+                  - text: ", equivalente a un ARR de"
+                  - strong [ref=e1216]: $6.255.096
+                  - text: ". Este valor corrige el efecto \"lump-sum\" de los planes no-mensuales: cuando un cliente paga un plan anual de ~$190.000, ese monto aparece como ingreso bruto en el mes de la venta, aunque corresponde a 12 meses de servicio. Al dividir cada venta por la duración de su plan, el MRR muestra el ingreso recurrente real por mes — la métrica adecuada para evaluar crecimiento sostenible. El mes con mayor distorsión reciente fue"
+                  - strong [ref=e1217]: Ene 22
+                  - text: ", donde el ingreso bruto fue"
+                  - strong [ref=e1218]: 6.0× mayor
+                  - text: al MRR normalizado, señal de ventas concentradas en planes largos ese período. La estructura del ingreso recurrente histórico está dominada por
+                  - strong [ref=e1219]: Plan Mensual
+                  - text: (65.3% del MRR total) — lo que da
+                  - strong [ref=e1220]: alta predictibilidad mensual
+                  - text: pero también mayor exposición al churn, ya que cada mes el cliente decide si renueva. El
+                  - strong [ref=e1221]: momentum MRR
+                  - text: (variación promedio MoM normalizado) es -1.7%, más moderado que el momentum bruto de -2.8% — la diferencia confirma que parte de la volatilidad del indicador bruto era ruido de planes largos, no señal de crecimiento real.
+          - generic [ref=e1222]:
+            - generic [ref=e1228]:
+              - heading "LTV · Valor de Vida del Cliente" [level=2] [ref=e1229]
+              - paragraph [ref=e1230]: Cuánto ingreso generó cada cliente desde su primera activación
+            - generic [ref=e1231]:
+              - button "LTV promedio $500.537 LTV alto sobre 261 clientes con historial de compras ¿Cómo se calcula?" [ref=e1232] [cursor=pointer]:
+                - generic [ref=e1234]:
+                  - paragraph [ref=e1235]: LTV promedio
+                  - paragraph [ref=e1236]: $500.537
+                  - generic [ref=e1237]: LTV alto
+                  - generic [ref=e1241]: sobre 261 clientes con historial de compras
+                  - paragraph [ref=e1243]: ¿Cómo se calcula?
+              - button "ARPU mensual $51.045 Tasa de consumo mensual ingreso promedio por cliente por mes activo ¿Cómo se calcula?" [ref=e1248] [cursor=pointer]:
+                - generic [ref=e1250]:
+                  - paragraph [ref=e1251]: ARPU mensual
+                  - paragraph [ref=e1252]: $51.045
+                  - generic [ref=e1253]: Tasa de consumo mensual
+                  - generic [ref=e1257]: ingreso promedio por cliente por mes activo
+                  - paragraph [ref=e1259]: ¿Cómo se calcula?
+              - button "Vida promedio 20.5 meses Clientes de largo aliento desde primera activación hasta última transacción registrada ¿Cómo se calcula?" [ref=e1264] [cursor=pointer]:
+                - generic [ref=e1266]:
+                  - paragraph [ref=e1267]: Vida promedio
+                  - paragraph [ref=e1268]: 20.5 meses
+                  - generic [ref=e1269]: Clientes de largo aliento
+                  - generic [ref=e1273]: desde primera activación hasta última transacción registrada
+                  - paragraph [ref=e1275]: ¿Cómo se calcula?
+              - button "Valor LTV en riesgo $13.927.332 Equivale a 28 LTV promedios en juego LTV histórico de 16 clientes con pantallas vencidas o próximas ¿Cómo se calcula?" [ref=e1280] [cursor=pointer]:
+                - generic [ref=e1282]:
+                  - paragraph [ref=e1283]: Valor LTV en riesgo
+                  - paragraph [ref=e1284]: $13.927.332
+                  - generic [ref=e1285]: Equivale a 28 LTV promedios en juego
+                  - generic [ref=e1289]: LTV histórico de 16 clientes con pantallas vencidas o próximas
+                  - paragraph [ref=e1291]: ¿Cómo se calcula?
+            - generic [ref=e1295]:
+              - generic [ref=e1296]:
+                - generic [ref=e1297]:
+                  - heading "Distribución del LTV por quintil" [level=3] [ref=e1298]
+                  - paragraph [ref=e1299]: Clientes agrupados en 5 segmentos según su LTV acumulado
+                - application [ref=e1303]:
+                  - generic [ref=e1315]:
+                    - generic [ref=e1316]:
+                      - generic [ref=e1317]: Q1 · bajo
+                      - generic [ref=e1319]: Q2
+                      - generic [ref=e1321]: Q3 · medio
+                      - generic [ref=e1323]: Q4
+                      - generic [ref=e1325]: Q5 · alto
+                    - generic [ref=e1327]:
+                      - generic [ref=e1328]: "0"
+                      - generic [ref=e1330]: "15"
+                      - generic [ref=e1332]: "30"
+                      - generic [ref=e1334]: "45"
+                      - generic [ref=e1336]: "60"
+              - generic [ref=e1338]:
+                - generic [ref=e1339]:
+                  - heading "Percentiles de LTV" [level=3] [ref=e1340]
+                  - paragraph [ref=e1341]: La brecha entre P25 y P90 revela la asimetría de la cartera
+                - generic [ref=e1342]:
+                  - generic [ref=e1343]:
+                    - generic [ref=e1345]:
+                      - generic [ref=e1346]: P25 · cuartil bajo
+                      - generic [ref=e1347]: $175.000
+                    - generic [ref=e1351]:
+                      - generic [ref=e1352]: P50 · mediana
+                      - generic [ref=e1353]: $365.000
+                    - generic [ref=e1357]:
+                      - generic [ref=e1358]: P75 · cuartil alto
+                      - generic [ref=e1359]: $630.000
+                    - generic [ref=e1363]:
+                      - generic [ref=e1364]: P90 · top 10%
+                      - generic [ref=e1365]: $1.069.488
+                    - generic [ref=e1369]:
+                      - generic [ref=e1370]: Máximo histórico
+                      - generic [ref=e1371]: $4.267.000
+                  - paragraph [ref=e1377]:
+                    - text: Analizando
+                    - strong [ref=e1378]: 261 clientes
+                    - text: con al menos una activación registrada, el
+                    - strong [ref=e1379]: LTV promedio es $500.537
+                    - text: ": el ingreso que un cliente típico generó durante su"
+                    - strong [ref=e1380]: vida activa de 20.5 meses
+                    - text: al ritmo de
+                    - strong [ref=e1381]: $51.045/mes
+                    - text: "(ARPU mensual normalizado). Esto establece el techo de lo que vale invertir en retener a un cliente antes de que el costo de retención supere el beneficio — si una campaña de reactivación, un descuento o una llamada de seguimiento cuesta menos de $500.537, siempre conviene retener antes que perder. La distribución no es uniforme: el 25% con menor LTV no supera $175.000, mientras que el 25% superior genera más de $630.000 — la"
+                    - strong [ref=e1382]: asimetría premia fuertemente la retención del segmento alto
+                    - text: . Hoy hay
+                    - strong [ref=e1383]: 16 clientes con pantallas próximas a vencer o ya vencidas
+                    - text: ", con un"
+                    - strong [ref=e1384]: LTV histórico acumulado de $13.927.332
+                    - text: en juego — atender esas cuentas es la acción de mayor ROI inmediato disponible en este momento.
+          - generic [ref=e1385]:
+            - generic [ref=e1390]:
+              - heading "Lectura del analista · Licencias TV" [level=2] [ref=e1391]
+              - paragraph [ref=e1392]: Interpretación financiera generada a partir de los datos reales del negocio de suscripciones
+            - generic [ref=e1393]:
+              - generic [ref=e1400]:
+                - paragraph [ref=e1401]: Nivel y calidad del EBITDA (licencias)
+                - paragraph [ref=e1402]: El negocio de suscripciones acumula un EBITDA histórico de $85.956.610 sobre ingresos de licencias con un margen del 65.6% — un nivel excepcional para un distribuidor digital. Al no registrarse nómina ni gastos administrativos, este EBITDA coincide con la utilidad bruta operativa de la línea de TV.
+              - generic [ref=e1410]:
+                - paragraph [ref=e1411]: Estructura de costos (OPEX)
+                - paragraph [ref=e1412]: Por cada $100 de ingreso de licencias, $34 se destinan a recargas de créditos e impuesto 4x1000 — el único costo operativo registrado. En 2026 el ratio va en 32.7%. Al ser un costo variable ligado al dólar, el margen queda expuesto a la TRM.
+              - generic [ref=e1419]:
+                - paragraph [ref=e1420]: Retorno sobre el gasto operativo
+                - paragraph [ref=e1421]: "La TIR clásica no es calculable porque la serie de flujos mensuales nunca fue negativa — el negocio operó en positivo desde el inicio registrado. La métrica sustituta es el ROI sobre OPEX: cada peso gastado en recargas generó $2,08 adicionales de excedente (208% de retorno acumulado sobre el costo)."
+              - generic [ref=e1427]:
+                - paragraph [ref=e1428]: Exposición cambiaria (TRM)
+                - paragraph [ref=e1429]: El costo de los créditos se paga referenciado al dólar. La TRM promedio pasó de $4.046 (Ene 22) a $3.634 (Abr 26), una variación del -10.2%. La apreciación del peso ha jugado a favor del margen.
+              - generic [ref=e1435]:
+                - paragraph [ref=e1436]: CAPEX y calidad del dato
+                - paragraph [ref=e1437]: "El negocio es asset-light: no hay CAPEX de infraestructura registrado y los equipos (Fire TV, ONN) se compran para reventa — contablemente son inventario/costo de venta, no inversión de capital. Se han registrado $26.514.819 en costo de equipos (ver pestaña Equipos)."
+  - generic [ref=e1438]: "0"

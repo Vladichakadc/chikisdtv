@@ -259,6 +259,8 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const totalIngresos = ventas.reduce((s, v) => s + (Number(v.precioVenta) || 0), 0);
   const tipoPagoMap = {};
   for (const v of ventas) {
+    // Excluir tipos inválidos/administrativos: Cortesia y Cambio de Plan
+    if (v.tipoPago === 'Cortesia' || v.tipoPago === 'Cambio de Plan') continue;
     const tipo = v.tipoPago || 'Sin clasificar';
     if (!tipoPagoMap[tipo]) tipoPagoMap[tipo] = { tipo, cantidad: 0, total: 0 };
     tipoPagoMap[tipo].cantidad += 1;

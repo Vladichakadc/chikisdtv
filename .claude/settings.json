@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node \"C:\\\\Users\\\\vladi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--ChikisdTV\\\\041b17c1-a0cf-451c-bcfe-34615f155e56\\\\scratchpad\\\\check_cambio_plan.js\")",
+      "Bash(pkill -f \"node.*server.js\")",
+      "Bash(timeout 5 node server.js)",
+      "PowerShell(Stop-Process -Name node -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; cd c:\\\\ChikisdTV\\\\server; Start-Process node -ArgumentList \"server.js\" -NoNewWindow -RedirectStandardOutput $env:TEMP\\\\backend.log -RedirectStandardError $env:TEMP\\\\backend-err.log)",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_take_screenshot"
+    ]
+  }
+}
