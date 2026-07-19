@@ -1587,24 +1587,11 @@ export default function AnalisisFinancieroPage() {
                 <CardHeader className="border-orange-50">
                   <CardTitle>Momentum de ventas — variación mensual de ingresos</CardTitle>
                   <p className="text-sm text-gray-400 mt-0.5">
-                    Variación % mes a mes de los últimos periodos con actividad (promedio: {k.momentumVentasPct > 0 ? '+' : ''}{k.momentumVentasPct.toFixed(1)}%)
+                    Variación % mes a mes · línea punteada = promedio histórico · verde = crecimiento, rojo = caída
                   </p>
                 </CardHeader>
                 <CardBody>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <ComposedChart data={momentumSerie} margin={{ top: 24, right: 20, left: 0, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#78716c' }} />
-                      <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#78716c' }} />
-                      <Tooltip formatter={(v) => [`${v}%`, 'Variación']} />
-                      <Bar dataKey="variacionPct" name="Variación mensual %" radius={[6, 6, 0, 0]} barSize={28}>
-                        {momentumSerie.map((m, i) => (
-                          <Cell key={i} fill={m.variacionPct >= 0 ? '#16a34a' : '#ef4444'} />
-                        ))}
-                        <LabelList dataKey="variacionPct" content={<MomentumValueLabel />} />
-                      </Bar>
-                    </ComposedChart>
-                  </ResponsiveContainer>
+                  <MomentumChart data={momentumSerie} kMomentum={k.momentumVentasPct} />
                   <ChartInsight text={narrarMomentum(momentumSerie, k)} />
                 </CardBody>
               </Card>
@@ -1679,26 +1666,10 @@ export default function AnalisisFinancieroPage() {
               <Card className="border-violet-100">
                 <CardHeader className="border-violet-50">
                   <CardTitle>Mix de planes por contribución al MRR histórico</CardTitle>
-                  <p className="text-sm text-gray-400 mt-0.5">Distribución del ingreso recurrente total generado, por tipo de plan</p>
+                  <p className="text-sm text-gray-400 mt-0.5">Distribución del ingreso recurrente total generado por tipo de plan · naranja=mensual, violeta=semestral, verde=anual</p>
                 </CardHeader>
                 <CardBody>
-                  <div className="space-y-3">
-                    {(bi.mrrPorTipoPlan || []).map((p, i) => {
-                      const PLAN_COLORS = { 'Plan Mensual': '#f97316', 'Plan Semestral': '#7c3aed', 'Plan Anual': '#16a34a' }
-                      const color = PLAN_COLORS[p.plan] || '#64748b'
-                      return (
-                        <div key={i}>
-                          <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="font-semibold text-slate-700">{p.plan}</span>
-                            <span className="text-slate-500">{formatCurrency(p.mrr)} · <strong style={{ color }}>{p.pct}%</strong></span>
-                          </div>
-                          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all" style={{ width: `${p.pct}%`, backgroundColor: color }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <MixPlanesChart data={bi.mrrPorTipoPlan} />
                   <ChartInsight text={narrarMrr(bi)} />
                 </CardBody>
               </Card>
@@ -1772,60 +1743,20 @@ export default function AnalisisFinancieroPage() {
                 <Card className="border-teal-100">
                   <CardHeader className="border-teal-50">
                     <CardTitle>Distribución del LTV por quintil</CardTitle>
-                    <p className="text-sm text-gray-400 mt-0.5">Clientes agrupados en 5 segmentos según su LTV acumulado</p>
+                    <p className="text-sm text-gray-400 mt-0.5">Clientes en 5 segmentos · cada barra muestra cantidad + % del total · Q1=base, Q5=top</p>
                   </CardHeader>
                   <CardBody>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <ComposedChart data={ltv.distribucion} margin={{ top: 22, right: 20, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#99f6e4" opacity={0.4} />
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#78716c' }} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#78716c' }} />
-                        <Tooltip
-                          formatter={(v) => [v, 'Clientes']}
-                          labelFormatter={(label, payload) => {
-                            const d = payload?.[0]?.payload
-                            return d ? `${label} · hasta ${formatCurrency(d.maxLtv)}` : label
-                          }}
-                        />
-                        <Bar dataKey="cantidad" name="Clientes" radius={[6, 6, 0, 0]} barSize={38}>
-                          {(ltv.distribucion || []).map((_, i) => (
-                            <Cell key={i} fill={QUINTIL_COLORS[i % QUINTIL_COLORS.length]} />
-                          ))}
-                          <LabelList dataKey="cantidad" position="top" formatter={(v) => v.toLocaleString('es-CO')} style={{ ...LABEL_STYLE, fontSize: 11 }} />
-                        </Bar>
-                      </ComposedChart>
-                    </ResponsiveContainer>
+                    <LtvQuintilChart data={ltv.distribucion} />
                   </CardBody>
                 </Card>
 
                 <Card className="border-teal-100">
                   <CardHeader className="border-teal-50">
                     <CardTitle>Percentiles de LTV</CardTitle>
-                    <p className="text-sm text-gray-400 mt-0.5">La brecha entre P25 y P90 revela la asimetría de la cartera</p>
+                    <p className="text-sm text-gray-400 mt-0.5">Badge de asimetría P90/P25 · cada barra escala respecto al máximo · descripción interpretativa por nivel</p>
                   </CardHeader>
                   <CardBody>
-                    <div className="space-y-4 py-2">
-                      {[
-                        { label: 'P25 · cuartil bajo',  val: ltv.percentiles.p25, color: '#94a3b8' },
-                        { label: 'P50 · mediana',        val: ltv.percentiles.p50, color: '#60a5fa' },
-                        { label: 'P75 · cuartil alto',  val: ltv.percentiles.p75, color: '#34d399' },
-                        { label: 'P90 · top 10%',       val: ltv.percentiles.p90, color: '#a855f7' },
-                        { label: 'Máximo histórico',    val: ltv.percentiles.max, color: '#f97316' },
-                      ].map(({ label, val, color }) => {
-                        const barPct = ltv.percentiles.max > 0 ? Math.round((val / ltv.percentiles.max) * 100) : 0
-                        return (
-                          <div key={label}>
-                            <div className="flex items-center justify-between text-sm mb-1">
-                              <span className="font-medium text-slate-600">{label}</span>
-                              <span className="font-bold" style={{ color }}>{formatCurrency(val)}</span>
-                            </div>
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full transition-all" style={{ width: `${barPct}%`, backgroundColor: color }} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                    <LtvPercentilesChart percentiles={ltv.percentiles} />
                     <ChartInsight text={narrarLtv(ltv)} />
                   </CardBody>
                 </Card>
