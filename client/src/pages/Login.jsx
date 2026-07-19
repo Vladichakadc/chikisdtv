@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Tv, Loader2, Lock, Mail, Eye, EyeOff } from 'lucide-react'
 import api from '../config/api'
 import { Button } from '../components/ui/Button'
@@ -183,6 +183,13 @@ export default function Login() {
                 )}
               </button>
             </form>
+
+            {/* Change Password Link */}
+            <div className="mt-6 text-center fade-in fade-in-4">
+              <Link to="/public-change-password" className="text-sm text-brand-primary hover:text-orange-500 font-medium transition-colors">
+                ¿Deseas cambiar tu contraseña?
+              </Link>
+            </div>
 
             {/* Footer */}
             <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col items-center justify-center fade-in fade-in-4">

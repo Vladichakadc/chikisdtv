@@ -20,8 +20,6 @@ router.post('/login', async (req, res) => {
 
     if (client.estatus === 'Inactivo') return res.status(403).json({ error: 'Cuenta inactiva' });
 
-    // Solo administradores pueden acceder a la plataforma
-    if (client.role !== 'admin') return res.status(403).json({ error: 'Acceso restringido a administradores' });
 
     const token = jwt.sign(
       { id: client.id, role: client.role, name: client.name, email: client.email, customerId: client.customerId, mustChangePassword: client.mustChangePassword },
@@ -51,6 +49,34 @@ router.post('/change-password', async (req, res) => {
 
     const hashed = await bcrypt.hash(newPassword, 10);
     await Client.update({ password: hashed, mustChangePassword: false }, { where: { id: decoded.id } });
+
+    res.json({ message: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// POST /api/auth/public-change-password
+router.post('/public-change-password', async (req, res) => {
+  try {
+    const { email, currentPassword, newPassword } = req.body;
+    if (!email || !currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Todos los campos son requeridos' });
+    }
+
+    const client = await Client.findOne({ where: { email } });
+    if (!client) return res.status(401).json({ error: 'Credenciales incorrectas' });
+
+    const valid = await bcrypt.compare(currentPassword, client.password);
+    if (!valid) return res.status(401).json({ error: 'Credenciales incorrectas' });
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await Client.update({ password: hashed, mustChangePassword: false }, { where: { id: client.id } });
 
     res.json({ message: 'Contraseña actualizada correctamente' });
   } catch (err) {

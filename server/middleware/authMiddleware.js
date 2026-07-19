@@ -10,6 +10,11 @@ function verifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+    
+    const { getRLSContext } = require('./rlsContext');
+    const store = getRLSContext();
+    if (store) store.set('user', decoded);
+    
     next();
   } catch {
     return res.status(403).json({ error: 'Token inválido o expirado' });

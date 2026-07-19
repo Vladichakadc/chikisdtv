@@ -52,4 +52,86 @@ TablaCliente.hasMany(VentaEquipo, { foreignKey: 'customerId', sourceKey: 'custom
 InventarioEquipo.belongsTo(VentaEquipo, { foreignKey: 'serie', targetKey: 'serial', as: 'venta', constraints: false });
 VentaEquipo.hasOne(InventarioEquipo, { foreignKey: 'serie', sourceKey: 'serial', as: 'inventario', constraints: false });
 
-module.exports = { Client, Plan, Subscription, Payment, Device, Planificador, Baja, TablaCliente, Venta, VentaEquipo, CuentaPadre, CostoPantalla, InventarioEquipo };
+const { getRLSContext } = require('../middleware/rlsContext');
+
+const models = { Client, Plan, Subscription, Payment, Device, Planificador, Baja, TablaCliente, Venta, VentaEquipo, CuentaPadre, CostoPantalla, InventarioEquipo };
+
+// Activar Row Level Security (RLS) a nivel de Aplicación
+function applyRLS(options, modelName) {
+  if (options.skipRLS) return; // Permite bypass explícito para procesos internos
+  
+  const store = getRLSContext();
+  const user = store?.get('user');
+  
+  // Si no hay contexto de usuario o es admin, dejamos pasar la consulta normal
+  if (!user || user.role === 'admin') return;
+
+  // Garantizar que options.where sea un objeto
+  options.where = options.where || {};
+
+  switch (modelName) {
+    case 'Client':
+      options.where.id = user.id;
+      break;
+    case 'VentaEquipo':
+    case 'TablaCliente':
+      if (user.customerId) {
+        options.where.customerId = user.customerId;
+      } else {
+        options.where.customerId = 'INVALID_ACCESS'; // Bloquea si no tiene customerId
+      }
+      break;
+    case 'Subscription':
+    case 'Payment':
+    case 'Device':
+    case 'Baja':
+      options.where.clientId = user.id;
+      break;
+    case 'Plan':
+      // Los planes pueden ser vistos por todos
+      break;
+    default:
+      // Cualquier otra tabla (Inventario, Costos) se bloquea para clientes regulares
+      options.where.id = -1; 
+      break;
+  }
+}
+
+// Inyectar los hooks RLS en todos los modelos
+Object.keys(models).forEach(modelName => {
+  const model = models[modelName];
+  
+  // Operaciones de lectura y bulk
+  model.addHook('beforeFind', (options) => applyRLS(options, modelName));
+  model.addHook('beforeCount', (options) => applyRLS(options, modelName));
+  model.addHook('beforeBulkUpdate', (options) => applyRLS(options, modelName));
+  model.addHook('beforeBulkDestroy', (options) => applyRLS(options, modelName));
+
+  // Operaciones de instancia (verificación de seguridad extra)
+  const verifyInstanceRLS = (instance, options) => {
+    if (options.skipRLS) return;
+    const store = getRLSContext();
+    const user = store?.get('user');
+    if (!user || user.role === 'admin') return;
+    
+    let allowed = false;
+    switch(modelName) {
+      case 'Client': allowed = instance.id === user.id; break;
+      case 'VentaEquipo':
+      case 'TablaCliente': allowed = instance.customerId === user.customerId; break;
+      case 'Subscription':
+      case 'Payment':
+      case 'Device':
+      case 'Baja': allowed = instance.clientId === user.id; break;
+      case 'Plan': allowed = true; break;
+      default: allowed = false; break;
+    }
+    
+    if (!allowed) throw new Error('RLS Violation: Acceso denegado a este registro');
+  };
+
+  model.addHook('beforeUpdate', verifyInstanceRLS);
+  model.addHook('beforeDestroy', verifyInstanceRLS);
+});
+
+module.exports = models;
