@@ -46,6 +46,8 @@ export default function AnalisisPagosPage() {
 
   const [incomeByPlanYear, setIncomeByPlanYear] = useState([])
   const [tiposPlanes, setTiposPlanes] = useState([])
+  const [incomeByPlanYearError, setIncomeByPlanYearError] = useState(null)
+  const [incomeByPlanYearLoading, setIncomeByPlanYearLoading] = useState(false)
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -60,12 +62,22 @@ export default function AnalisisPagosPage() {
   }
 
   const loadIncomeByPlanYear = async () => {
+    setIncomeByPlanYearLoading(true)
+    setIncomeByPlanYearError(null)
     try {
       const { data } = await api.get('/admin/payments/ventas-licencia-by-plan-year')
+      if (!data || !data.series || !Array.isArray(data.series)) {
+        throw new Error('Respuesta del servidor sin estructura esperada')
+      }
       setIncomeByPlanYear(data.series || [])
       setTiposPlanes(data.tiposPlanes || [])
     } catch (e) {
-      console.error('Error cargando ingresos por plan y año:', e.message)
+      console.error('Error cargando ingresos por plan y año:', e.message, e.response?.status, e.response?.data)
+      setIncomeByPlanYearError(e.response?.data?.error || e.message || 'Error al cargar datos')
+      setIncomeByPlanYear([])
+      setTiposPlanes([])
+    } finally {
+      setIncomeByPlanYearLoading(false)
     }
   }
 
@@ -388,7 +400,12 @@ export default function AnalisisPagosPage() {
           <p className="text-sm text-gray-400 mt-0.5">Análisis histórico de composición de MRR: identifica cambios en mix de producto y crecimiento por línea de negocio</p>
         </CardHeader>
         <CardBody>
-          <IncomeByPlanYearChart data={incomeByPlanYear} tiposPlanes={tiposPlanes} />
+          <IncomeByPlanYearChart
+            data={incomeByPlanYear}
+            tiposPlanes={tiposPlanes}
+            loading={incomeByPlanYearLoading}
+            error={incomeByPlanYearError}
+          />
           <ChartInsight text={tiposPlanes.length > 0
             ? `La composición de ingresos muestra **${tiposPlanes.sort((a, b) => {
               const totalA = incomeByPlanYear.reduce((s, y) => s + (y[a] || 0), 0);
