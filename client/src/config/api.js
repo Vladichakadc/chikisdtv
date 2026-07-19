@@ -20,6 +20,10 @@ api.interceptors.response.use(
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login'
       }
+    } else if (err.response?.status === 403 && err.response?.data?.mustChangePassword) {
+      if (!window.location.pathname.startsWith('/change-password')) {
+        window.location.href = '/change-password'
+      }
     }
     return Promise.reject(err)
   }

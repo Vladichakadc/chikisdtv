@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { KeyRound, Loader2, Lock, Mail, Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import api from '../config/api'
 import { Input } from '../components/ui/Input'
+import { PasswordStrengthMeter } from '../components/ui/PasswordStrengthMeter'
 
 const STYLES = `
   @keyframes fadeInUp {
@@ -215,6 +216,7 @@ export default function PublicChangePasswordPage() {
                       {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                  <PasswordStrengthMeter password={newPassword} />
                 </div>
 
                 {/* Confirm Password Input */}

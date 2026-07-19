@@ -1,16 +1,36 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import api from '../config/api'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+import { PasswordStrengthMeter } from '../components/ui/PasswordStrengthMeter'
 
 export default function ChangePasswordPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [daysRemaining, setDaysRemaining] = useState(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const { data } = await api.get('/user/me')
+        if (data.role === 'admin' && data.passwordLastChanged) {
+          const daysSince = (new Date() - new Date(data.passwordLastChanged)) / (1000 * 60 * 60 * 24)
+          const remaining = Math.max(0, 90 - Math.floor(daysSince))
+          setDaysRemaining(remaining)
+        }
+      } catch (err) {
+        console.error('Error fetching profile', err)
+      }
+    }
+    fetchProfile()
+  }, [])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -40,9 +60,37 @@ export default function ChangePasswordPage() {
           <p className="text-sm text-gray-500">Actualiza tu contraseña para mantener tu cuenta segura.</p>
         </div>
 
+        {daysRemaining !== null && daysRemaining <= 5 && (
+          <div className={`mb-6 p-4 rounded-xl flex gap-3 text-sm font-medium fade-in ${daysRemaining === 0 ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-yellow-50 text-yellow-700 border border-yellow-100'}`}>
+            <AlertTriangle className="flex-shrink-0" size={20} />
+            <div>
+              {daysRemaining === 0 
+                ? 'Tu contraseña ha caducado (90 días). Por política de seguridad, es obligatorio cambiarla ahora mismo.' 
+                : `Tu contraseña caducará en ${daysRemaining} día(s). Por favor actualízala para no perder acceso.`}
+            </div>
+          </div>
+        )}
+
         <form onSubmit={submit} className="space-y-4">
-          <Input label="Nueva contraseña" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
-          <Input label="Confirmar contraseña" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+          <div>
+            <label className="block text-sm font-medium text-brand-accent mb-1">Nueva contraseña</label>
+            <div className="relative">
+              <Input type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+              <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-primary focus:outline-none transition-colors">
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            <PasswordStrengthMeter password={newPassword} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-brand-accent mb-1">Confirmar contraseña</label>
+            <div className="relative">
+              <Input type={showConfirmPassword ? 'text' : 'password'} value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+              <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-primary focus:outline-none transition-colors">
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
 
           {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">{error}</div>}
 

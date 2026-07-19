@@ -133,6 +133,7 @@ async function seedDevicesFromVentas() {
     // costo_pantalla recibió columnas nuevas después de su creación inicial;
     // alter:true agrega las que falten. Se corre una sola vez al arranque
     // (antes se ejecutaba en cada GET /payments/costo-pantalla).
+    await Client.sync({ alter: true }); // Agrega passwordLastChanged si no existe
     await CostoPantalla.sync({ alter: true });
     // ventas_equipos también ganó columnas tarde (costo, serial, garantia):
     // ALTER dirigido e idempotente — debe correr ANTES de seedDevicesFromVentas,
