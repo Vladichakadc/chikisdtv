@@ -11,7 +11,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { BarChart, Bar, LineChart, Line, Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { BarChart, Bar, LineChart, Line, Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Label, LabelList } from 'recharts'
 import { TrendingUp, TrendingDown, Activity, Zap, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 
@@ -74,6 +74,36 @@ function detectarAnomalias(variaciones, volatilidad) {
   return variaciones
     .map((v, i) => ({ indice: i, valor: v, zScore: Math.abs((v - promedio) / volatilidad) }))
     .filter(a => a.zScore > 2)
+}
+
+// ─── Componente CustomDot: renderiza el punto con etiqueta de % ─────────────
+function CustomDot(props) {
+  const { cx, cy, payload, width } = props
+  if (payload.varPct === undefined || isNaN(payload.varPct)) return null
+
+  const varPct = payload.varPct
+  const isPositive = varPct >= 0
+  const color = isPositive ? '#10b981' : '#ef4444'
+  const bgColor = isPositive ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)'
+
+  return (
+    <g>
+      {/* Punto base */}
+      <circle cx={cx} cy={cy} r={4} fill="#f97316" />
+      {/* Etiqueta con % */}
+      <text
+        x={cx}
+        y={cy - 16}
+        textAnchor="middle"
+        fontSize={11}
+        fontWeight={700}
+        fill={color}
+        style={{ pointerEvents: 'none', textShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
+      >
+        {isPositive ? '+' : ''}{varPct.toFixed(1)}%
+      </text>
+    </g>
+  )
 }
 
 // ─── Componente principal ───────────────────────────────────────────────────
@@ -355,8 +385,8 @@ export function MomentumAnalysisChart({ data, kMomentum }) {
             fill="url(#colorVar)"
             stroke="#f97316"
             strokeWidth={2.5}
-            dot={{ fill: '#f97316', r: 4 }}
-            activeDot={{ r: 6 }}
+            dot={<CustomDot />}
+            activeDot={{ r: 6, fill: '#f97316' }}
             name="Variación mensual"
           />
 
@@ -370,84 +400,132 @@ export function MomentumAnalysisChart({ data, kMomentum }) {
         </AreaChart>
       </ResponsiveContainer>
 
-      {/* Métricas de salud operativa (financial-analyst) */}
+      {/* Métricas de salud operativa (financial-analyst + kpi-dashboard-design) */}
       {metricas && (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
           gap: 12,
           paddingTop: 12,
           borderTop: '1px solid #f5f5f5',
         }}>
+          {/* Tarjeta 1: Volatilidad — Riesgo operativo */}
           <div style={{
-            padding: 12,
+            padding: 14,
             borderRadius: 8,
-            background: '#fef3c7',
-            border: '1px solid #fde68a',
+            background: metricas.volatilidad > 15 ? '#fee2e2' : metricas.volatilidad > 8 ? '#fef3c7' : '#f0fdf4',
+            border: `1px solid ${metricas.volatilidad > 15 ? '#fecaca' : metricas.volatilidad > 8 ? '#fde68a' : '#dcfce7'}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
           }}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', marginBottom: 4 }}>
-              Volatilidad
-            </p>
-            <p style={{ fontSize: 18, fontWeight: 800, color: '#b45309', fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: metricas.volatilidad > 15 ? '#7f1d1d' : metricas.volatilidad > 8 ? '#92400e' : '#15803d', textTransform: 'uppercase', margin: 0 }}>
+                Volatilidad
+              </p>
+              <span style={{ fontSize: 11, fontWeight: 600, color: metricas.volatilidad > 15 ? '#dc2626' : metricas.volatilidad > 8 ? '#f59e0b' : '#10b981' }}>
+                {metricas.volatilidad > 15 ? '🔴 Alto' : metricas.volatilidad > 8 ? '🟡 Moderado' : '🟢 Bajo'}
+              </span>
+            </div>
+            <p style={{ fontSize: 20, fontWeight: 900, color: metricas.volatilidad > 15 ? '#991b1b' : metricas.volatilidad > 8 ? '#b45309' : '#166534', margin: 0, fontVariantNumeric: 'tabular-nums' }}>
               {metricas.volatilidad}%
             </p>
-            <p style={{ fontSize: 9, color: '#78350f', marginTop: 2 }}>
-              Riesgo: {metricas.salud === 'alto' ? '🔴 Alto' : metricas.salud === 'moderado' ? '🟡 Moderado' : '🟢 Bajo'}
+            <p style={{ fontSize: 8, color: metricas.volatilidad > 15 ? '#991b1b' : metricas.volatilidad > 8 ? '#b45309' : '#166534', margin: 0, lineHeight: 1.3 }}>
+              {metricas.volatilidad > 15
+                ? '⚠️ Desviación muy alta. Requiere análisis de causas raíz.\n\n✓ SOLUCIONES:\n• Segmenta por canal (web/dispositivos) y tipo cliente\n• Audita bajas vs activaciones mes a mes\n• Revisa estacionalidad (factores externos)\n• Implementa alertas automáticas si churn > 5%'
+                : metricas.volatilidad > 8
+                ? 'Variabilidad moderada. Monitorea factores externos y estacionalidad.'
+                : 'Operación predecible. Ritmo de ingresos consistente y confiable.'}
             </p>
           </div>
 
+          {/* Tarjeta 2: Promedio mensual — Momentum de crecimiento */}
           <div style={{
-            padding: 12,
+            padding: 14,
             borderRadius: 8,
-            background: '#dbeafe',
-            border: '1px solid #bfdbfe',
+            background: metricas.promedio > 5 ? '#dcfce7' : metricas.promedio > 0 ? '#dbeafe' : '#fee2e2',
+            border: `1px solid ${metricas.promedio > 5 ? '#bbf7d0' : metricas.promedio > 0 ? '#bfdbfe' : '#fecaca'}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
           }}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: '#0c2340', textTransform: 'uppercase', marginBottom: 4 }}>
-              Promedio mensual
-            </p>
-            <p style={{
-              fontSize: 18,
-              fontWeight: 800,
-              color: metricas.promedio >= 0 ? '#10b981' : '#ef4444',
-              fontVariantNumeric: 'tabular-nums',
-            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: metricas.promedio >= 0 ? '#15803d' : '#7f1d1d', textTransform: 'uppercase', margin: 0 }}>
+                Promedio mensual
+              </p>
+              <span style={{ fontSize: 11, fontWeight: 600, color: metricas.promedio >= 0 ? '#10b981' : '#ef4444' }}>
+                {metricas.promedio >= 0 ? '↗' : '↘'}
+              </span>
+            </div>
+            <p style={{ fontSize: 20, fontWeight: 900, color: metricas.promedio >= 0 ? '#166534' : '#991b1b', margin: 0, fontVariantNumeric: 'tabular-nums' }}>
               {metricas.promedio >= 0 ? '+' : ''}{metricas.promedio}%
             </p>
+            <p style={{ fontSize: 8, color: metricas.promedio >= 0 ? '#166534' : '#991b1b', margin: 0, lineHeight: 1.3 }}>
+              {metricas.promedio > 5
+                ? 'Momentum fuerte. Crecimiento sostenido superior a benchmark de salud.'
+                : metricas.promedio > 0
+                ? 'Crecimiento tímido. Optimiza canales y retención para acelerar.'
+                : '🔴 Contracción en ingresos. Requiere acción inmediata.\n\n✓ SOLUCIONES:\n• Audita causas de baja (producto/precio/competencia)\n• Incrementa inversión en campañas de retención\n• Revisa LTV vs CAC por segmento\n• Activa plan de reactivación (clientes en riesgo)'}
+            </p>
           </div>
 
+          {/* Tarjeta 3: Rango (Max–Min) — Amplitud de variación */}
           <div style={{
-            padding: 12,
+            padding: 14,
             borderRadius: 8,
-            background: '#f0fdf4',
-            border: '1px solid #dbeafe',
+            background: metricas.rango > 50 ? '#fee2e2' : metricas.rango > 25 ? '#fef3c7' : '#f0fdf4',
+            border: `1px solid ${metricas.rango > 50 ? '#fecaca' : metricas.rango > 25 ? '#fde68a' : '#dcfce7'}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
           }}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: '#052e16', textTransform: 'uppercase', marginBottom: 4 }}>
-              Rango (Max–Min)
-            </p>
-            <p style={{ fontSize: 18, fontWeight: 800, color: '#059669', fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: metricas.rango > 50 ? '#7f1d1d' : metricas.rango > 25 ? '#92400e' : '#15803d', textTransform: 'uppercase', margin: 0 }}>
+                Rango (Amplitud)
+              </p>
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#6b7280' }}>
+                {metricas.rango > 50 ? '📊' : metricas.rango > 25 ? '⚖️' : '✓'}
+              </span>
+            </div>
+            <p style={{ fontSize: 20, fontWeight: 900, color: metricas.rango > 50 ? '#991b1b' : metricas.rango > 25 ? '#b45309' : '#166534', margin: 0, fontVariantNumeric: 'tabular-nums' }}>
               {metricas.rango}%
             </p>
-            <p style={{ fontSize: 9, color: '#065f46', marginTop: 2 }}>
-              {metricas.maxVar}% a {metricas.minVar}%
+            <p style={{ fontSize: 8, color: metricas.rango > 50 ? '#991b1b' : metricas.rango > 25 ? '#b45309' : '#166534', margin: 0, lineHeight: 1.3 }}>
+              {metricas.rango > 50
+                ? `Escala: ${metricas.maxVar}% a ${metricas.minVar}%. 🔴 Amplitud extrema.\n\n✓ SOLUCIONES:\n• Identifica mes outlier (causa de pico/valle)\n• Analiza impacto de eventos (lanzamientos/promociones)\n• Segmenta por cohorte para ver si afecta a todos`
+                : metricas.rango > 25
+                ? `Escala: ${metricas.maxVar}% a ${metricas.minVar}%. Variación significativa: investiga drivers.`
+                : `Escala: ${metricas.maxVar}% a ${metricas.minVar}%. Rango compacto: operación consistente.`}
             </p>
           </div>
 
+          {/* Tarjeta 4: Salud operativa — Síntesis de riesgo */}
           <div style={{
-            padding: 12,
+            padding: 14,
             borderRadius: 8,
-            background: '#f3e8ff',
-            border: '1px solid #e9d5ff',
+            background: metricas.salud === 'alto' ? '#fee2e2' : metricas.salud === 'moderado' ? '#fef3c7' : '#f0fdf4',
+            border: `1px solid ${metricas.salud === 'alto' ? '#fecaca' : metricas.salud === 'moderado' ? '#fde68a' : '#dcfce7'}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
           }}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: '#4c1d95', textTransform: 'uppercase', marginBottom: 4 }}>
-              Salud operativa
-            </p>
-            <p style={{
-              fontSize: 18,
-              fontWeight: 800,
-              color: metricas.salud === 'alto' ? '#dc2626' : metricas.salud === 'moderado' ? '#f59e0b' : '#10b981',
-              fontVariantNumeric: 'tabular-nums',
-            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: metricas.salud === 'alto' ? '#7f1d1d' : metricas.salud === 'moderado' ? '#92400e' : '#15803d', textTransform: 'uppercase', margin: 0 }}>
+                Salud operativa
+              </p>
+              <span style={{ fontSize: 11, fontWeight: 600, color: metricas.salud === 'alto' ? '#dc2626' : metricas.salud === 'moderado' ? '#f59e0b' : '#10b981' }}>
+                {metricas.salud === 'alto' ? '🔴' : metricas.salud === 'moderado' ? '🟡' : '🟢'}
+              </span>
+            </div>
+            <p style={{ fontSize: 18, fontWeight: 900, color: metricas.salud === 'alto' ? '#991b1b' : metricas.salud === 'moderado' ? '#b45309' : '#166534', margin: 0 }}>
               {metricas.salud === 'alto' ? 'Vigilar' : metricas.salud === 'moderado' ? 'Estable' : 'Sólida'}
+            </p>
+            <p style={{ fontSize: 8, color: metricas.salud === 'alto' ? '#991b1b' : metricas.salud === 'moderado' ? '#b45309' : '#166534', margin: 0, lineHeight: 1.3 }}>
+              {metricas.salud === 'alto'
+                ? '🔴 RIESGO CRÍTICO. Requiere decisiones estratégicas inmediatas.\n\n✓ PLAN DE ACCIÓN (7-14 DÍAS):\n• Análisis de retención por cohorte edad/canal\n• Auditoría de bajas (razones/segmentos)\n• Campaña de reactivación para clientes en riesgo\n• Revisa pricing/competencia y propuesta de valor'
+                : metricas.salud === 'moderado'
+                ? '⚡ Ritmo manejable. Continúa monitoreando y prepara contingencias.'
+                : '✨ Desempeño confiable. Operación resiliente con fundamentals sólidos.'}
             </p>
           </div>
         </div>
