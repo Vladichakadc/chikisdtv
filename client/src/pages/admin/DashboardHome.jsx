@@ -4,6 +4,7 @@ import {
   Users, Package, FileText, Tv, DollarSign, AlertCircle, Clock, TrendingUp,
   Wallet, PiggyBank, Percent, BarChart3, Lightbulb, Activity,
   Trophy, Hourglass, RefreshCw, Calendar, Receipt, Download, Upload, ShieldAlert,
+  CheckCircle2, ChevronRight,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -106,6 +107,42 @@ const COLOR_MAP = {
   blue: 'sky', green: 'emerald',
   purple: 'purple', amber: 'amber', red: 'red',
 }
+// ─── Centro de alertas operativas ────────────────────────────────────────────
+// Patrón de dashboard ejecutivo: lo que requiere acción hoy va primero, con
+// severidad semántica (rojo = urgente, ámbar = atención, verde = oportunidad).
+
+const ALERT_TONES = {
+  error:   { iconBg: 'bg-red-50',     iconText: 'text-red-600' },
+  warning: { iconBg: 'bg-amber-50',   iconText: 'text-amber-600' },
+  info:    { iconBg: 'bg-emerald-50', iconText: 'text-emerald-600' },
+}
+const ALERT_ORDER = { error: 0, warning: 1, info: 2 }
+
+function AlertRow({ alerta }) {
+  const t = ALERT_TONES[alerta.tone]
+  const Icon = alerta.icon
+  const clickable = Boolean(alerta.onClick)
+  return (
+    <button
+      onClick={alerta.onClick}
+      disabled={!clickable}
+      className={cn(
+        'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+        clickable ? 'hover:bg-orange-50/40 cursor-pointer' : 'cursor-default'
+      )}
+    >
+      <span className={cn('p-2 rounded-lg flex-shrink-0', t.iconBg)}>
+        <Icon size={16} className={t.iconText} />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-semibold text-brand-accent">{alerta.titulo}</span>
+        <span className="block text-xs text-gray-500">{alerta.detalle}</span>
+      </span>
+      {clickable && <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />}
+    </button>
+  )
+}
+
 function StatCard({ icon, title, value, color, subtitle, onClick }) {
   const tone = Object.entries(COLOR_MAP).find(([k]) => color?.includes(k))?.[1] || 'indigo'
   return (
@@ -447,6 +484,69 @@ export default function DashboardHome() {
     [pantallasEnriquecidas]
   )
 
+  // Alertas operativas: se derivan de datos ya cargados (sin peticiones extra).
+  const alertas = useMemo(() => {
+    if (!stats) return []
+    const list = []
+    const nV = cuentasVencidas.length
+    if (nV > 0) {
+      list.push({
+        tone: 'error', icon: AlertCircle,
+        titulo: `${nV} cuenta${nV === 1 ? '' : 's'} vencida${nV === 1 ? '' : 's'} sin renovar`,
+        detalle: 'Cada día sin contacto aumenta el riesgo de perder al cliente — abrir la lista para gestionar',
+        onClick: () => setShowVencidasPanel(true),
+      })
+    }
+    const nP = proximasAVencer.length
+    if (nP > 0) {
+      list.push({
+        tone: 'warning', icon: Clock,
+        titulo: `${nP} cuenta${nP === 1 ? '' : 's'} vence${nP === 1 ? '' : 'n'} en ≤ ${planificador?.diasAlerta ?? 8} días`,
+        detalle: 'Ventana ideal para asegurar la renovación antes del corte del servicio',
+        onClick: () => setShowProximasPanel(true),
+      })
+    }
+    if (stats.pendingPayments > 0) {
+      list.push({
+        tone: 'warning', icon: Hourglass,
+        titulo: `${stats.pendingPayments} pago${stats.pendingPayments === 1 ? '' : 's'} pendiente${stats.pendingPayments === 1 ? '' : 's'} de conciliar`,
+        detalle: 'Dinero registrado que aún no está confirmado en el módulo de Pagos',
+        onClick: () => navigate('/admin/payments'),
+      })
+    }
+    const oc = bi?.ocupacion
+    if (oc) {
+      if (oc.pctOcupacionGlobal >= 90) {
+        list.push({
+          tone: 'error', icon: Tv,
+          titulo: `Capacidad instalada al ${oc.pctOcupacionGlobal}%`,
+          detalle: oc.totalLibres === 0
+            ? 'Sin pantallas libres — la próxima venta requiere comprar una cuenta padre nueva'
+            : `Solo ${oc.totalLibres} pantalla${oc.totalLibres === 1 ? '' : 's'} libre${oc.totalLibres === 1 ? '' : 's'} — planear compra de cuentas padre antes de la próxima venta`,
+          onClick: () => navigate('/admin/planificador'),
+        })
+      } else if (oc.pctOcupacionGlobal >= 75) {
+        list.push({
+          tone: 'warning', icon: Tv,
+          titulo: `Capacidad instalada al ${oc.pctOcupacionGlobal}%`,
+          detalle: `${oc.totalLibres} pantalla${oc.totalLibres === 1 ? '' : 's'} libre${oc.totalLibres === 1 ? '' : 's'} — vigilar antes de que se agote el cupo`,
+          onClick: () => navigate('/admin/planificador'),
+        })
+      } else if (oc.totalLibres > 0) {
+        list.push({
+          tone: 'info', icon: TrendingUp,
+          titulo: `${oc.totalLibres} pantalla${oc.totalLibres === 1 ? '' : 's'} libre${oc.totalLibres === 1 ? '' : 's'} para vender`,
+          detalle: 'La capacidad ya está pagada — cada venta sobre estos cupos es ingreso sin costo adicional',
+          onClick: () => navigate('/admin/planificador'),
+        })
+      }
+    }
+    return list.sort((a, b) => ALERT_ORDER[a.tone] - ALERT_ORDER[b.tone])
+  }, [stats, bi, planificador, cuentasVencidas, proximasAVencer])
+
+  const alertasUrgentes = alertas.filter(a => a.tone !== 'info').length
+  const valorEnRiesgo = bi?.ltv?.valorEnRiesgo || 0
+
   const handleGenerateVentaPlanificador = (screen, catKey) => {
     setShowVencidasPanel(false)
     setShowProximasPanel(false)
@@ -609,6 +709,48 @@ export default function DashboardHome() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ─── Centro de alertas: lo que requiere acción hoy ───────────────── */}
+      <div className="dash-a2">
+        <Card className={cn(
+          alertas.some(a => a.tone === 'error') ? 'border-red-200' :
+          alertas.some(a => a.tone === 'warning') ? 'border-amber-200' : 'border-emerald-100'
+        )}>
+          <CardHeader className="border-gray-50 py-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <ShieldAlert size={16} className={alertasUrgentes > 0 ? 'text-red-500' : 'text-emerald-500'} />
+                <CardTitle className="text-base">Centro de alertas</CardTitle>
+                {alertasUrgentes > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold tabular-nums">
+                    {alertasUrgentes} {alertasUrgentes === 1 ? 'asunto requiere' : 'asuntos requieren'} acción
+                  </span>
+                )}
+              </div>
+              {valorEnRiesgo > 0 && alertasUrgentes > 0 && (
+                <span className="text-xs text-gray-500">
+                  Valor en riesgo (vencidas + por vencer): <span className="font-bold text-red-600">{formatCurrency(valorEnRiesgo)}</span>
+                </span>
+              )}
+            </div>
+          </CardHeader>
+          <CardBody className="p-0 divide-y divide-gray-50">
+            {alertas.length > 0 ? (
+              alertas.map((a, i) => <AlertRow key={i} alerta={a} />)
+            ) : (
+              <div className="flex items-center gap-3 px-4 py-3">
+                <span className="p-2 rounded-lg bg-emerald-50 flex-shrink-0">
+                  <CheckCircle2 size={16} className="text-emerald-600" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-brand-accent">Sin alertas operativas</p>
+                  <p className="text-xs text-gray-500">Cartera al día y capacidad bajo control</p>
+                </div>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
 
       {/* ─── KPIs operativos: clientes, catálogo y capacidad ─────────────── */}
