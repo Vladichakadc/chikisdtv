@@ -7,6 +7,7 @@ import DashboardLayout from './layouts/DashboardLayout'
 // En móvil esto reduce la carga inicial de ~2MB a una fracción — el login y el
 // shell cargan de inmediato y el resto llega bajo demanda.
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
+const PublicChangePasswordPage = lazy(() => import('./pages/PublicChangePasswordPage'))
 const DashboardHome = lazy(() => import('./pages/admin/DashboardHome'))
 const ClientsPage = lazy(() => import('./pages/admin/ClientsPage'))
 const PlansPage = lazy(() => import('./pages/admin/PlansPage'))
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/" element={<RequireAuth><Navigate to="/admin" replace /></RequireAuth>} />
         <Route path="/login" element={<Login />} />
         <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route path="/public-change-password" element={<PublicChangePasswordPage />} />
 
         <Route path="/admin" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
           <Route index element={<DashboardHome />} />
@@ -58,6 +60,7 @@ export default function App() {
           <Route path="payments" element={<PaymentsPage />} />
           <Route path="ventas-dispositivos" element={<VentaDispositivosPage />} />
           <Route path="devices" element={<DevicesPage />} />
+          <Route path="change-password" element={<ChangePasswordPage />} />
           <Route path="planificador" element={<PlanificadorPage />} />
           <Route path="bajas" element={<BajasPage />} />
           <Route path="costo-pantalla" element={<CostoPantallaPage />} />

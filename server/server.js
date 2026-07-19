@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const sequelize = require('./config/database');
 const { Client, Plan, CostoPantalla } = require('./models');
+const { withRLS } = require('./middleware/rlsContext');
 
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
@@ -21,12 +22,16 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(withRLS);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'ChikisdTV', time: new Date().toISOString() }));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'ChikisdTV', time: new Date().toISOString() }));
 
+const userRoutes = require('./routes/user');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/user', userRoutes);
 
 // Sirve el frontend en producción.
 // Doble condición: NODE_ENV=production O la carpeta dist existe (Railway no siempre

@@ -80,6 +80,12 @@ const navSections = [
       },
     ],
   },
+  {
+    label: 'Ajustes',
+    items: [
+      { to: '/admin/change-password', label: 'Seguridad', icon: KeyRound },
+    ],
+  },
 ]
 
 // Lista plana para resolver el título de la página actual (header móvil)
