@@ -17,7 +17,7 @@
 /code-review       # Alias de review (alternativa)
 ```
 
-### Nuevas (Recién Instaladas)
+### Nuevas (Recién Instaladas - Fase 1)
 
 ```
 ✅ /skill-creator      # Crear y gestionar skills personalizadas
@@ -25,6 +25,14 @@
 ✅ /context-mode       # Gestionar contexto de conversación
 ✅ /claude-men         # Mentoría especializada en desarrollo
 ✅ code-review-guide   # Guía de /review y /ultrareview
+```
+
+### Nuevas (Recién Instaladas - Fase 2)
+
+```
+✅ /impeccable         # Código perfecto - limpieza extrema y standards
+✅ /emilkowalski       # Diseño UI/UX moderno - componentes elegantes
+✅ /taste-skill        # Buen gusto en diseño - criterios y ejercicios
 ```
 
 ---
