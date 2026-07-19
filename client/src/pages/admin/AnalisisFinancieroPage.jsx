@@ -573,6 +573,269 @@ function TrmOpexChart({ data }) {
   )
 }
 
+// ─── Momentum de ventas ───────────────────────────────────────────────────────
+function MomentumTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const v = payload[0]?.value ?? 0
+  const pos = v >= 0
+  return (
+    <div style={{ background:'rgba(255,255,255,0.97)', border:`1px solid ${pos?'#16a34a':'#ef4444'}40`, borderLeft:`3px solid ${pos?'#16a34a':'#ef4444'}`, borderRadius:10, padding:'10px 14px', fontSize:12, boxShadow:'0 4px 20px rgba(0,0,0,0.10)', minWidth:220 }}>
+      <p style={{ fontWeight:700, color:'#1e293b', marginBottom:5 }}>{label}</p>
+      <p style={{ color:pos?'#16a34a':'#dc2626', fontWeight:800, fontSize:15 }}>{pos?'+':''}{v.toFixed(1)}%</p>
+      <p style={{ color:'#9ca3af', marginTop:5 }}>
+        {pos
+          ? 'Este mes los ingresos crecieron frente al mes anterior.'
+          : 'Este mes los ingresos cayeron frente al mes anterior.'}
+      </p>
+    </div>
+  )
+}
+function MomentumChart({ data, kMomentum }) {
+  if (!data?.length) return <div style={{ height:270, display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', fontSize:13 }}>Sin datos de momentum</div>
+  const positivos = data.filter(d => d.variacionPct >= 0).length
+  const negativos = data.length - positivos
+  const momentum = kMomentum ?? 0
+  const momColor = momentum >= 0 ? '#16a34a' : '#dc2626'
+  const momBg    = momentum >= 0 ? 'rgba(22,163,74,0.10)' : 'rgba(220,38,38,0.10)'
+  return (
+    <div>
+      {/* Badge resumen */}
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
+        <div style={{ display:'inline-flex', alignItems:'center', gap:6, background: momentum >= 0 ? 'rgba(22,163,74,0.10)' : 'rgba(220,38,38,0.10)', border:`1px solid ${momColor}30`, borderRadius:20, padding:'4px 12px', fontSize:12 }}>
+          <span style={{ width:7, height:7, borderRadius:'50%', background:momColor, display:'inline-block' }}/>
+          <span style={{ fontWeight:700, color:momColor }}>Momentum {momentum >= 0 ? '+' : ''}{momentum.toFixed(1)}% promedio</span>
+        </div>
+        <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:'rgba(16,185,129,0.08)', border:'1px solid rgba(16,185,129,0.2)', borderRadius:20, padding:'4px 12px', fontSize:12 }}>
+          <span style={{ fontWeight:700, color:'#10b981' }}>↑ {positivos} meses en alza</span>
+        </div>
+        <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:20, padding:'4px 12px', fontSize:12 }}>
+          <span style={{ fontWeight:700, color:'#ef4444' }}>↓ {negativos} meses en baja</span>
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={240}>
+        <ComposedChart data={data} margin={{ top:28, right:12, left:4, bottom:12 }}>
+          <defs>
+            <linearGradient id="momPos" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#16a34a" stopOpacity={0.9}/>
+              <stop offset="100%" stopColor="#4ade80" stopOpacity={0.7}/>
+            </linearGradient>
+            <linearGradient id="momNeg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity={0.85}/>
+              <stop offset="100%" stopColor="#f87171" stopOpacity={0.65}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="label" tick={{ fontSize:10, fill:'#78716c' }} label={{ value:'Mes', position:'insideBottomRight', offset:-4, fontSize:10, fill:'#9ca3af' }}/>
+          <YAxis tickFormatter={v=>`${v}%`} tick={{ fontSize:10, fill:'#78716c' }} width={42} label={{ value:'Variación %', angle:-90, position:'insideLeft', offset:8, fontSize:10, fill:'#9ca3af' }}/>
+          <Tooltip content={<MomentumTooltip />}/>
+          <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 2" strokeWidth={1.5} label={{ value:'0%', position:'insideTopRight', fontSize:10, fill:'#94a3b8' }}/>
+          {/* Línea de momentum promedio */}
+          <ReferenceLine y={momentum} stroke={momColor} strokeDasharray="6 3" strokeWidth={1.5} label={{ value:`Prom. ${momentum >= 0?'+':''}${momentum.toFixed(1)}%`, position:'insideTopLeft', fontSize:10, fill:momColor }}/>
+          <Bar dataKey="variacionPct" name="Variación mensual %" radius={[5,5,0,0]} barSize={28}>
+            {data.map((m,i) => <Cell key={i} fill={m.variacionPct >= 0 ? 'url(#momPos)' : 'url(#momNeg)'} />)}
+            <LabelList dataKey="variacionPct" content={({ x, y, width, height, value }) => {
+              if (value == null) return null
+              const pos = value >= 0
+              const ly = pos ? y - 7 : y + height + 14
+              return (
+                <text x={x + width/2} y={ly} textAnchor="middle" fontSize={11} fontWeight={700}
+                  fill={pos ? '#15803d' : '#b91c1c'}
+                  stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">
+                  {pos ? '+' : ''}{value.toFixed(1)}%
+                </text>
+              )
+            }} />
+          </Bar>
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ─── Mix de planes por contribución al MRR ────────────────────────────────────
+const MIX_PLAN_GRAD = {
+  'Plan Mensual':   { id:'mixMensual',   from:'#f97316', to:'#fb923c' },
+  'Plan Semestral': { id:'mixSemestral', from:'#7c3aed', to:'#a78bfa' },
+  'Plan Anual':     { id:'mixAnual',     from:'#16a34a', to:'#4ade80' },
+}
+function MixPlanesTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload
+  const grad = MIX_PLAN_GRAD[label] || { from:'#64748b', to:'#94a3b8' }
+  return (
+    <div style={{ background:'rgba(255,255,255,0.97)', border:`1px solid ${grad.from}40`, borderLeft:`3px solid ${grad.from}`, borderRadius:10, padding:'10px 14px', fontSize:12, boxShadow:'0 4px 20px rgba(0,0,0,0.10)', minWidth:230 }}>
+      <p style={{ fontWeight:700, color:'#1e293b', marginBottom:5 }}>{label}</p>
+      <p style={{ color:grad.from, fontWeight:800, fontSize:15 }}>{formatCurrency(d?.mrr ?? 0)} MRR</p>
+      <p style={{ color:'#8b5cf6', fontWeight:700, marginTop:3 }}>{d?.pct ?? 0}% del MRR total</p>
+      <p style={{ color:'#9ca3af', marginTop:5 }}>Contribución acumulada histórica de este tipo de plan al ingreso recurrente normalizado.</p>
+    </div>
+  )
+}
+function MixPlanesChart({ data }) {
+  if (!data?.length) return <div style={{ height:200, display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', fontSize:13 }}>Sin datos de planes</div>
+  const dominante = [...data].sort((a,b) => b.mrr - a.mrr)[0]
+  const domGrad = MIX_PLAN_GRAD[dominante?.plan] || { from:'#64748b', to:'#94a3b8' }
+  const renderLabel = (props) => {
+    const { x, y, width, height, value, index } = props
+    if (!value) return null
+    const item = data[index]
+    const grad = MIX_PLAN_GRAD[item?.plan] || { from:'#64748b' }
+    return (
+      <g>
+        <text x={x + width + 10} y={y + height/2 - 6} dominantBaseline="central" fontSize={12} fontWeight={700} fill={grad.from} stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">
+          {formatCurrency(value)}
+        </text>
+        <text x={x + width + 10} y={y + height/2 + 9} dominantBaseline="central" fontSize={10} fill="#9ca3af">
+          {item?.pct}% del MRR
+        </text>
+      </g>
+    )
+  }
+  return (
+    <div>
+      {dominante && (
+        <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:`${domGrad.from}14`, border:`1px solid ${domGrad.from}30`, borderRadius:20, padding:'4px 12px', marginBottom:12, fontSize:12 }}>
+          <span style={{ width:7, height:7, borderRadius:'50%', background:domGrad.from, display:'inline-block' }}/>
+          <span style={{ fontWeight:700, color:domGrad.from }}>Plan dominante: {dominante.plan} ({dominante.pct}%)</span>
+        </div>
+      )}
+      <div style={{ display:'flex', flexDirection:'column', gap:16, padding:'4px 0' }}>
+        {data.map((p, i) => {
+          const grad = MIX_PLAN_GRAD[p.plan] || { id:`mixOther${i}`, from:'#64748b', to:'#94a3b8' }
+          const gradId = grad.id || `mixOther${i}`
+          return (
+            <div key={i}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ width:10, height:10, borderRadius:3, background:grad.from, display:'inline-block', flexShrink:0 }}/>
+                  <span style={{ fontWeight:700, fontSize:13, color:'#1e293b' }}>{p.plan}</span>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <span style={{ fontWeight:800, fontSize:13, color:grad.from }}>{formatCurrency(p.mrr)}</span>
+                  <span style={{ color:'#9ca3af', fontSize:11, marginLeft:6 }}>{p.pct}%</span>
+                </div>
+              </div>
+              <div style={{ position:'relative', height:28, background:'#f1f5f9', borderRadius:8, overflow:'hidden' }}>
+                <div style={{ position:'absolute', inset:0, width:`${p.pct}%`, background:`linear-gradient(90deg,${grad.from},${grad.to})`, borderRadius:8, transition:'width 0.6s ease', display:'flex', alignItems:'center', justifyContent:'flex-end', paddingRight:8 }}>
+                  {p.pct > 15 && <span style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.9)' }}>{p.pct}%</span>}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Distribución del LTV por quintil ────────────────────────────────────────
+const QUINTIL_GRAD_PAIRS = [
+  { id:'q1', from:'#94a3b8', to:'#cbd5e1' },
+  { id:'q2', from:'#60a5fa', to:'#93c5fd' },
+  { id:'q3', from:'#34d399', to:'#6ee7b7' },
+  { id:'q4', from:'#f97316', to:'#fdba74' },
+  { id:'q5', from:'#a855f7', to:'#d8b4fe' },
+]
+const QUINTIL_COLORS = QUINTIL_GRAD_PAIRS.map(g => g.from)
+const QUINTIL_LABELS = ['Segmento base', 'Clientes emergentes', 'Clientes consolidados', 'Clientes premium', 'Top clientes']
+function LtvQuintilTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload
+  const idx = ['Q1','Q2','Q3','Q4','Q5'].indexOf(label)
+  const grad = QUINTIL_GRAD_PAIRS[idx] || QUINTIL_GRAD_PAIRS[0]
+  const segLabel = QUINTIL_LABELS[idx] || label
+  return (
+    <div style={{ background:'rgba(255,255,255,0.97)', border:`1px solid ${grad.from}40`, borderLeft:`3px solid ${grad.from}`, borderRadius:10, padding:'10px 14px', fontSize:12, boxShadow:'0 4px 20px rgba(0,0,0,0.10)', minWidth:230 }}>
+      <p style={{ fontWeight:700, color:'#1e293b', marginBottom:4 }}>{label} · {segLabel}</p>
+      <p style={{ color:grad.from, fontWeight:800, fontSize:15 }}>{d?.cantidad ?? 0} clientes</p>
+      <p style={{ color:'#475569', marginTop:3 }}>LTV hasta <strong>{formatCurrency(d?.maxLtv ?? 0)}</strong></p>
+      <p style={{ color:'#9ca3af', marginTop:5 }}>Clientes cuyo ingreso total histórico cae en el {label} inferior de la distribución.</p>
+    </div>
+  )
+}
+function LtvQuintilChart({ data }) {
+  if (!data?.length) return <div style={{ height:240, display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', fontSize:13 }}>Sin datos de distribución</div>
+  const total = data.reduce((s,d) => s + (d.cantidad||0), 0)
+  return (
+    <ResponsiveContainer width="100%" height={240}>
+      <ComposedChart data={data} margin={{ top:28, right:20, left:4, bottom:4 }}>
+        <defs>
+          {QUINTIL_GRAD_PAIRS.map(g => (
+            <linearGradient key={g.id} id={g.id} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={g.from} stopOpacity={0.95}/>
+              <stop offset="100%" stopColor={g.to} stopOpacity={0.75}/>
+            </linearGradient>
+          ))}
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis dataKey="label" tick={{ fontSize:10, fill:'#78716c' }}/>
+        <YAxis allowDecimals={false} tick={{ fontSize:10, fill:'#78716c' }} width={42} label={{ value:'Clientes', angle:-90, position:'insideLeft', offset:8, fontSize:10, fill:'#9ca3af' }}/>
+        <Tooltip content={<LtvQuintilTooltip />}/>
+        <Bar dataKey="cantidad" name="Clientes" radius={[6,6,0,0]} barSize={40}>
+          {(data||[]).map((_, i) => <Cell key={i} fill={`url(#${QUINTIL_GRAD_PAIRS[i % QUINTIL_GRAD_PAIRS.length].id})`} />)}
+          <LabelList dataKey="cantidad" content={({ x, y, width, height, value, index }) => {
+            if (!value) return null
+            const grad = QUINTIL_GRAD_PAIRS[index % QUINTIL_GRAD_PAIRS.length]
+            const pct = total > 0 ? ((value/total)*100).toFixed(0) : 0
+            return (
+              <g>
+                <text x={x+width/2} y={y-14} textAnchor="middle" fontSize={12} fontWeight={700} fill={grad.from} stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">{value}</text>
+                <text x={x+width/2} y={y-3} textAnchor="middle" fontSize={9} fill="#9ca3af">{pct}%</text>
+              </g>
+            )
+          }} />
+        </Bar>
+      </ComposedChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ─── Percentiles de LTV ───────────────────────────────────────────────────────
+const PERCENTIL_META = [
+  { key:'p25',  label:'P25 · Cuartil bajo',  from:'#94a3b8', to:'#cbd5e1',  desc:'La mitad inferior de los clientes tiene un LTV igual o menor a este valor.' },
+  { key:'p50',  label:'P50 · Mediana',        from:'#60a5fa', to:'#93c5fd',  desc:'El cliente típico — la mitad tiene más, la mitad tiene menos.' },
+  { key:'p75',  label:'P75 · Cuartil alto',  from:'#34d399', to:'#6ee7b7',  desc:'Solo el 25% de los clientes supera este LTV.' },
+  { key:'p90',  label:'P90 · Top 10%',       from:'#a855f7', to:'#d8b4fe',  desc:'Los clientes más valiosos — el 10% que más ingreso ha generado.' },
+  { key:'max',  label:'Máximo histórico',    from:'#f97316', to:'#fdba74',  desc:'El cliente de mayor valor en toda la historia del negocio.' },
+]
+function LtvPercentilesChart({ percentiles }) {
+  if (!percentiles) return null
+  const maxVal = percentiles.max || 1
+  const asimetria = percentiles.p90 > 0 && percentiles.p25 > 0 ? (percentiles.p90 / percentiles.p25).toFixed(1) : null
+  return (
+    <div>
+      {asimetria && (
+        <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.2)', borderRadius:20, padding:'4px 12px', marginBottom:16, fontSize:12 }}>
+          <span style={{ width:7, height:7, borderRadius:'50%', background:'#a855f7', display:'inline-block' }}/>
+          <span style={{ fontWeight:700, color:'#7c3aed' }}>Asimetría P90/P25: {asimetria}×</span>
+          <span style={{ color:'#9ca3af' }}>· {asimetria > 5 ? 'cartera muy concentrada en pocos clientes premium' : asimetria > 2 ? 'distribución heterogénea esperada' : 'base de clientes bastante homogénea'}</span>
+        </div>
+      )}
+      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        {PERCENTIL_META.map(({ key, label, from, to, desc }) => {
+          const val = percentiles[key] ?? 0
+          const barPct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0
+          return (
+            <div key={key}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+                <div>
+                  <span style={{ fontWeight:700, fontSize:12, color:'#1e293b' }}>{label}</span>
+                  <p style={{ fontSize:10, color:'#94a3b8', marginTop:1 }}>{desc}</p>
+                </div>
+                <span style={{ fontWeight:800, fontSize:14, color:from, marginLeft:12, flexShrink:0 }}>{formatCurrency(val)}</span>
+              </div>
+              <div style={{ position:'relative', height:10, background:'#f1f5f9', borderRadius:6, overflow:'hidden' }}>
+                <div style={{ position:'absolute', inset:0, width:`${barPct}%`, background:`linear-gradient(90deg,${from},${to})`, borderRadius:6, transition:'width 0.6s ease' }}/>
+              </div>
+              <div style={{ fontSize:10, color:'#9ca3af', marginTop:2, textAlign:'right' }}>{barPct}% del máximo</div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── Narrativa experta EBITDA ────────────────────────────────────────────────
 
 function NarrativaFinanciera({ fin, kpisLic }) {
@@ -852,9 +1115,25 @@ export default function AnalisisFinancieroPage() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
-                icon={PiggyBank} label="EBITDA histórico · licencias" tone={kpisLicencias.ebitdaHistorico >= 0 ? 'positive' : 'negative'}
+                icon={PiggyBank}
+                label="EBITDA histórico · licencias"
+                tone={kpisLicencias.ebitdaHistorico >= 0 ? 'positive' : 'negative'}
                 value={fmtM(kpisLicencias.ebitdaHistorico)}
                 sub="Ingresos licencias − OPEX (recargas + 4x1000)"
+                badge={
+                  kpisLicencias.margenEbitdaPct >= 50
+                    ? { text: 'EBITDA excelente', color: '#10b981', bg: 'rgba(16,185,129,0.12)' }
+                    : kpisLicencias.margenEbitdaPct >= 30
+                    ? { text: 'EBITDA sólido', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+                    : kpisLicencias.ebitdaHistorico >= 0
+                    ? { text: 'Margen ajustado', color: '#f97316', bg: 'rgba(249,115,22,0.12)' }
+                    : { text: 'EBITDA negativo', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+                }
+                trend={
+                  kpisLicencias.ltm?.ebitda != null && kpisLicencias.ebitdaPromedioMensual
+                    ? ((kpisLicencias.ltm.ebitda - kpisLicencias.ebitdaPromedioMensual * 12) / Math.abs(kpisLicencias.ebitdaPromedioMensual * 12)) * 100
+                    : null
+                }
                 onClick={() => setExplain({
                   title: 'EBITDA histórico · licencias', value: formatCurrency(kpisLicencias.ebitdaHistorico), icon: PiggyBank,
                   queEs: 'La utilidad operativa acumulada del negocio de suscripciones TV: lo que queda después de pagar las recargas de créditos, antes de impuestos.',
@@ -863,9 +1142,25 @@ export default function AnalisisFinancieroPage() {
                 })}
               />
               <KpiCard
-                icon={Percent} label="Margen EBITDA · licencias" tone="accent"
+                icon={Percent}
+                label="Margen EBITDA · licencias"
+                tone="accent"
                 value={kpisLicencias.margenEbitdaPct != null ? `${kpisLicencias.margenEbitdaPct}%` : '—'}
-                sub="Sobre ingresos históricos de licencias"
+                sub="De cada $100 de licencias que entran"
+                badge={
+                  kpisLicencias.margenEbitdaPct >= 60
+                    ? { text: 'Margen premium', color: '#10b981', bg: 'rgba(16,185,129,0.12)' }
+                    : kpisLicencias.margenEbitdaPct >= 40
+                    ? { text: 'Margen saludable', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+                    : kpisLicencias.margenEbitdaPct >= 20
+                    ? { text: 'Margen moderado', color: '#f97316', bg: 'rgba(249,115,22,0.12)' }
+                    : { text: 'Margen bajo — vigilar', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+                }
+                trend={
+                  kpisLicencias.ltm?.margenEbitdaPct != null && kpisLicencias.margenEbitdaPct != null
+                    ? kpisLicencias.ltm.margenEbitdaPct - kpisLicencias.margenEbitdaPct
+                    : null
+                }
                 onClick={() => setExplain({
                   title: 'Margen EBITDA · licencias', value: `${kpisLicencias.margenEbitdaPct}%`, icon: Percent,
                   queEs: 'De cada $100 de licencias que entran, cuántos quedan como utilidad operativa.',
@@ -874,9 +1169,20 @@ export default function AnalisisFinancieroPage() {
                 })}
               />
               <KpiCard
-                icon={Wallet} label="OPEX ratio" tone="neutral"
+                icon={Wallet}
+                label="OPEX ratio"
+                tone="neutral"
                 value={kpisLicencias.opexRatioPct != null ? `${kpisLicencias.opexRatioPct}%` : '—'}
-                sub={`OPEX histórico: ${fmtM(kpisLicencias.opexHistorico)} (recargas + 4x1000)`}
+                sub={`OPEX histórico: ${fmtM(kpisLicencias.opexHistorico)}`}
+                badge={
+                  kpisLicencias.opexRatioPct <= 25
+                    ? { text: 'Costo muy controlado', color: '#10b981', bg: 'rgba(16,185,129,0.12)' }
+                    : kpisLicencias.opexRatioPct <= 40
+                    ? { text: 'Costo moderado', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+                    : kpisLicencias.opexRatioPct <= 55
+                    ? { text: 'Costo elevado', color: '#f97316', bg: 'rgba(249,115,22,0.12)' }
+                    : { text: 'Costo crítico', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+                }
                 onClick={() => setExplain({
                   title: 'OPEX ratio', value: `${kpisLicencias.opexRatioPct}%`, icon: Wallet,
                   queEs: 'Qué porcentaje de cada peso de ingreso de licencias se va en el gasto operativo (recargas de créditos).',
@@ -886,9 +1192,22 @@ export default function AnalisisFinancieroPage() {
                 })}
               />
               <KpiCard
-                icon={TrendingUp} label={fin.kpis.tirAnualPct != null ? 'TIR anualizada' : 'ROI sobre OPEX'} tone="positive"
+                icon={TrendingUp}
+                label={fin.kpis.tirAnualPct != null ? 'TIR anualizada' : 'ROI sobre OPEX'}
+                tone="positive"
                 value={fin.kpis.tirAnualPct != null ? `${fin.kpis.tirAnualPct}%` : fin.kpis.roiSobreOpex != null ? `${(fin.kpis.roiSobreOpex * 100).toFixed(0)}%` : '—'}
                 sub={fin.kpis.tirAnualPct != null ? `TIR mensual: ${fin.kpis.tirMensualPct}%` : 'TIR no calculable: flujos siempre positivos'}
+                badge={(() => {
+                  const pct = fin.kpis.tirAnualPct ?? (fin.kpis.roiSobreOpex != null ? fin.kpis.roiSobreOpex * 100 : null)
+                  if (pct == null) return null
+                  return pct >= 80
+                    ? { text: 'Retorno excepcional', color: '#10b981', bg: 'rgba(16,185,129,0.12)' }
+                    : pct >= 40
+                    ? { text: 'Retorno sólido', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+                    : pct >= 10
+                    ? { text: 'Retorno moderado', color: '#f97316', bg: 'rgba(249,115,22,0.12)' }
+                    : { text: 'Retorno bajo', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+                })()}
                 onClick={() => setExplain({
                   title: fin.kpis.tirAnualPct != null ? 'TIR anualizada' : 'ROI sobre OPEX',
                   value: fin.kpis.tirAnualPct != null ? `${fin.kpis.tirAnualPct}%` : `${(fin.kpis.roiSobreOpex * 100).toFixed(0)}%`,
@@ -908,9 +1227,25 @@ export default function AnalisisFinancieroPage() {
           {/* ─── EBITDA: KPIs fila 2 ──────────────────────────────────────── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 fin-a3">
             <KpiCard
-              icon={Activity} label="EBITDA licencias · LTM" tone={kpisLicencias.ltm.ebitda >= 0 ? 'positive' : 'negative'}
+              icon={Activity}
+              label="EBITDA licencias · LTM"
+              tone={kpisLicencias.ltm.ebitda >= 0 ? 'positive' : 'negative'}
               value={fmtM(kpisLicencias.ltm.ebitda)}
               sub={kpisLicencias.ltm.margenEbitdaPct != null ? `Margen LTM: ${kpisLicencias.ltm.margenEbitdaPct}%` : undefined}
+              badge={
+                kpisLicencias.ltm.ebitda > 0 && kpisLicencias.ebitdaPromedioMensual > 0
+                  ? kpisLicencias.ltm.ebitda > kpisLicencias.ebitdaPromedioMensual * 12
+                    ? { text: 'LTM supera el histórico anualizado', color: '#10b981', bg: 'rgba(16,185,129,0.12)' }
+                    : { text: 'LTM por debajo del histórico anualizado', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+                  : kpisLicencias.ltm.ebitda < 0
+                  ? { text: 'Últimos 12 meses en negativo', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+                  : null
+              }
+              trend={
+                kpisLicencias.ltm?.ebitda != null && kpisLicencias.ebitdaPromedioMensual
+                  ? ((kpisLicencias.ltm.ebitda - kpisLicencias.ebitdaPromedioMensual * 12) / Math.abs(kpisLicencias.ebitdaPromedioMensual * 12)) * 100
+                  : null
+              }
               onClick={() => setExplain({
                 title: 'EBITDA licencias · últimos 12 meses', value: formatCurrency(kpisLicencias.ltm.ebitda), icon: Activity,
                 queEs: 'La utilidad operativa de licencias en los últimos 12 meses — la foto reciente del negocio de suscripciones.',
@@ -919,9 +1254,16 @@ export default function AnalisisFinancieroPage() {
               })}
             />
             <KpiCard
-              icon={DollarSign} label="EBITDA promedio mensual" tone="neutral"
+              icon={DollarSign}
+              label="EBITDA promedio mensual"
+              tone="neutral"
               value={fmtM(kpisLicencias.ebitdaPromedioMensual)}
               sub="Sobre meses con actividad registrada"
+              badge={
+                kpisLicencias.ebitdaPromedioMensual > 0
+                  ? { text: 'Rentable en promedio mensual', color: '#10b981', bg: 'rgba(16,185,129,0.12)' }
+                  : { text: 'Promedio mensual negativo', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+              }
               onClick={() => setExplain({
                 title: 'EBITDA promedio mensual · licencias', value: formatCurrency(kpisLicencias.ebitdaPromedioMensual), icon: DollarSign,
                 queEs: 'Cuánta utilidad operativa de licencias deja el negocio en un mes típico.',
@@ -930,9 +1272,20 @@ export default function AnalisisFinancieroPage() {
               })}
             />
             <KpiCard
-              icon={Hourglass} label="Payback" tone="neutral"
+              icon={Hourglass}
+              label="Payback"
+              tone="neutral"
               value={fin.kpis.paybackMes ? fin.kpis.paybackMes.label : 'Inmediato'}
               sub={fin.kpis.paybackMes ? `Mes ${fin.kpis.paybackMes.index} de operación` : 'El flujo acumulado nunca fue negativo'}
+              badge={
+                !fin.kpis.paybackMes
+                  ? { text: 'Sin zona de pérdida acumulada', color: '#10b981', bg: 'rgba(16,185,129,0.12)' }
+                  : fin.kpis.paybackMes.index <= 6
+                  ? { text: 'Payback rápido (≤6 meses)', color: '#10b981', bg: 'rgba(16,185,129,0.12)' }
+                  : fin.kpis.paybackMes.index <= 18
+                  ? { text: 'Payback moderado', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+                  : { text: 'Payback lento (>18 meses)', color: '#f97316', bg: 'rgba(249,115,22,0.12)' }
+              }
               onClick={() => setExplain({
                 title: 'Payback', value: fin.kpis.paybackMes ? fin.kpis.paybackMes.label : 'Inmediato', icon: Hourglass,
                 queEs: 'En qué momento el negocio recuperó lo invertido y empezó a estar "en verde" de forma acumulada.',
@@ -941,9 +1294,12 @@ export default function AnalisisFinancieroPage() {
               })}
             />
             <KpiCard
-              icon={AlertTriangle} label="CAPEX registrado" tone="neutral"
+              icon={AlertTriangle}
+              label="CAPEX registrado"
+              tone="neutral"
               value={fmtM(fin.kpis.capexRegistrado)}
               sub="Negocio asset-light — sin inversión de capital registrada"
+              badge={{ text: 'Modelo asset-light ✓', color: '#06b6d4', bg: 'rgba(6,182,212,0.12)' }}
               onClick={() => setExplain({
                 title: 'CAPEX registrado', value: formatCurrency(fin.kpis.capexRegistrado), icon: AlertTriangle,
                 queEs: 'La inversión en activos de largo plazo. En este negocio es prácticamente cero: modelo asset-light.',

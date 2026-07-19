@@ -22,6 +22,8 @@
  *   tone       — Nombre de paleta: indigo|purple|emerald|amber|red|orange|sky|pink|cyan
  *   delay      — Número de animación de entrada (1-6)
  *   onClick    — Handler de click (activa cursor pointer + "Ver detalle →")
+ *   badge      — { text, color, bg } — badge semáforo debajo del sub
+ *   trend      — Número % (positivo=verde, negativo=rojo) — variación vs período anterior
  *   className  — Clases adicionales
  */
 
@@ -53,6 +55,7 @@ function injectStyles() {
   const style = document.createElement('style')
   style.textContent = `
     @keyframes kpi-shimmer { from { background-position: -200% 0 } to { background-position: 200% 0 } }
+    @keyframes kpi-badge-in { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
     .kpi-dark-card {
       position: relative;
       border-radius: 18px;
@@ -72,9 +75,23 @@ function injectStyles() {
       background-size: 200% 100%;
       animation: kpi-shimmer 1.6s infinite;
     }
+    .kpi-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      border-radius: 99px; padding: 3px 10px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+      font-family: 'Plus Jakarta Sans','Inter',sans-serif;
+      margin-top: 8px;
+      animation: kpi-badge-in 0.3s ease both;
+    }
+    .kpi-trend {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 700;
+      font-family: 'Plus Jakarta Sans','Inter',sans-serif;
+    }
     @media (prefers-reduced-motion: reduce) {
       .kpi-dark-card, .kpi-dark-card.clickable:hover { transition: none !important; transform: none !important; }
       .kpi-dark-shimmer { animation: none !important; }
+      .kpi-badge { animation: none !important; }
     }
   `
   document.head.appendChild(style)
@@ -91,9 +108,10 @@ export function KpiCard({
   tone,
   delay,
   onClick,
+  badge,    // { text, color, bg } — badge semáforo opcional
+  trend,    // number % — variación vs período anterior (opcional)
   className = '',
 }) {
-  // Resolve colors: tone > gradFrom/gradTo > default indigo
   injectStyles()
   const resolved = tone
     ? (TONES[tone] || TONES.indigo)
@@ -102,9 +120,17 @@ export function KpiCard({
       : TONES.indigo
 
   const { from, to, glow } = resolved
-
-  // Dark backgrounds per tone depth
   const bg = `linear-gradient(135deg, #111827 0%, #0c0c1a 100%)`
+
+  // Colores del indicador de trend
+  const trendColor = trend == null ? null
+    : Math.abs(trend) < 0.1 ? '#94a3b8'
+    : trend > 0 ? '#10b981'
+    : '#ef4444'
+  const trendArrow = trend == null ? null
+    : Math.abs(trend) < 0.1 ? '→'
+    : trend > 0 ? '↑'
+    : '↓'
 
   return (
     <div
@@ -166,14 +192,36 @@ export function KpiCard({
             </p>
           )}
 
-          {sub && !loading && (
-            <p style={{
-              fontSize: '11px', color: 'rgba(255,255,255,0.35)',
-              marginTop: '6px', fontWeight: 500,
-              fontFamily: "'Plus Jakarta Sans','Inter',sans-serif",
-            }}>
-              {sub}
-            </p>
+          {/* Sub + trend en la misma línea */}
+          {(sub || trend != null) && !loading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '6px', flexWrap: 'wrap' }}>
+              {sub && (
+                <p style={{
+                  fontSize: '11px', color: 'rgba(255,255,255,0.35)',
+                  fontWeight: 500,
+                  fontFamily: "'Plus Jakarta Sans','Inter',sans-serif",
+                  margin: 0,
+                }}>
+                  {sub}
+                </p>
+              )}
+              {trend != null && (
+                <span className="kpi-trend" style={{ color: trendColor }}>
+                  {trendArrow} {trend > 0 ? '+' : ''}{trend.toFixed(1)}%
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Badge semáforo */}
+          {badge && !loading && (
+            <div
+              className="kpi-badge"
+              style={{ background: badge.bg, color: badge.color, border: `1px solid ${badge.color}30` }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: badge.color, flexShrink: 0, display: 'inline-block' }} />
+              {badge.text}
+            </div>
           )}
 
           {onClick && !loading && (
