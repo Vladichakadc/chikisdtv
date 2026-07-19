@@ -138,12 +138,18 @@ export function EditModal({ row, allPantallas, onClose, onSaved }) {
     }))
   }
 
+  // Si el nickname asignado es "Libre" se limpian los campos de plan real
+  const LIBRE_NICKNAME = 'libre'
+  const isLibre = (nick) => nick.trim().toLowerCase() === LIBRE_NICKNAME
+
   const handleNicknameChange = (nickname) => {
     const opt = nicknameOptions.find(o => o.nickname === nickname)
     setForm(f => ({
       ...f,
       nickname,
       ...(opt ? { nombre: opt.nombre, apellido: opt.apellido, customerId: opt.customerId } : {}),
+      // Al asignar "Libre" se borran Duración (meses), Inicio real, Fin real, Nombre y Apellido
+      ...(isLibre(nickname) ? { duracionPlan: '', inicioReal: '', duracionReal: '', nombre: '', apellido: '' } : {}),
     }))
   }
 
@@ -309,7 +315,7 @@ export function EditModal({ row, allPantallas, onClose, onSaved }) {
                 {assigningNewNickname ? (
                   <Input
                     value={form.nickname}
-                    onChange={set('nickname')}
+                    onChange={handleNicknameChange}
                     placeholder="Nuevo nickname…"
                   />
                 ) : (
