@@ -14,6 +14,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const { autoFixCuentaIdMismatches } = require('./services/planificadorImportService');
 const { ensureVentasEquiposSchema } = require('./utils/ensureVentasEquiposSchema');
+const { ensureModelColumns, dropStaleBackupTables } = require('./utils/ensureModelColumns');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -130,11 +131,15 @@ async function seedDevicesFromVentas() {
     await sequelize.query('PRAGMA journal_mode = WAL');
     await sequelize.query('PRAGMA synchronous = NORMAL');
     await sequelize.sync();
-    // costo_pantalla recibió columnas nuevas después de su creación inicial;
-    // alter:true agrega las que falten. Se corre una sola vez al arranque
-    // (antes se ejecutaba en cada GET /payments/costo-pantalla).
-    await Client.sync({ alter: true }); // Agrega passwordLastChanged si no existe
-    await CostoPantalla.sync({ alter: true });
+    // Un sync({ alter }) interrumpido por un redeploy deja tablas `_backup`
+    // huérfanas que bloquean el arranque siguiente — se limpian primero.
+    await dropStaleBackupTables('clients', 'costo_pantalla');
+    // clients y costo_pantalla recibieron columnas nuevas después de su
+    // creación inicial (p. ej. passwordLastChanged). ALTER dirigido e
+    // idempotente en lugar de sync({ alter: true }), que en SQLite reconstruye
+    // la tabla completa y puede dejar la BD a medias si el proceso muere.
+    await ensureModelColumns(Client);
+    await ensureModelColumns(CostoPantalla);
     // ventas_equipos también ganó columnas tarde (costo, serial, garantia):
     // ALTER dirigido e idempotente — debe correr ANTES de seedDevicesFromVentas,
     // que hace el primer SELECT del modelo y falla si falta alguna columna.
