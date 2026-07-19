@@ -23,6 +23,7 @@ import {
   narrarPareto, narrarProductividad, narrarMomentum, narrarMrr, narrarLtv,
 } from './dashboard/biShared'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
+import { MomentumAnalysisChart } from './dashboard/MomentumAnalysisChart'
 
 // ─── Formateadores ───────────────────────────────────────────────────────────
 
@@ -1582,16 +1583,16 @@ export default function AnalisisFinancieroPage() {
                 </Card>
               </div>
 
-              {/* Momentum mensual */}
+              {/* Momentum mensual — análisis profesional con controles interactivos */}
               <Card className="border-orange-100 mt-4">
                 <CardHeader className="border-orange-50">
-                  <CardTitle>Momentum de ventas — variación mensual de ingresos</CardTitle>
+                  <CardTitle>Momentum de ventas — análisis dinámico de variación mensual</CardTitle>
                   <p className="text-sm text-gray-400 mt-0.5">
-                    Variación % mes a mes · línea punteada = promedio histórico · verde = crecimiento, rojo = caída
+                    Variación % mes a mes con análisis de volatilidad, tendencia e inflexiones · controla la visualización con los botones
                   </p>
                 </CardHeader>
                 <CardBody>
-                  <MomentumChart data={momentumSerie} kMomentum={k.momentumVentasPct} />
+                  <MomentumAnalysisChart data={bi?.porMes || []} kMomentum={k.momentumVentasPct} />
                   <ChartInsight text={narrarMomentum(momentumSerie, k)} />
                 </CardBody>
               </Card>
