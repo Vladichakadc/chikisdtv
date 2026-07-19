@@ -247,9 +247,118 @@
 
 ---
 
+### 8. /impeccable - Código Perfecto ✨
+
+**Propósito**: Escritura de código absolutamente limpio y perfecto
+
+**Ubicación**: `.claude/skills/impeccable/SKILL.md`
+
+**Características**:
+```bash
+# Análisis de código
+/impeccable analyze --file src/app.jsx
+
+# Auto-formateo
+/impeccable format --directory src/ --recursive true
+
+# Validar standards
+/impeccable validate --standards "eslint,typescript,prettier" --strict true
+
+# Reportes
+/impeccable report --format detailed --group-by severity
+```
+
+**3 Niveles**:
+- **Basic**: Formateo automático
+- **Intermediate**: Eliminación de dead code
+- **Strict (Impeccable)**: Refactor + optimización máxima
+
+**Reglas**:
+- Máximo 3 niveles de anidamiento
+- Funciones < 20 líneas
+- Máximo 100 caracteres por línea
+- Zero warnings en strict mode
+
+---
+
+### 9. /emilkowalski - UI/UX Moderno 🎨
+
+**Propósito**: Diseño de interfaces elegantes y animaciones fluidas
+
+**Ubicación**: `.claude/skills/emilkowalski/SKILL.md`
+
+**Características**:
+```bash
+# Crear componentes
+/emilkowalski create-component button --style modern --animations true
+
+# Diseñar página
+/emilkowalski design-page --name "dashboard" --theme minimal
+
+# Agregar animaciones
+/emilkowalski animate --component "card" --effect "fade-slide"
+
+# Validar accesibilidad
+/emilkowalski validate-a11y --file src/components/
+```
+
+**Componentes Incluidos**:
+- Botones con micro-interacciones
+- Inputs elegantes
+- Tarjetas adaptativas
+- Modales y overlays
+- Navbars responsivas
+
+**Temas**:
+- Minimalista moderno
+- Neomórfico
+- Glassmorphism
+
+---
+
+### 10. /taste-skill - Buen Gusto en Diseño 🎭
+
+**Propósito**: Desarrollar criterios de diseño elegante y usabilidad
+
+**Ubicación**: `.claude/skills/taste-skill/SKILL.md`
+
+**Características**:
+```bash
+# Analizar diseño
+/taste-skill analyze --url "website-url" --criteria "typography,color,spacing"
+
+# Critican con mejoras
+/taste-skill critique --file "design.figma" --suggest-improvements true
+
+# Aprender principios
+/taste-skill learn --topic "typography" --style practical
+
+# Ejercicios de entrenamiento
+/taste-skill exercise --type comparison --difficulty intermediate
+```
+
+**5 Principios Fundamentales**:
+1. Simplicidad elegante
+2. Propósito antes que forma
+3. Coherencia visual
+4. Espacio estratégico
+5. Escala y proporción
+
+**Ejercicios de Entrenamiento**:
+- Análisis comparativo
+- Crítica constructiva
+- Rediseño minimalista
+- Restricciones creativas
+
+**Puntuación de Gusto** (0-10):
+- Tipografía, Color, Espaciado, Jerarquía
+- Consistencia, Funcionalidad, Accesibilidad, Originalidad
+
+---
+
 ## 🎯 Workflow Recomendado
 
-### Durante Desarrollo (Daily)
+### Workflow 1: Durante Desarrollo (Daily)
 
 ```bash
 # 1. Comienza sesión
@@ -265,26 +374,49 @@
 /review
 ```
 
-### Antes de PR
+### Workflow 2: Antes de PR (Full Quality)
 
 ```bash
-# 1. Review local profundo
+# 1. Ejecutar con GSD
+/gsd --task "Feature completada" --deliverables "code,tests,docs"
+
+# 2. Hacer código impeccable
+/impeccable format --directory src/ --auto-fix true
+/impeccable validate --strict true
+
+# 3. Review local
 /review --severity high
 
-# 2. Arregla issues
-# ... (cambios)
-
-# 3. Ultra review final
+# 4. Ultra review final
 /ultrareview --strict true
 
-# 4. Arregla críticos
+# 5. Arreglar críticos
 # ... (cambios)
 
-# 5. Push y crear PR
+# 6. Push y crear PR
 git push origin feature-branch
 ```
 
-### Fin de Sprint
+### Workflow 3: Diseño de Componentes
+
+```bash
+# 1. Planificar con gusto
+/taste-skill analyze --criteria "typography,color,spacing"
+
+# 2. Diseñar con Emil Kowalski
+/emilkowalski create-component button --style modern --animations true
+
+# 3. Implementar código limpio
+/impeccable format --file "component.jsx"
+
+# 4. Validar accesibilidad
+/emilkowalski validate-a11y --file "component"
+
+# 5. Review final
+/review --aspect "design"
+```
+
+### Workflow 4: Fin de Sprint (Learning & Improvement)
 
 ```bash
 # 1. Review de todo el código
@@ -293,11 +425,37 @@ git push origin feature-branch
 # 2. Aprender de findings
 /claude-men --topic "arquitectura" --context "ultrareview-results"
 
-# 3. Documentar mejoras
+# 3. Ejercicio de gusto
+/taste-skill exercise --type comparison --difficulty advanced
+
+# 4. Documentar mejoras
 # ... (actualizar docs)
 
-# 4. Crear skills de aprendizaje
+# 5. Crear skills de aprendizaje
 /skill-creator create sprint-lessons --type guide
+```
+
+### Workflow 5: Refactor Profesional
+
+```bash
+# 1. Analizar código existente
+/taste-skill critique --file "src/" --depth full
+
+# 2. Planificar refactor
+/gsd --task "Refactor módulo X" --timeline "3 días"
+
+# 3. Hacer impeccable
+/impeccable format --directory src/module --level strict
+
+# 4. Mejorar diseño si es UI
+/emilkowalski refactor-ui --file "src/components"
+
+# 5. Validaciones finales
+/impeccable validate --strict true
+/ultrareview --compare main...refactor-branch
+
+# 6. Commit limpio
+git commit -m "refactor: mejora modulo X con estándares impeccables"
 ```
 
 ---
@@ -313,6 +471,9 @@ git push origin feature-branch
 | Aprender técnica | `/claude-men` | Mentoría personalizada |
 | Crear skill del proyecto | `/skill-creator` | Reutilizable |
 | Referencia de reviews | `code-review-guide` | Documentación |
+| Código absolutamente limpio | `/impeccable` | Perfección + standards |
+| Diseñar UI elegante | `/emilkowalski` | Componentes modernos |
+| Mejorar criterios de diseño | `/taste-skill` | Ejercicios + principios |
 
 ---
 
