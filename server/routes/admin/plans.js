@@ -175,7 +175,8 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
     })
     .sort((a, b) => b.ingresos - a.ingresos);
 
-  // ── Serie mensual (últimos 12 meses con datos): ingresos por plan ──
+  // ── Serie mensual completa (todos los meses con datos): ingresos por plan ──
+  // El frontend decide la ventana (últimos 12 meses o un año específico).
   // Los planes menores se agrupan como "Otros" para no saturar el gráfico.
   const topPlanes = lista.slice(0, 3).map(p => p.plan);
   const seriePorMes = {};
@@ -191,7 +192,6 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
   }
   const serieMensual = Object.values(seriePorMes)
     .sort((a, b) => a.key.localeCompare(b.key))
-    .slice(-12)
     .map(m => ({ ...m, ...Object.fromEntries(Object.entries(m).map(([k, val]) => [k, typeof val === 'number' ? Math.round(val) : val])) }));
 
   res.json({
