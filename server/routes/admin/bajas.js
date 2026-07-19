@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Client, Planificador, Baja } = require('../../models');
+const { Client, Planificador, Baja, Venta } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { importFromExcel } = require('../../services/planificadorImportService');
+const { Op } = require('sequelize');
 
 // ============ BAJAS CRUD ============
 
@@ -82,6 +83,24 @@ router.get('/bajas/nicknames', asyncHandler(async (_req, res) => {
   const result = Object.values(nicknameMap).sort((a, b) => a.nickname.localeCompare(b.nickname));
   console.log(`[NICKNAMES] Devolviendo ${result.length} nicknames`);
   res.json(result);
+}));
+
+
+// Obtener último registro de venta por nickname (para autocompletar SKU / Tipo Fire TV)
+router.get('/bajas/last-venta/:nickname', asyncHandler(async (req, res) => {
+  const nick = (req.params.nickname || '').trim();
+  if (!nick) return res.json(null);
+
+  const venta = await Venta.findOne({
+    where: { nickname: nick },
+    order: [
+      ['fecha', 'DESC'],
+      ['createdAt', 'DESC'],
+    ],
+    attributes: ['sku', 'tipoFire', 'nombre', 'apellido', 'customerId', 'tipoPlan', 'tipoPantalla', 'cuentaDedicada', 'cortesia'],
+  });
+
+  res.json(venta || null);
 }));
 
 router.get('/bajas', asyncHandler(async (_req, res) => {
