@@ -12,6 +12,7 @@ const Client = sequelize.define('Client', {
   role: { type: DataTypes.ENUM('admin', 'user'), defaultValue: 'user' },
   estatus: { type: DataTypes.ENUM('Activo', 'Inactivo'), defaultValue: 'Activo' },
   mustChangePassword: { type: DataTypes.BOOLEAN, defaultValue: false },
+  passwordLastChanged: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   observaciones: { type: DataTypes.TEXT }
 }, {
   tableName: 'clients',
