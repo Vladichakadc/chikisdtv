@@ -206,45 +206,79 @@ router.delete('/payments/ventas-licencia/:idVM', asyncHandler(async (req, res) =
 
 // Ingresos por tipo de plan y año (para gráfica de composición por años)
 router.get('/payments/ventas-licencia-by-plan-year', asyncHandler(async (_req, res) => {
-  const { Sequelize } = require('sequelize');
-  const { Op } = Sequelize;
+  try {
+    const { Sequelize } = require('sequelize');
+    const { Op } = Sequelize;
 
-  const data = await Venta.findAll({
-    attributes: [
-      'anio',
-      'tipoPlan',
-      [Sequelize.fn('SUM', Sequelize.col('precioVenta')), 'totalIngreso'],
-      [Sequelize.fn('COUNT', Sequelize.col('idVM')), 'cantidadVentas']
-    ],
-    where: {
-      anio: { [Op.not]: null },
-      tipoPlan: { [Op.not]: null }
-    },
-    group: ['anio', 'tipoPlan'],
-    raw: true,
-    order: [['anio', 'DESC'], ['totalIngreso', 'DESC']]
-  });
-
-  // Transformar a estructura de tiempo serie por año
-  const porAnioYPlan = {};
-  data.forEach(row => {
-    if (!porAnioYPlan[row.anio]) {
-      porAnioYPlan[row.anio] = { anio: row.anio, total: 0 };
+    // Validar que la tabla Venta tenga datos
+    const totalCount = await Venta.count();
+    if (totalCount === 0) {
+      return res.json({
+        series: [],
+        tiposPlanes: [],
+        _debug: 'Tabla Venta vacía'
+      });
     }
-    porAnioYPlan[row.anio][row.tipoPlan] = Math.round(Number(row.totalIngreso) || 0);
-    porAnioYPlan[row.anio].total += Math.round(Number(row.totalIngreso) || 0);
-  });
 
-  // Identificar todos los tipos de plan únicos
-  const tiposPlanes = new Set();
-  data.forEach(row => {
-    if (row.tipoPlan) tiposPlanes.add(row.tipoPlan);
-  });
+    // Ejecutar query de agregación
+    const data = await Venta.findAll({
+      attributes: [
+        'anio',
+        'tipoPlan',
+        [Sequelize.fn('SUM', Sequelize.col('precioVenta')), 'totalIngreso'],
+        [Sequelize.fn('COUNT', Sequelize.col('idVM')), 'cantidadVentas']
+      ],
+      where: {
+        anio: { [Op.not]: null },
+        tipoPlan: { [Op.not]: null }
+      },
+      group: ['anio', 'tipoPlan'],
+      raw: true,
+      order: [['anio', 'DESC'], ['totalIngreso', 'DESC']]
+    });
 
-  res.json({
-    series: Object.values(porAnioYPlan).sort((a, b) => a.anio.localeCompare(b.anio)),
-    tiposPlanes: Array.from(tiposPlanes).sort()
-  });
+    if (!Array.isArray(data)) {
+      console.error('⚠️ Unexpected query result type:', typeof data);
+      return res.json({
+        series: [],
+        tiposPlanes: [],
+        _debug: 'Query result was not an array'
+      });
+    }
+
+    // Transformar a estructura de tiempo serie por año
+    const porAnioYPlan = {};
+    data.forEach(row => {
+      if (!row.anio || !row.tipoPlan) return; // Skip invalid rows
+      if (!porAnioYPlan[row.anio]) {
+        porAnioYPlan[row.anio] = { anio: row.anio, total: 0 };
+      }
+      const ingreso = Math.round(Number(row.totalIngreso) || 0);
+      porAnioYPlan[row.anio][row.tipoPlan] = ingreso;
+      porAnioYPlan[row.anio].total += ingreso;
+    });
+
+    // Identificar todos los tipos de plan únicos
+    const tiposPlanes = new Set();
+    data.forEach(row => {
+      if (row.tipoPlan) tiposPlanes.add(row.tipoPlan);
+    });
+
+    const series = Object.values(porAnioYPlan).sort((a, b) => a.anio.localeCompare(b.anio));
+    const tipos = Array.from(tiposPlanes).sort();
+
+    res.json({
+      series,
+      tiposPlanes: tipos
+    });
+
+  } catch (innerErr) {
+    console.error('❌ Error en /payments/ventas-licencia-by-plan-year:', innerErr.message);
+    return res.status(500).json({
+      error: 'Error al procesar datos de ingresos por plan',
+      message: innerErr.message
+    });
+  }
 }));
 
 module.exports = router;

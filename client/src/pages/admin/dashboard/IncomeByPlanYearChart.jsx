@@ -20,8 +20,28 @@ const PLAN_COLORS = {
 
 const getColorForPlan = (plan) => PLAN_COLORS[plan] || PLAN_COLORS['Default']
 
-export function IncomeByPlanYearChart({ data, tiposPlanes = [] }) {
-  if (!data || data.length === 0) {
+export function IncomeByPlanYearChart({ data, tiposPlanes = [], loading = false, error = null }) {
+  if (error) {
+    return (
+      <div style={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, color: '#dc2626' }}>
+        <p style={{ fontWeight: 600 }}>❌ Error al cargar datos</p>
+        <p style={{ fontSize: 12, color: '#991b1b' }}>{error}</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div style={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+          Cargando datos de ingresos por plan...
+        </div>
+      </div>
+    )
+  }
+
+  if (!data || data.length === 0 || !tiposPlanes || tiposPlanes.length === 0) {
     return (
       <div style={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
         Sin datos de ingresos por tipo de plan disponibles
