@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Tv, Loader2, Lock, Mail } from 'lucide-react'
+import { Tv, Loader2, Lock, Mail, Eye, EyeOff } from 'lucide-react'
 import api from '../config/api'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -40,6 +40,7 @@ const STYLES = `
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [focusedField, setFocusedField] = useState(null)
@@ -102,11 +103,11 @@ export default function Login() {
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email Input */}
-              <div className="fade-in fade-in-3 input-focus">
-                <div className="relative">
-                  <Mail className="absolute left-4 top-3.5 text-gray-400" size={18} />
+              <div className="fade-in fade-in-3">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                <div className="relative input-focus">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10 pointer-events-none" size={18} />
                   <Input
-                    label="Correo Electrónico"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -114,7 +115,7 @@ export default function Login() {
                     onBlur={() => setFocusedField(null)}
                     required
                     placeholder="admin@chikisdtv.com"
-                    className="pl-10"
+                    className="pl-10 relative z-0"
                     style={{
                       transition: 'all 0.3s ease',
                       borderColor: focusedField === 'email' ? '#f97316' : undefined,
@@ -124,24 +125,31 @@ export default function Login() {
               </div>
 
               {/* Password Input */}
-              <div className="fade-in fade-in-4 input-focus">
-                <div className="relative">
-                  <Lock className="absolute left-4 top-3.5 text-gray-400" size={18} />
+              <div className="fade-in fade-in-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                <div className="relative input-focus">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10 pointer-events-none" size={18} />
                   <Input
-                    label="Contraseña"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onFocus={() => setFocusedField('password')}
                     onBlur={() => setFocusedField(null)}
                     required
                     placeholder="••••••••"
-                    className="pl-10"
+                    className="pl-10 pr-10 relative z-0"
                     style={{
                       transition: 'all 0.3s ease',
                       borderColor: focusedField === 'password' ? '#f97316' : undefined,
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-primary focus:outline-none z-10 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
 
@@ -177,12 +185,9 @@ export default function Login() {
             </form>
 
             {/* Footer */}
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <p className="text-center text-xs text-gray-400">
-                ChikisdTV © 2026 • Plataforma IPTV
-              </p>
-              <p className="text-center text-xs text-gray-500 mt-2">
-                Demo: admin@chikisdtv.com / admin123
+            <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col items-center justify-center fade-in fade-in-4">
+              <p className="text-center text-xs text-gray-400 font-medium tracking-wide">
+                ChikisdTV © {new Date().getFullYear()} • Todos los derechos reservados.
               </p>
             </div>
           </div>
