@@ -1,0 +1,250 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic:
+      - link "Ir al contenido" [ref=e4] [cursor=pointer]:
+        - /url: "#content-wrapper"
+      - banner [ref=e5]:
+        - generic [ref=e6]:
+          - generic:
+            - generic:
+              - option "azərbaycan"
+              - option "Afrikaans"
+              - option "Bahasa Indonesia"
+              - option "Melayu"
+              - option "català"
+              - option "čeština"
+              - option "dansk"
+              - option "Deutsch"
+              - option "eesti"
+              - option "English"
+              - option "español" [selected]
+              - option "français"
+              - option "Gaeilge"
+              - option "hrvatski"
+              - option "italiano"
+              - option "Kiswahili"
+              - option "latviešu"
+              - option "lietuvių"
+              - option "magyar"
+              - option "Nederlands"
+              - option "norsk bokmål"
+              - option "o‘zbek"
+              - option "Filipino"
+              - option "polski"
+              - option "Português (Brasil)"
+              - option "Português (Portugal)"
+              - option "română"
+              - option "shqip"
+              - option "slovenčina"
+              - option "slovenščina"
+              - option "suomi"
+              - option "svenska"
+              - option "Tiếng Việt"
+              - option "Türkçe"
+              - option "Ελληνικά"
+              - option "български"
+              - option "қазақ тілі"
+              - option "македонски"
+              - option "русский"
+              - option "српски"
+              - option "українська"
+              - option "עברית"
+              - option "العربية"
+              - option "فارسی"
+              - option "اردو"
+              - option "বাংলা"
+              - option "हिन्दी"
+              - option "ગુજરાતી"
+              - option "ಕನ್ನಡ"
+              - option "मराठी"
+              - option "ਪੰਜਾਬੀ"
+              - option "தமிழ்"
+              - option "తెలుగు"
+              - option "മലയാളം"
+              - option "ไทย"
+              - option "简体中文"
+              - option "繁體中文（台灣）"
+              - option "繁體中文（香港）"
+              - option "日本語"
+              - option "한국어"
+          - link "Página de inicio de WhatsApp" [ref=e8] [cursor=pointer]:
+            - /url: https://www.whatsapp.com/
+            - img "Página principal de WhatsApp" [ref=e10]
+          - navigation:
+            - list:
+              - listitem [ref=e11]:
+                - button "Características" [ref=e13] [cursor=pointer]
+              - listitem [ref=e17]:
+                - link "Funciones de privacidad de WhatsApp" [ref=e18] [cursor=pointer]:
+                  - /url: https://www.whatsapp.com/privacy
+                  - generic [ref=e19]: Privacidad
+              - listitem [ref=e21]:
+                - link "Página de inicio del Centro de ayuda de WhatsApp" [ref=e22] [cursor=pointer]:
+                  - /url: https://faq.whatsapp.com/
+                  - generic [ref=e23]: Centro de ayuda
+              - listitem [ref=e25]:
+                - link "Blogs de WhatsApp para nuestros avisos más recientes" [ref=e26] [cursor=pointer]:
+                  - /url: https://blog.whatsapp.com/
+                  - generic [ref=e27]: Blog
+              - listitem [ref=e29]:
+                - link "Página de inicio de WhatsApp para empresas" [ref=e30] [cursor=pointer]:
+                  - /url: https://business.whatsapp.com/
+                  - generic [ref=e31]: Para empresas
+              - listitem [ref=e33]:
+                - link "Descargar WhatsApp" [ref=e34] [cursor=pointer]:
+                  - /url: https://www.whatsapp.com/download
+                  - generic [ref=e35]: Aplicaciones
+          - link "Descargar" [ref=e39] [cursor=pointer]:
+            - /url: https://www.whatsapp.com/dl
+    - generic [ref=e51]:
+      - heading "Compartir en Whatsapp" [level=2] [ref=e53]
+      - paragraph [ref=e57]: hola � estrella � fin
+      - generic [ref=e58]:
+        - link "Abrir aplicación" [ref=e59] [cursor=pointer]:
+          - /url: https://web.whatsapp.com/send/?text=hola+%EF%BF%BD+estrella+%EF%BF%BD+fin&type=custom_url&app_absent=0
+        - link "Continuar en WhatsApp Web" [ref=e61] [cursor=pointer]:
+          - /url: https://web.whatsapp.com/send/?text=hola+%EF%BF%BD+estrella+%EF%BF%BD+fin&type=custom_url&app_absent=0
+        - generic [ref=e63]:
+          - heading "¿No tienes la aplicación?" [level=4] [ref=e69]
+          - heading [level=4] [ref=e70]:
+            - link "Obtener WhatsApp desde Microsoft" [ref=e71] [cursor=pointer]:
+              - /url: https://get.microsoft.com/installer/download/9NKSQGP7F2NH?cid=wa_api_v2
+              - text: Descárgala ahora
+  - contentinfo [ref=e74]:
+    - generic [ref=e76]:
+      - generic [ref=e77]:
+        - link "Página de inicio de WhatsApp" [ref=e78] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/
+          - img "Logotipo principal de WhatsApp" [ref=e80]
+        - link "Descargar" [ref=e82] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/dl
+      - generic [ref=e88]:
+        - heading "Lo que hacemos" [level=4] [ref=e91]
+        - link "Funciones" [ref=e92] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/calling
+        - link "Blogs de WhatsApp para nuestros avisos más recientes" [ref=e95] [cursor=pointer]:
+          - /url: https://blog.whatsapp.com/
+          - generic [ref=e96]: Blog
+        - link "Funciones de seguridad de WhatsApp" [ref=e98] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/security
+          - generic [ref=e99]: Seguridad
+        - link "Página de inicio de WhatsApp para empresas" [ref=e101] [cursor=pointer]:
+          - /url: https://business.whatsapp.com/
+          - generic [ref=e102]: Para empresas
+      - generic [ref=e104]:
+        - heading "Quiénes somos" [level=4] [ref=e107]
+        - link "Declaración de la misión de WhatsApp" [ref=e108] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/about
+          - generic [ref=e109]: Acerca de nosotros
+        - link "Empleos" [ref=e111] [cursor=pointer]:
+          - /url: https://www.metacareers.com/jobs?divisions[0]=WhatsApp
+        - link "Visita el centro de marcas de WhatsApp" [ref=e114] [cursor=pointer]:
+          - /url: https://www.facebook.com/brand/resources/whatsapp/whatsapp-brand
+          - generic [ref=e115]: Centro de marca
+        - link "Funciones de privacidad de WhatsApp" [ref=e117] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/privacy
+          - generic [ref=e118]: Privacidad
+      - generic [ref=e120]:
+        - heading "Usa WhatsApp" [level=4] [ref=e123]
+        - link "Descargar WhatsApp para Android" [ref=e124] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/android
+          - generic [ref=e125]: Android
+        - link "iPhone" [ref=e127] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/download/mobile
+        - link "Mac/PC" [ref=e130] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/download/desktop
+        - link "Iniciar sesión en WhatsApp Web" [ref=e133] [cursor=pointer]:
+          - /url: https://web.whatsapp.com/
+          - generic [ref=e134]: WhatsApp Web
+      - generic [ref=e136]:
+        - heading "¿Necesitas ayuda?" [level=4] [ref=e139]
+        - link "Obtener asistencia de WhatsApp" [ref=e140] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/contact
+          - generic [ref=e141]: Contáctanos
+        - link "Página de inicio del Centro de ayuda de WhatsApp" [ref=e143] [cursor=pointer]:
+          - /url: https://faq.whatsapp.com/
+          - generic [ref=e144]: Centro de ayuda
+        - link "Descargar WhatsApp" [ref=e146] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/download
+          - generic [ref=e147]: Aplicaciones
+        - link "Avisos de seguridad más recientes de WhatsApp" [ref=e149] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/security/advisories
+          - generic [ref=e150]: Avisos de seguridad
+    - generic [ref=e153]:
+      - generic [ref=e155]:
+        - paragraph [ref=e157]: 2026 © WhatsApp LLC
+        - link "Políticas legales de WhatsApp" [ref=e158] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/legal/
+          - generic [ref=e159]: Condiciones y Política de privacidad
+        - link "Mapa del sitio" [ref=e162] [cursor=pointer]:
+          - /url: https://www.whatsapp.com/sitemap
+      - generic [ref=e164]:
+        - link "Twitter" [ref=e165] [cursor=pointer]:
+          - /url: https://x.com/whatsapp
+        - link "Youtube" [ref=e168] [cursor=pointer]:
+          - /url: https://www.youtube.com/channel/UCAuerig2N-RZWJT8x75V9yw
+        - link "Instagram" [ref=e171] [cursor=pointer]:
+          - /url: https://www.instagram.com/whatsapp/?hl=en
+        - link "Facebook" [ref=e174] [cursor=pointer]:
+          - /url: https://www.facebook.com/profile.php?id=100064758844406
+      - listbox "Selecciona tu idioma preferido" [ref=e180]:
+        - option "azərbaycan"
+        - option "Afrikaans"
+        - option "Bahasa Indonesia"
+        - option "Melayu"
+        - option "català"
+        - option "čeština"
+        - option "dansk"
+        - option "Deutsch"
+        - option "eesti"
+        - option "English"
+        - option "español" [selected]
+        - option "français"
+        - option "Gaeilge"
+        - option "hrvatski"
+        - option "italiano"
+        - option "Kiswahili"
+        - option "latviešu"
+        - option "lietuvių"
+        - option "magyar"
+        - option "Nederlands"
+        - option "norsk bokmål"
+        - option "o‘zbek"
+        - option "Filipino"
+        - option "polski"
+        - option "Português (Brasil)"
+        - option "Português (Portugal)"
+        - option "română"
+        - option "shqip"
+        - option "slovenčina"
+        - option "slovenščina"
+        - option "suomi"
+        - option "svenska"
+        - option "Tiếng Việt"
+        - option "Türkçe"
+        - option "Ελληνικά"
+        - option "български"
+        - option "қазақ тілі"
+        - option "македонски"
+        - option "русский"
+        - option "српски"
+        - option "українська"
+        - option "עברית"
+        - option "العربية"
+        - option "فارسی"
+        - option "اردو"
+        - option "বাংলা"
+        - option "हिन्दी"
+        - option "ગુજરાતી"
+        - option "ಕನ್ನಡ"
+        - option "मराठी"
+        - option "ਪੰਜਾਬੀ"
+        - option "தமிழ்"
+        - option "తెలుగు"
+        - option "മലയാളം"
+        - option "ไทย"
+        - option "简体中文"
+        - option "繁體中文（台灣）"
+        - option "繁體中文（香港）"
+        - option "日本語"
+        - option "한국어"

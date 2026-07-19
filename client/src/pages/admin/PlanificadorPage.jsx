@@ -9,7 +9,7 @@ import {
   XCircle, Wallet, Gift, DollarSign, Percent, Package,
   Users, Maximize2, Minimize2, KeyRound, Copy, Check,
   Building2, ExternalLink, ChevronDown,
-  Eye, EyeOff, Pencil, Trash2,
+  Eye, EyeOff, Pencil, Trash2, Receipt,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import api from '../../config/api'
@@ -24,6 +24,7 @@ import { formatDate, formatCurrency } from '../../utils/excelUtils'
 import { StatCard } from './planificador/StatCard'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 import { EditModal } from './planificador/EditModal'
+import { ComprobanteModal } from './planificador/ComprobanteModal'
 import {
   calcDias, getRowVariant, ROW_BG, estadoBadgeVariant, getPlanSortVal,
 } from './planificador/rowHelpers'
@@ -446,6 +447,7 @@ export default function PlanificadorPage() {
   const [activePanel, setActivePanel]     = useState(null)
   const [explain, setExplain]             = useState(null)
   const [showEstatusPanel, setShowEstatusPanel] = useState(false)
+  const [comprobanteRow, setComprobanteRow] = useState(null)
   const [showCuentaData, setShowCuentaData]     = useState(false)
   const [estatusExpanded, setEstatusExpanded]   = useState(false)
   const [showEstatusPwd, setShowEstatusPwd]     = useState(false)
@@ -1079,6 +1081,11 @@ export default function PlanificadorPage() {
         </div>
       </div>
 
+      {/* Comprobante de renovación (desde Estatus Cliente) */}
+      {comprobanteRow && (
+        <ComprobanteModal row={comprobanteRow} onClose={() => setComprobanteRow(null)} />
+      )}
+
       {/* Panel Estatus Cliente — overlay flotante */}
       {showEstatusPanel && (
         <div
@@ -1171,6 +1178,7 @@ export default function PlanificadorPage() {
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Estado R.</th>
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Alerta R.</th>
                   <th className="sticky top-0 z-10 bg-slate-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Debe</th>
+                  <th className="sticky top-0 z-10 bg-orange-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Comprobante</th>
                 </tr>
               </thead>
               <tbody>
@@ -1218,11 +1226,27 @@ export default function PlanificadorPage() {
                           ? <Badge variant="error">{row.montoDebe ? formatCurrency(row.montoDebe) : 'Debe'}</Badge>
                           : <span className="text-gray-300">—</span>}
                       </td>
+                      <td className="px-3 py-2 whitespace-nowrap border-b border-gray-100 text-center">
+                        <button
+                          onClick={() => setComprobanteRow(row)}
+                          disabled={!row.nickname}
+                          title={row.nickname ? 'Generar comprobante — si está vencido o próximo a vencer incluye el mensaje de renovación para WhatsApp' : 'Sin nickname — no hay pagos que consultar'}
+                          className={cn(
+                            'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold transition-all',
+                            row.nickname
+                              ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 hover:border-orange-300'
+                              : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'
+                          )}
+                        >
+                          <Receipt size={12} />
+                          Generar
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={showCuentaData ? 15 : 12} className="px-4 py-10 text-center text-gray-400">Sin resultados con el filtro actual</td></tr>
+                  <tr><td colSpan={showCuentaData ? 16 : 13} className="px-4 py-10 text-center text-gray-400">Sin resultados con el filtro actual</td></tr>
                 )}
               </tbody>
             </table>

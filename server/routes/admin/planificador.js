@@ -3,7 +3,7 @@ const router = express.Router();
 const path = require('path');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
-const { Planificador, CuentaPadre } = require('../../models');
+const { Planificador, CuentaPadre, Venta, Client, Plan } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { importFromExcel, autoFixCuentaIdMismatches } = require('../../services/planificadorImportService');
 // La alerta se recalcula según la fecha vigente; "CORTESIA" es un valor manual que se respeta
@@ -307,6 +307,48 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
     capacidadPorCuenta,
     syncPendiente,
   });
+}));
+
+// Comprobante de renovación: último pago registrado para un nickname en la
+// tabla de ventas (módulo Pagos) + teléfono del cliente para reenviarlo por
+// WhatsApp. El nickname es la llave que une Planificador con Pagos.
+// Para el mensaje de renovación (VENCIDO / PROXIMO A VENCER) también se
+// devuelve cuántas pantallas tiene el cliente en el Planificador (agrupadas
+// por customerId — cada pantalla es una fila con nickname propio) y el
+// catálogo de venta activo, para ofertar el precio del combo que le aplica.
+router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) => {
+  const { nickname } = req.params;
+  const pago = await Venta.findOne({
+    where: { nickname },
+    order: [['fecha', 'DESC'], ['createdAt', 'DESC']],
+    attributes: ['idVM', 'tipoPlan', 'tipoPago', 'precioVenta', 'fecha', 'customerId', 'pantallas'],
+  });
+
+  let telefono = null;
+  const customerId = req.query.customerId || pago?.customerId || null;
+  if (customerId) {
+    const cliente = await Client.findOne({ where: { customerId }, attributes: ['phone'] });
+    telefono = cliente?.phone || null;
+  }
+
+  let pantallasCliente = 1;
+  if (customerId) {
+    const n = await Planificador.count({
+      where: {
+        customerId,
+        nickname: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }, { [Op.notLike]: '%libre%' }] },
+      },
+    });
+    pantallasCliente = Math.max(1, n);
+  }
+
+  const catalogo = await Plan.findAll({
+    where: { activo: true },
+    attributes: ['nombre', 'precio', 'duracionDias', 'numeroPantallas'],
+    order: [['numeroPantallas', 'ASC'], ['duracionDias', 'ASC']],
+  });
+
+  res.json({ pago, telefono, pantallasCliente, catalogo });
 }));
 
 // GET /planificador/export — descarga el Planificador completo como .xlsx
