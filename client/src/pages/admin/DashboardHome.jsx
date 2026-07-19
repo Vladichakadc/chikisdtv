@@ -20,7 +20,6 @@ import { cn } from '../../utils/cn'
 import { calcDias, getRowVariant, diasLabel } from './planificador/rowHelpers'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
-import { ExecutiveDashboardHero } from './dashboard/ExecutiveDashboardHero'
 import {
   BiCard, GrowthBadge, SmartTag, ChartTooltip, ChartInsight,
   PIE_COLORS, MES_LABELS, LABEL_STYLE, formatCompactCurrency, renderDonutLabel,
@@ -561,23 +560,56 @@ export default function DashboardHome() {
 
       <style>{CSS}</style>
 
-      {/* ── HERO EJECUTIVO CORPORATIVO ── */}
-      <ExecutiveDashboardHero
-        stats={{
-          totalIngresos: bi?.kpis?.ingresosTotales,
-          totalClients: stats.totalClients,
-          churnRate: bi?.kpis?.churnPct,
-          marginPercent: bi?.kpis?.margenPctTotal,
-        }}
-        trendData={bi?.porMes?.slice(-12).map(m => ({ mes: m.label, ingresos: m.ingresos }))}
-        onDownloadBackup={handleDownloadBackup}
-        onRestoreBackup={handleRestoreLocalBackup}
-        onSync={handleSync}
-        downloadingBackup={downloadingBackup}
-        restoringBackup={restoringBackup}
-        syncing={syncing}
-        isDev={import.meta.env.DEV}
-      />
+      {/* ── HERO HEADER ── */}
+      <div className="dash-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)' }}>
+        <div className="dash-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.25] pointer-events-none" style={{ background: 'radial-gradient(circle,#a855f7,transparent 70%)' }} />
+        <div className="dash-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#6366f1,transparent 70%)' }} />
+        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/25 mb-4">
+              <Activity size={12} className="text-indigo-300" />
+              <span className="text-indigo-300 text-xs font-semibold tracking-widest uppercase">Operaciones</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
+              Dashboard
+            </h1>
+            <p className="text-indigo-100/70 text-sm mt-2 max-w-xl">
+              Pulso diario de ChikisdTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-indigo-400 font-bold hover:text-white transition-colors">Análisis Financiero</button>
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {import.meta.env.DEV && (
+              <>
+                <input
+                  type="file" accept=".sqlite" id="restore-db-input" className="hidden"
+                  onChange={handleRestoreLocalBackup}
+                />
+                <button
+                  onClick={() => document.getElementById('restore-db-input').click()}
+                  disabled={restoringBackup}
+                  className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2"
+                >
+                  <Upload size={15} /> {restoringBackup ? 'Cargando…' : 'BD Local'}
+                </button>
+              </>
+            )}
+            <button
+              onClick={handleDownloadBackup} disabled={downloadingBackup}
+              className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2"
+            >
+              <Download size={15} /> {downloadingBackup ? 'Descargando…' : 'Respaldo'}
+            </button>
+            <button
+              onClick={handleSync} disabled={syncing}
+              className="dash-cta px-5 py-2.5 rounded-2xl text-sm font-bold flex items-center gap-2"
+            >
+              <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando…' : 'Sincronizar'}
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* ─── KPIs operativos: clientes, catálogo y capacidad ─────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 dash-a2">
