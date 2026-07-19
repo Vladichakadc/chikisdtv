@@ -1,0 +1,186 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e3]:
+    - complementary [ref=f4e4]:
+      - generic [ref=f4e5]:
+        - generic [ref=f4e10]:
+          - generic [ref=f4e11]: ChikisdTV
+          - generic [ref=f4e12]: Panel Administrador
+        - button "Colapsar menú" [ref=f4e13] [cursor=pointer]
+      - navigation [ref=f4e18]:
+        - generic [ref=f4e19]:
+          - paragraph [ref=f4e20]: Principal
+          - generic [ref=f4e22]:
+            - generic [ref=f4e23]:
+              - link "Dashboard" [ref=f4e24] [cursor=pointer]:
+                - /url: /admin
+              - button "Expandir Dashboard" [ref=f4e31] [cursor=pointer]
+            - generic [ref=f4e34]:
+              - link "Análisis Financiero" [ref=f4e35] [cursor=pointer]:
+                - /url: /admin/analisis-financiero
+              - link "Análisis Retención" [ref=f4e40] [cursor=pointer]:
+                - /url: /admin/retencion
+        - generic [ref=f4e47]:
+          - paragraph [ref=f4e48]: Operación
+          - generic [ref=f4e49]:
+            - link "Planificador" [ref=f4e52] [cursor=pointer]:
+              - /url: /admin/planificador
+            - link "Cuentas Padre" [ref=f4e60] [cursor=pointer]:
+              - /url: /admin/cuentas-padre
+            - generic [ref=f4e65]:
+              - generic [ref=f4e66]:
+                - link "Clientes" [ref=f4e67] [cursor=pointer]:
+                  - /url: /admin/clients
+                - button "Expandir Clientes" [ref=f4e74] [cursor=pointer]
+              - link "Análisis Demográfico" [ref=f4e78] [cursor=pointer]:
+                - /url: /admin/analisis-clientes
+            - link "Planes" [ref=f4e86] [cursor=pointer]:
+              - /url: /admin/plans
+            - link "Suscripciones" [ref=f4e94] [cursor=pointer]:
+              - /url: /admin/subscriptions
+            - generic [ref=f4e99]:
+              - generic [ref=f4e100]:
+                - link "Pagos" [ref=f4e101] [cursor=pointer]:
+                  - /url: /admin/payments
+                - button "Contraer Pagos" [expanded] [ref=f4e105] [cursor=pointer]
+              - link "Análisis de Pagos" [ref=f4e109] [cursor=pointer]:
+                - /url: /admin/analisis-pagos
+            - generic [ref=f4e114]:
+              - generic [ref=f4e115]:
+                - link "Bajas" [ref=f4e116] [cursor=pointer]:
+                  - /url: /admin/bajas
+                - button "Expandir Bajas" [ref=f4e123] [cursor=pointer]
+              - link "Análisis de Bajas" [ref=f4e127] [cursor=pointer]:
+                - /url: /admin/analisis-bajas
+        - generic [ref=f4e133]:
+          - paragraph [ref=f4e134]: Equipos
+          - generic [ref=f4e135]:
+            - link "Costo Pantalla" [ref=f4e138] [cursor=pointer]:
+              - /url: /admin/costo-pantalla
+            - generic [ref=f4e142]:
+              - generic [ref=f4e143]:
+                - link "Venta Dispositivos" [ref=f4e144] [cursor=pointer]:
+                  - /url: /admin/ventas-dispositivos
+                - button "Expandir Venta Dispositivos" [ref=f4e149] [cursor=pointer]
+              - link "Análisis Dispositivos" [ref=f4e153] [cursor=pointer]:
+                - /url: /admin/analisis-dispositivos
+            - generic [ref=f4e159]:
+              - generic [ref=f4e160]:
+                - link "Inventario Equipos" [ref=f4e161] [cursor=pointer]:
+                  - /url: /admin/devices
+                - button "Expandir Inventario Equipos" [ref=f4e173] [cursor=pointer]
+              - link "Análisis Inventario" [ref=f4e177] [cursor=pointer]:
+                - /url: /admin/analisis-inventario
+      - generic [ref=f4e183]:
+        - generic [ref=f4e184]: A
+        - generic [ref=f4e185]:
+          - paragraph [ref=f4e186]: Administrador
+          - paragraph [ref=f4e187]: admin@chikisdtv.com
+        - button "Cerrar sesión" [ref=f4e189] [cursor=pointer]
+    - main [ref=f4e194]:
+      - generic [ref=f4e201]:
+        - generic [ref=f4e204]:
+          - generic [ref=f4e205]: Análisis Financiero
+          - heading "Análisis de Pagos" [level=1] [ref=f4e209]
+          - paragraph [ref=f4e210]: Visualiza cómo se distribuyen los ingresos
+        - generic [ref=f4e211]:
+          - button [ref=f4e213] [cursor=pointer]:
+            - generic [ref=f4e216]:
+              - text: "Año:"
+              - strong [ref=f4e217]: Todos los años
+          - button [ref=f4e221] [cursor=pointer]:
+            - generic [ref=f4e224]:
+              - text: "Mes:"
+              - strong [ref=f4e225]: Todos los meses
+        - generic [ref=f4e228]:
+          - button [ref=f4e229] [cursor=pointer]:
+            - generic [ref=f4e232]:
+              - paragraph [ref=f4e233]: Total Registros
+              - paragraph [ref=f4e234]: "2465"
+              - paragraph [ref=f4e236]: Histórico completo
+              - paragraph [ref=f4e237]: Ver detalle →
+          - button [ref=f4e243] [cursor=pointer]:
+            - generic [ref=f4e246]:
+              - paragraph [ref=f4e247]: Ingresos Totales
+              - paragraph [ref=f4e248]: $131.107.391
+              - paragraph [ref=f4e250]: Licencias vendidas
+              - paragraph [ref=f4e251]: Ver detalle →
+          - button [ref=f4e255] [cursor=pointer]:
+            - generic [ref=f4e258]:
+              - paragraph [ref=f4e259]: Renovaciones
+              - paragraph [ref=f4e260]: "2032"
+              - paragraph [ref=f4e262]: Clientes recurrentes
+              - paragraph [ref=f4e263]: Ver detalle →
+          - button [ref=f4e268] [cursor=pointer]:
+            - generic [ref=f4e271]:
+              - paragraph [ref=f4e272]: Activaciones
+              - paragraph [ref=f4e273]: "406"
+              - paragraph [ref=f4e275]: Nuevas pantallas
+              - paragraph [ref=f4e276]: Ver detalle →
+        - generic [ref=f4e280]:
+          - generic [ref=f4e281]:
+            - generic [ref=f4e282]:
+              - heading "Ingresos por medio de pago" [level=3] [ref=f4e283]
+              - paragraph [ref=f4e284]: Por dónde entra la plata — refleja el filtro activo
+            - generic [ref=f4e285]:
+              - application [ref=f4e288]:
+                - generic [ref=f4e322]:
+                  - generic [ref=f4e323]: 50%
+                  - generic [ref=f4e325]: 37%
+                  - generic [ref=f4e327]: 5%
+              - generic [ref=f4e329]:
+                - generic [ref=f4e330]:
+                  - generic [ref=f4e331]: Nequi
+                  - generic [ref=f4e333]: $65.681.387
+                - generic [ref=f4e334]:
+                  - generic [ref=f4e335]: Sin registrar
+                  - generic [ref=f4e337]: $47.928.499
+                - generic [ref=f4e338]:
+                  - generic [ref=f4e339]: NU
+                  - generic [ref=f4e341]: $6.965.000
+                - generic [ref=f4e342]:
+                  - generic [ref=f4e343]: BBVA
+                  - generic [ref=f4e345]: $3.676.750
+                - generic [ref=f4e346]:
+                  - generic [ref=f4e347]: Paypal
+                  - generic [ref=f4e349]: $2.183.506
+              - paragraph [ref=f4e353]:
+                - strong [ref=f4e354]: Nequi
+                - text: es el canal de recaudo dominante con $65.681.387, seguido de
+                - strong [ref=f4e355]: Sin registrar
+                - text: ($47.928.499). Concentrar el recaudo en pocos canales simplifica la conciliación, pero conviene mantener al menos dos activos por si uno falla o cambia sus comisiones.
+          - generic [ref=f4e356]:
+            - generic [ref=f4e357]:
+              - heading "Ingresos por tipo de plan" [level=3] [ref=f4e358]
+              - paragraph [ref=f4e359]: Qué planes sostienen el ingreso — con ticket promedio por plan
+            - generic [ref=f4e360]:
+              - application [ref=f4e363]:
+                - generic [ref=f4e393]:
+                  - generic [ref=f4e394]:
+                    - generic [ref=f4e395]: 0K
+                    - generic [ref=f4e397]: 20.0M
+                    - generic [ref=f4e399]: 40.0M
+                    - generic [ref=f4e401]: 60.0M
+                    - generic [ref=f4e403]: 80.0M
+                  - generic [ref=f4e405]:
+                    - generic [ref=f4e406]: PlanSemestral
+                    - generic [ref=f4e408]: Plan Anual
+                    - generic [ref=f4e410]: PlanMensual
+                    - generic [ref=f4e412]: 3+1 Mundial
+                    - generic [ref=f4e414]: 7 MESES + 1MES GRATIS
+                  - generic [ref=f4e416]:
+                    - generic [ref=f4e417]: $69.1M
+                    - generic [ref=f4e418]: $34.3M
+                    - generic [ref=f4e419]: $27.5M
+                    - generic [ref=f4e420]: $105.000
+                    - generic [ref=f4e421]: $100.000
+              - paragraph [ref=f4e425]:
+                - strong [ref=f4e426]: Plan Semestral
+                - text: lidera con $69.107.763 en 702 ventas (ticket promedio $98.444). Los planes largos (semestral/anual) adelantan caja pero "esconden" el churn; los mensuales dan señal temprana de fuga.
+        - generic [ref=f4e427]:
+          - generic [ref=f4e428]:
+            - heading "Evolución de Ingresos por Tipo de Plan (Años)" [level=3] [ref=f4e429]
+            - paragraph [ref=f4e430]: "Análisis histórico de composición de MRR: identifica cambios en mix de producto y crecimiento por línea de negocio"
+          - generic [ref=f4e431]:
+            - generic [ref=f4e432]: Sin datos de ingresos por tipo de plan disponibles
+            - paragraph [ref=f4e436]: Agregando datos de ingresos por tipo de plan...
+  - generic [ref=f4e437]: Plan Semestral

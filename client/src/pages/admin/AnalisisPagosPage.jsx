@@ -10,6 +10,7 @@ import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts'
 import { ChartInsight, PIE_COLORS, LABEL_STYLE, renderDonutLabel } from './dashboard/biShared'
+import { IncomeByPlanYearChart } from './dashboard/IncomeByPlanYearChart'
 
 const fmtCOP = (v) => (v == null || v === '' ? '—' : formatCurrency(v))
 
@@ -32,16 +33,19 @@ export default function AnalisisPagosPage() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  
+
   const [selectedYears, setSelectedYears] = useState(null)
   const [yearMenuOpen, setYearMenuOpen] = useState(false)
   const yearMenuRef = useRef(null)
-  
+
   const [selectedMonths, setSelectedMonths] = useState(null)
   const [monthMenuOpen, setMonthMenuOpen] = useState(false)
   const monthMenuRef = useRef(null)
-  
+
   const [explain, setExplain] = useState(null)
+
+  const [incomeByPlanYear, setIncomeByPlanYear] = useState([])
+  const [tiposPlanes, setTiposPlanes] = useState([])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -55,7 +59,18 @@ export default function AnalisisPagosPage() {
     }
   }
 
+  const loadIncomeByPlanYear = async () => {
+    try {
+      const { data } = await api.get('/admin/payments/ventas-licencia-by-plan-year')
+      setIncomeByPlanYear(data.series || [])
+      setTiposPlanes(data.tiposPlanes || [])
+    } catch (e) {
+      console.error('Error cargando ingresos por plan y año:', e.message)
+    }
+  }
+
   useEffect(() => { load() }, [])
+  useEffect(() => { loadIncomeByPlanYear() }, [])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -365,6 +380,24 @@ export default function AnalisisPagosPage() {
           </CardBody>
         </Card>
       </div>
+
+      {/* Gráfica de ingresos por tipo de plan por años */}
+      <Card className="border-orange-100">
+        <CardHeader className="border-orange-50">
+          <CardTitle>Evolución de Ingresos por Tipo de Plan (Años)</CardTitle>
+          <p className="text-sm text-gray-400 mt-0.5">Análisis histórico de composición de MRR: identifica cambios en mix de producto y crecimiento por línea de negocio</p>
+        </CardHeader>
+        <CardBody>
+          <IncomeByPlanYearChart data={incomeByPlanYear} tiposPlanes={tiposPlanes} />
+          <ChartInsight text={tiposPlanes.length > 0
+            ? `La composición de ingresos muestra **${tiposPlanes.sort((a, b) => {
+              const totalA = incomeByPlanYear.reduce((s, y) => s + (y[a] || 0), 0);
+              const totalB = incomeByPlanYear.reduce((s, y) => s + (y[b] || 0), 0);
+              return totalB - totalA;
+            })[0]}** como la línea de negocio principal. Monitorea la diversificación: planes únicos concentran riesgo, mientras mezclas balanceadas ofrecen resiliencia. Los planes largos (semestral/anual) adelantan caja pero pueden ocultar churn; los mensuales dan señal temprana de fuga.`
+            : 'Agregando datos de ingresos por tipo de plan...'} />
+        </CardBody>
+      </Card>
     </div>
   )
 }
