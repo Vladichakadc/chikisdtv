@@ -1,0 +1,396 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e3]:
+    - complementary [ref=f3e4]:
+      - generic [ref=f3e5]:
+        - generic [ref=f3e10]:
+          - generic [ref=f3e11]: ChikisdTV
+          - generic [ref=f3e12]: Panel Administrador
+        - button "Colapsar menú" [ref=f3e13] [cursor=pointer]
+      - navigation [ref=f3e18]:
+        - generic [ref=f3e19]:
+          - paragraph [ref=f3e20]: Principal
+          - generic [ref=f3e22]:
+            - generic [ref=f3e23]:
+              - link "Dashboard" [ref=f3e24] [cursor=pointer]:
+                - /url: /admin
+              - button "Expandir Dashboard" [ref=f3e31] [cursor=pointer]
+            - generic [ref=f3e34]:
+              - link "Análisis Financiero" [ref=f3e35] [cursor=pointer]:
+                - /url: /admin/analisis-financiero
+              - link "Análisis Retención" [ref=f3e40] [cursor=pointer]:
+                - /url: /admin/retencion
+        - generic [ref=f3e47]:
+          - paragraph [ref=f3e48]: Operación
+          - generic [ref=f3e49]:
+            - link "Planificador" [ref=f3e52] [cursor=pointer]:
+              - /url: /admin/planificador
+            - link "Cuentas Padre" [ref=f3e60] [cursor=pointer]:
+              - /url: /admin/cuentas-padre
+            - generic [ref=f3e65]:
+              - generic [ref=f3e66]:
+                - link "Clientes" [ref=f3e67] [cursor=pointer]:
+                  - /url: /admin/clients
+                - button "Expandir Clientes" [ref=f3e74] [cursor=pointer]
+              - link "Análisis Demográfico" [ref=f3e78] [cursor=pointer]:
+                - /url: /admin/analisis-clientes
+            - link "Planes" [ref=f3e86] [cursor=pointer]:
+              - /url: /admin/plans
+            - link "Suscripciones" [ref=f3e94] [cursor=pointer]:
+              - /url: /admin/subscriptions
+            - generic [ref=f3e99]:
+              - generic [ref=f3e100]:
+                - link "Pagos" [ref=f3e101] [cursor=pointer]:
+                  - /url: /admin/payments
+                - button "Expandir Pagos" [ref=f3e105] [cursor=pointer]
+              - link "Análisis de Pagos" [ref=f3e109] [cursor=pointer]:
+                - /url: /admin/analisis-pagos
+            - generic [ref=f3e114]:
+              - generic [ref=f3e115]:
+                - link "Bajas" [ref=f3e116] [cursor=pointer]:
+                  - /url: /admin/bajas
+                - button "Expandir Bajas" [ref=f3e123] [cursor=pointer]
+              - link "Análisis de Bajas" [ref=f3e127] [cursor=pointer]:
+                - /url: /admin/analisis-bajas
+        - generic [ref=f3e133]:
+          - paragraph [ref=f3e134]: Equipos
+          - generic [ref=f3e135]:
+            - link "Costo Pantalla" [ref=f3e138] [cursor=pointer]:
+              - /url: /admin/costo-pantalla
+            - generic [ref=f3e142]:
+              - generic [ref=f3e143]:
+                - link "Venta Dispositivos" [ref=f3e144] [cursor=pointer]:
+                  - /url: /admin/ventas-dispositivos
+                - button "Expandir Venta Dispositivos" [ref=f3e149] [cursor=pointer]
+              - link "Análisis Dispositivos" [ref=f3e153] [cursor=pointer]:
+                - /url: /admin/analisis-dispositivos
+            - generic [ref=f3e159]:
+              - generic [ref=f3e160]:
+                - link "Inventario Equipos" [ref=f3e161] [cursor=pointer]:
+                  - /url: /admin/devices
+                - button "Expandir Inventario Equipos" [ref=f3e173] [cursor=pointer]
+              - link "Análisis Inventario" [ref=f3e177] [cursor=pointer]:
+                - /url: /admin/analisis-inventario
+        - generic [ref=f3e182]:
+          - paragraph [ref=f3e183]: Ajustes
+          - link "Seguridad" [ref=f3e187] [cursor=pointer]:
+            - /url: /admin/change-password
+      - generic [ref=f3e193]:
+        - generic [ref=f3e194]: A
+        - generic [ref=f3e195]:
+          - paragraph [ref=f3e196]: Administrador
+          - paragraph [ref=f3e197]: admin@chikisdtv.com
+        - button "Cerrar sesión" [ref=f3e199] [cursor=pointer]
+    - main [ref=f3e204]:
+      - generic [ref=f3e205]:
+        - generic [ref=f3e209]:
+          - generic [ref=f3e211]:
+            - generic [ref=f3e212]:
+              - generic [ref=f3e213]: Desempeño comercial
+              - heading "Planes" [level=1] [ref=f3e217]
+              - paragraph [ref=f3e218]: Qué plan vende, retiene y sostiene el negocio — datos reales de Pagos y Planificador
+            - button "Nuevo Plan" [ref=f3e219] [cursor=pointer]
+          - generic [ref=f3e221]:
+            - generic [ref=f3e225]:
+              - paragraph [ref=f3e226]: Ingresos por planes
+              - paragraph [ref=f3e227]: $128.726.391
+              - paragraph [ref=f3e229]: Histórico · sin cortesías ni cambios de plan
+            - generic [ref=f3e237]:
+              - paragraph [ref=f3e238]: Base instalada
+              - paragraph [ref=f3e239]: 252 pantallas
+              - paragraph [ref=f3e241]: Vigentes hoy, según la última venta de cada una
+            - generic [ref=f3e248]:
+              - paragraph [ref=f3e249]: Plan líder
+              - paragraph [ref=f3e250]: Plan Semestral
+              - paragraph [ref=f3e252]: 52.9% del ingreso histórico
+            - generic [ref=f3e263]:
+              - paragraph [ref=f3e264]: Renovación global
+              - paragraph [ref=f3e265]: 83.3%
+              - paragraph [ref=f3e267]: De las ventas son renovaciones
+          - generic [ref=f3e274]:
+            - generic [ref=f3e275]:
+              - generic [ref=f3e276]:
+                - generic [ref=f3e277]:
+                  - generic [ref=f3e278]:
+                    - heading "Plan Semestral" [level=3] [ref=f3e281]
+                    - paragraph [ref=f3e282]: Cobertura 6 meses · no está en el catálogo
+                  - generic [ref=f3e283]: "-6.7%"
+                - generic [ref=f3e287]:
+                  - paragraph [ref=f3e288]: $68.099.763
+                  - generic [ref=f3e289]: 52.9% del ingreso
+                - generic [ref=f3e293]:
+                  - generic [ref=f3e294]:
+                    - paragraph [ref=f3e295]: Ventas
+                    - paragraph [ref=f3e296]: "689"
+                  - generic [ref=f3e297]:
+                    - paragraph [ref=f3e298]: Ticket promedio
+                    - paragraph [ref=f3e299]: $98.839
+                  - generic [ref=f3e300]:
+                    - paragraph [ref=f3e301]: Pantallas vigentes
+                    - paragraph [ref=f3e302]: 137+6 vencidas
+                  - generic [ref=f3e303]:
+                    - paragraph [ref=f3e304]: Clientes activos
+                    - paragraph [ref=f3e305]: "108"
+                - generic [ref=f3e306]:
+                  - generic [ref=f3e307]:
+                    - generic [ref=f3e308]: Fidelidad (renovaciones)
+                    - generic [ref=f3e309]: 69.4%
+                  - paragraph [ref=f3e312]: 478 renovaciones · 211 activaciones
+                - paragraph [ref=f3e313]:
+                  - text: "Año corrido 2026:"
+                  - strong [ref=f3e314]: $11.228.116
+                  - text: "· mismo periodo 2025: $12.034.800"
+              - generic [ref=f3e315]:
+                - generic [ref=f3e316]:
+                  - generic [ref=f3e317]:
+                    - heading "Plan Anual" [level=3] [ref=f3e320]
+                    - paragraph [ref=f3e321]: Cobertura 12 meses · no está en el catálogo
+                  - generic [ref=f3e322]: +39.5%
+                - generic [ref=f3e326]:
+                  - paragraph [ref=f3e327]: $32.956.877
+                  - generic [ref=f3e328]: 25.6% del ingreso
+                - generic [ref=f3e332]:
+                  - generic [ref=f3e333]:
+                    - paragraph [ref=f3e334]: Ventas
+                    - paragraph [ref=f3e335]: "172"
+                  - generic [ref=f3e336]:
+                    - paragraph [ref=f3e337]: Ticket promedio
+                    - paragraph [ref=f3e338]: $191.610
+                  - generic [ref=f3e339]:
+                    - paragraph [ref=f3e340]: Pantallas vigentes
+                    - paragraph [ref=f3e341]: "74"
+                  - generic [ref=f3e342]:
+                    - paragraph [ref=f3e343]: Clientes activos
+                    - paragraph [ref=f3e344]: "62"
+                - generic [ref=f3e345]:
+                  - generic [ref=f3e346]:
+                    - generic [ref=f3e347]: Fidelidad (renovaciones)
+                    - generic [ref=f3e348]: 54.1%
+                  - paragraph [ref=f3e351]: 93 renovaciones · 79 activaciones
+                - paragraph [ref=f3e352]:
+                  - text: "Año corrido 2026:"
+                  - strong [ref=f3e353]: $6.785.330
+                  - text: "· mismo periodo 2025: $4.863.000"
+              - generic [ref=f3e354]:
+                - generic [ref=f3e355]:
+                  - generic [ref=f3e356]:
+                    - heading "Plan Mensual" [level=3] [ref=f3e359]
+                    - paragraph [ref=f3e360]: Cobertura mensual · no está en el catálogo
+                  - generic [ref=f3e361]: "-54.4%"
+                - generic [ref=f3e365]:
+                  - paragraph [ref=f3e366]: $27.464.750
+                  - generic [ref=f3e367]: 21.3% del ingreso
+                - generic [ref=f3e371]:
+                  - generic [ref=f3e372]:
+                    - paragraph [ref=f3e373]: Ventas
+                    - paragraph [ref=f3e374]: "1.573"
+                  - generic [ref=f3e375]:
+                    - paragraph [ref=f3e376]: Ticket promedio
+                    - paragraph [ref=f3e377]: $17.460
+                  - generic [ref=f3e378]:
+                    - paragraph [ref=f3e379]: Pantallas vigentes
+                    - paragraph [ref=f3e380]: 37+5 vencidas
+                  - generic [ref=f3e381]:
+                    - paragraph [ref=f3e382]: Clientes activos
+                    - paragraph [ref=f3e383]: "28"
+                - generic [ref=f3e384]:
+                  - generic [ref=f3e385]:
+                    - generic [ref=f3e386]: Fidelidad (renovaciones)
+                    - generic [ref=f3e387]: 92.8%
+                  - paragraph [ref=f3e390]: 1.460 renovaciones · 113 activaciones
+                - paragraph [ref=f3e391]:
+                  - text: "Año corrido 2026:"
+                  - strong [ref=f3e392]: $2.432.250
+                  - text: "· mismo periodo 2025: $5.338.000"
+            - paragraph [ref=f3e396]:
+              - strong [ref=f3e397]: Plan Semestral
+              - text: "es el motor del negocio: aporta el 52.9% del ingreso histórico por licencias y concentra 137 pantallas vigentes de la base instalada. En el año corrido,"
+              - strong [ref=f3e398]: Plan Anual
+              - text: es el que más crece (+39.5% vs. el mismo periodo del año pasado) mientras
+              - strong [ref=f3e399]: Plan Mensual
+              - text: "varía -54.4%. La lectura: la base está migrando hacia planes de mayor cobertura — buena señal de fidelización y caja anticipada, pero conviene cuidar el plan mensual como puerta de entrada de clientes nuevos. La fidelidad más alta la tiene"
+              - strong [ref=f3e400]: Plan Mensual
+              - text: ": 92.8% de sus ventas son renovaciones."
+          - generic [ref=f3e401]:
+            - generic [ref=f3e402]:
+              - heading "Composición del ingreso por plan" [level=3] [ref=f3e403]
+              - paragraph [ref=f3e404]: Histórico de ventas de licencias ($ COP)
+              - application [ref=f3e407]:
+                - generic [ref=f3e844]:
+                  - generic [ref=f3e1090]: 53%
+                  - generic [ref=f3e1092]: 26%
+                  - generic [ref=f3e1094]: 21%
+              - generic [ref=f3e426]:
+                - generic [ref=f3e427]:
+                  - generic [ref=f3e428]: Plan Semestral
+                  - generic [ref=f3e430]: 52.9%
+                - generic [ref=f3e431]:
+                  - generic [ref=f3e432]: Plan Anual
+                  - generic [ref=f3e434]: 25.6%
+                - generic [ref=f3e435]:
+                  - generic [ref=f3e436]: Plan Mensual
+                  - generic [ref=f3e438]: 21.3%
+                - generic [ref=f3e439]:
+                  - generic [ref=f3e440]: 3+1 Mundial
+                  - generic [ref=f3e442]: 0.1%
+                - generic [ref=f3e443]:
+                  - generic [ref=f3e444]: 7 MESES + 1 MES GRATIS
+                  - generic [ref=f3e446]: 0.1%
+            - generic [ref=f3e447]:
+              - heading "Ingresos por plan — últimos 12 meses" [level=3] [ref=f3e448]
+              - paragraph [ref=f3e449]: "Barras apiladas: aporte de cada plan al ingreso del mes ($ COP)"
+              - generic [ref=f3e451]:
+                - list [ref=f3e453]:
+                  - listitem [ref=f3e454]:
+                    - img "Otros legend icon" [ref=f3e455]
+                    - text: Otros
+                  - listitem [ref=f3e457]:
+                    - img "Plan Anual legend icon" [ref=f3e458]
+                    - text: Plan Anual
+                  - listitem [ref=f3e460]:
+                    - img "Plan Mensual legend icon" [ref=f3e461]
+                    - text: Plan Mensual
+                  - listitem [ref=f3e463]:
+                    - img "Plan Semestral legend icon" [ref=f3e464]
+                    - text: Plan Semestral
+                - application [ref=f3e466]:
+                  - generic [ref=f3e605]:
+                    - generic [ref=f3e606]:
+                      - generic [ref=f3e607]: Sep 25
+                      - generic [ref=f3e609]: Nov 25
+                      - generic [ref=f3e611]: Dic 25
+                      - generic [ref=f3e613]: Feb 26
+                      - generic [ref=f3e615]: Abr 26
+                      - generic [ref=f3e617]: Jun 26
+                      - generic [ref=f3e619]: Jul 26
+                    - generic [ref=f3e621]:
+                      - generic [ref=f3e622]: 0K
+                      - generic [ref=f3e624]: 1.5M
+                      - generic [ref=f3e626]: 3.0M
+                      - generic [ref=f3e628]: 4.5M
+                      - generic [ref=f3e630]: 6.0M
+          - generic [ref=f3e632]:
+            - heading "Promociones y planes menores" [level=3] [ref=f3e633]
+            - paragraph [ref=f3e634]: Con pocas ventas registradas — no entran en el análisis principal
+            - table [ref=f3e636]:
+              - rowgroup [ref=f3e637]:
+                - row [ref=f3e638]:
+                  - columnheader "Plan" [ref=f3e639]
+                  - columnheader "Ventas" [ref=f3e640]
+                  - columnheader "Ingresos" [ref=f3e641]
+                  - columnheader "Pantallas vigentes" [ref=f3e642]
+              - rowgroup [ref=f3e643]:
+                - row [ref=f3e644]:
+                  - cell "3+1 Mundial" [ref=f3e645]
+                  - cell "3" [ref=f3e646]
+                  - cell "$105.000" [ref=f3e647]
+                  - cell "3" [ref=f3e648]
+                - row [ref=f3e649]:
+                  - cell "7 MESES + 1 MES GRATIS" [ref=f3e650]
+                  - cell "1" [ref=f3e651]
+                  - cell "$100.000" [ref=f3e652]
+                  - cell "1" [ref=f3e653]
+          - generic [ref=f3e654]:
+            - generic [ref=f3e655]:
+              - heading "Catálogo de venta" [level=2] [ref=f3e656]
+              - paragraph [ref=f3e657]: 4 planes definidos · 4 activos — es la plantilla de configuración para crear suscripciones, no el histórico de ventas
+            - paragraph [ref=f3e661]:
+              - text: "El catálogo no coincide con los planes que realmente se venden:"
+              - strong [ref=f3e662]: Plan Semestral, Plan Anual, Plan Mensual
+              - text: no existen aquí. Créalos para alinear la configuración con la operación real.
+            - searchbox "Buscar por nombre o descripción…" [ref=f3e665]
+            - table [ref=f3e668]:
+              - rowgroup [ref=f3e669]:
+                - row [ref=f3e670]:
+                  - columnheader "Nombre del Plan" [ref=f3e671]
+                  - columnheader "Precio" [ref=f3e672]
+                  - columnheader "Duración" [ref=f3e673]
+                  - columnheader "Pantallas" [ref=f3e674]
+                  - columnheader "Estado" [ref=f3e675]
+                  - columnheader [ref=f3e676]
+              - rowgroup [ref=f3e677]:
+                - row [ref=f3e678]:
+                  - cell [ref=f3e679]:
+                    - paragraph [ref=f3e680]: 1 Pantalla
+                    - paragraph [ref=f3e681]: Plan mensual 1 pantalla
+                  - cell "$8.000" [ref=f3e682]
+                  - cell [ref=f3e683]
+                  - cell [ref=f3e687]
+                  - cell [ref=f3e691]
+                  - cell [ref=f3e696]:
+                    - generic [ref=f3e697]:
+                      - button "Editar" [ref=f3e698] [cursor=pointer]
+                      - button "Eliminar" [ref=f3e702] [cursor=pointer]
+                - row [ref=f3e706]:
+                  - cell [ref=f3e707]:
+                    - paragraph [ref=f3e708]: 2 Pantallas
+                    - paragraph [ref=f3e709]: Plan mensual 2 pantallas
+                  - cell "$12.000" [ref=f3e710]
+                  - cell [ref=f3e711]
+                  - cell [ref=f3e715]
+                  - cell [ref=f3e719]
+                  - cell [ref=f3e724]:
+                    - generic [ref=f3e725]:
+                      - button "Editar" [ref=f3e726] [cursor=pointer]
+                      - button "Eliminar" [ref=f3e730] [cursor=pointer]
+                - row [ref=f3e734]:
+                  - cell [ref=f3e735]:
+                    - paragraph [ref=f3e736]: 3 Pantallas
+                    - paragraph [ref=f3e737]: Plan mensual 3 pantallas
+                  - cell "$16.000" [ref=f3e738]
+                  - cell [ref=f3e739]
+                  - cell [ref=f3e743]
+                  - cell [ref=f3e747]
+                  - cell [ref=f3e752]:
+                    - generic [ref=f3e753]:
+                      - button "Editar" [ref=f3e754] [cursor=pointer]
+                      - button "Eliminar" [ref=f3e758] [cursor=pointer]
+                - row [ref=f3e762]:
+                  - cell [ref=f3e763]:
+                    - paragraph [ref=f3e764]: Anual 1 Pantalla
+                    - paragraph [ref=f3e765]: Plan anual 1 pantalla
+                  - cell "$80.000" [ref=f3e766]
+                  - cell [ref=f3e767]
+                  - cell [ref=f3e771]
+                  - cell [ref=f3e775]
+                  - cell [ref=f3e780]:
+                    - generic [ref=f3e781]:
+                      - button "Editar" [ref=f3e782] [cursor=pointer]
+                      - button "Eliminar" [ref=f3e786] [cursor=pointer]
+        - generic [ref=f3e791]:
+          - generic [ref=f3e794]:
+            - generic [ref=f3e795]:
+              - paragraph [ref=f3e796]: Editar registro
+              - heading "Editar Plan" [level=2] [ref=f3e797]
+              - paragraph [ref=f3e798]: Configura las características y el precio.
+            - button [ref=f3e799] [cursor=pointer]
+          - generic [ref=f3e803]:
+            - generic [ref=f3e804]:
+              - generic [ref=f3e805]: Información General
+              - generic [ref=f3e808]:
+                - generic [ref=f3e809]: Nombre del plan *
+                - textbox "Ej. Plan Familiar Mensual" [ref=f3e810]: 1 Pantalla
+              - generic [ref=f3e811]:
+                - generic [ref=f3e812]: Descripción
+                - textbox "Detalles de lo que incluye el plan..." [ref=f3e813]: Plan mensual 1 pantalla
+              - generic [ref=f3e814]: Detalles Comerciales
+              - generic [ref=f3e817]:
+                - generic [ref=f3e818]:
+                  - generic [ref=f3e819]: Precio *
+                  - generic [ref=f3e821]:
+                    - generic: $
+                    - textbox [active] [ref=f3e822]: 255.800.000
+                - generic [ref=f3e823]:
+                  - generic [ref=f3e824]: Estado
+                  - generic [ref=f3e825]:
+                    - button "Activo" [ref=f3e826] [cursor=pointer]
+                    - button "Inactivo" [ref=f3e827] [cursor=pointer]
+                - generic [ref=f3e828]:
+                  - generic [ref=f3e829]: Duración (días) *
+                  - spinbutton [ref=f3e833]: "30"
+                - generic [ref=f3e834]:
+                  - generic [ref=f3e835]: N° Pantallas *
+                  - spinbutton [ref=f3e839]: "1"
+            - generic [ref=f3e840]:
+              - button "Cancelar" [ref=f3e841] [cursor=pointer]
+              - button "Guardar cambios" [ref=f3e842] [cursor=pointer]
+  - generic [ref=f3e843]: 0K

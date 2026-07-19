@@ -1,0 +1,83 @@
+- generic [ref=f2e3]:
+  - complementary [ref=f2e4]:
+    - generic [ref=f2e5]:
+      - generic [ref=f2e10]:
+        - generic [ref=f2e11]: ChikisdTV
+        - generic [ref=f2e12]: Panel Administrador
+      - button "Colapsar menú" [ref=f2e13] [cursor=pointer]
+    - navigation [ref=f2e18]:
+      - generic [ref=f2e19]:
+        - paragraph [ref=f2e20]: Principal
+        - generic [ref=f2e22]:
+          - generic [ref=f2e23]:
+            - link "Dashboard" [ref=f2e24] [cursor=pointer]:
+              - /url: /admin
+            - button "Expandir Dashboard" [ref=f2e31] [cursor=pointer]
+          - generic [ref=f2e34]:
+            - link "Análisis Financiero" [ref=f2e35] [cursor=pointer]:
+              - /url: /admin/analisis-financiero
+            - link "Análisis Retención" [ref=f2e40] [cursor=pointer]:
+              - /url: /admin/retencion
+      - generic [ref=f2e47]:
+        - paragraph [ref=f2e48]: Operación
+        - generic [ref=f2e49]:
+          - link "Planificador" [ref=f2e52] [cursor=pointer]:
+            - /url: /admin/planificador
+          - link "Cuentas Padre" [ref=f2e60] [cursor=pointer]:
+            - /url: /admin/cuentas-padre
+          - generic [ref=f2e65]:
+            - generic [ref=f2e66]:
+              - link "Clientes" [ref=f2e67] [cursor=pointer]:
+                - /url: /admin/clients
+              - button "Expandir Clientes" [ref=f2e74] [cursor=pointer]
+            - link "Análisis Demográfico" [ref=f2e78] [cursor=pointer]:
+              - /url: /admin/analisis-clientes
+          - link "Planes" [ref=f2e86] [cursor=pointer]:
+            - /url: /admin/plans
+          - link "Suscripciones" [ref=f2e94] [cursor=pointer]:
+            - /url: /admin/subscriptions
+          - generic [ref=f2e99]:
+            - generic [ref=f2e100]:
+              - link "Pagos" [ref=f2e101] [cursor=pointer]:
+                - /url: /admin/payments
+              - button "Expandir Pagos" [ref=f2e105] [cursor=pointer]
+            - link "Análisis de Pagos" [ref=f2e109] [cursor=pointer]:
+              - /url: /admin/analisis-pagos
+          - generic [ref=f2e114]:
+            - generic [ref=f2e115]:
+              - link "Bajas" [ref=f2e116] [cursor=pointer]:
+                - /url: /admin/bajas
+              - button "Expandir Bajas" [ref=f2e123] [cursor=pointer]
+            - link "Análisis de Bajas" [ref=f2e127] [cursor=pointer]:
+              - /url: /admin/analisis-bajas
+      - generic [ref=f2e133]:
+        - paragraph [ref=f2e134]: Equipos
+        - generic [ref=f2e135]:
+          - link "Costo Pantalla" [ref=f2e138] [cursor=pointer]:
+            - /url: /admin/costo-pantalla
+          - generic [ref=f2e142]:
+            - generic [ref=f2e143]:
+              - link "Venta Dispositivos" [ref=f2e144] [cursor=pointer]:
+                - /url: /admin/ventas-dispositivos
+              - button "Expandir Venta Dispositivos" [ref=f2e149] [cursor=pointer]
+            - link "Análisis Dispositivos" [ref=f2e153] [cursor=pointer]:
+              - /url: /admin/analisis-dispositivos
+          - generic [ref=f2e159]:
+            - generic [ref=f2e160]:
+              - link "Inventario Equipos" [ref=f2e161] [cursor=pointer]:
+                - /url: /admin/devices
+              - button "Expandir Inventario Equipos" [ref=f2e173] [cursor=pointer]
+            - link "Análisis Inventario" [ref=f2e177] [cursor=pointer]:
+              - /url: /admin/analisis-inventario
+      - generic [ref=f2e182]:
+        - paragraph [ref=f2e183]: Ajustes
+        - link "Seguridad" [ref=f2e187] [cursor=pointer]:
+          - /url: /admin/change-password
+    - generic [ref=f2e193]:
+      - generic [ref=f2e194]: A
+      - generic [ref=f2e195]:
+        - paragraph [ref=f2e196]: Administrador
+        - paragraph [ref=f2e197]: admin@chikisdtv.com
+      - button "Cerrar sesión" [ref=f2e199] [cursor=pointer]
+  - main [ref=f2e204]:
+    - paragraph [ref=f2e208]: Cargando…
