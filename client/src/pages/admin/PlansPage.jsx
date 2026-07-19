@@ -15,14 +15,20 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   Search, Plus, Pencil, Trash2, X,
-  CheckCircle2, XCircle, LayoutGrid, DollarSign,
-  Activity, AlertTriangle, Layers, Monitor, Calendar
+  CheckCircle2, XCircle,
+  Activity, AlertTriangle, Layers, Monitor, Calendar,
+  Wallet, Trophy, RefreshCw, AlertCircle,
 } from 'lucide-react'
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, PieChart, Pie, Cell,
+} from 'recharts'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
+import { GrowthBadge, ChartInsight, ChartTooltip, renderDonutLabel } from './dashboard/biShared'
 
 /* ══════════════════════════════════════════════════════════════
    DESIGN TOKENS (Huashu — brand Cyan/Sky para Planes)
@@ -97,6 +103,117 @@ const CSS = `
 const EMPTY = {
   nombre: '', precio: 0, duracionDias: 30, numeroPantallas: 1,
   descripcion: '', activo: true
+}
+
+/* ── Desempeño por plan (datos de Pagos + Planificador) ── */
+
+// Color fijo por plan real para que el usuario construya memoria visual
+const PLAN_COLORS = {
+  'Plan Semestral': '#f97316',
+  'Plan Anual': '#8b5cf6',
+  'Plan Mensual': '#0ea5e9',
+  'Otros': '#94a3b8',
+}
+const planColor = (nombre) => PLAN_COLORS[nombre] || '#94a3b8'
+
+function narrarPlanes(perf) {
+  if (!perf?.planes?.length) return null
+  const [lider] = perf.planes
+  const conYTD = perf.planes.filter(p => p.crecimientoYTDPct != null && p.ventas >= 10)
+  const sube = conYTD.length ? conYTD.reduce((a, b) => (b.crecimientoYTDPct > a.crecimientoYTDPct ? b : a)) : null
+  const baja = conYTD.length ? conYTD.reduce((a, b) => (b.crecimientoYTDPct < a.crecimientoYTDPct ? b : a)) : null
+  const fiel = perf.planes.filter(p => p.pctRenovacion != null && p.ventas >= 10)
+    .reduce((a, b) => (!a || b.pctRenovacion > a.pctRenovacion ? b : a), null)
+  const partes = [
+    `**${lider.plan}** es el motor del negocio: aporta el ${lider.pctIngresos}% del ingreso histórico por licencias y concentra ${lider.pantallasVigentes} pantallas vigentes de la base instalada.`,
+  ]
+  if (sube && baja && sube.plan !== baja.plan) {
+    partes.push(` En el año corrido, **${sube.plan}** es el que más crece (${sube.crecimientoYTDPct >= 0 ? '+' : ''}${sube.crecimientoYTDPct}% vs. el mismo periodo del año pasado) mientras **${baja.plan}** varía ${baja.crecimientoYTDPct >= 0 ? '+' : ''}${baja.crecimientoYTDPct}%.`)
+    if (baja.plan === 'Plan Mensual' && sube.mesesCobertura > 1) {
+      partes.push(' La lectura: la base está migrando hacia planes de mayor cobertura — buena señal de fidelización y caja anticipada, pero conviene cuidar el plan mensual como puerta de entrada de clientes nuevos.')
+    }
+  }
+  if (fiel) {
+    partes.push(` La fidelidad más alta la tiene **${fiel.plan}**: ${fiel.pctRenovacion}% de sus ventas son renovaciones.`)
+  }
+  return partes.join('')
+}
+
+function MiniStat({ label, value, extra }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">{label}</p>
+      <p className="text-sm font-bold text-slate-700 tabular-nums">
+        {value}
+        {extra && <span className="ml-1.5 text-[11px] font-semibold text-red-500">{extra}</span>}
+      </p>
+    </div>
+  )
+}
+
+function PlanPerfCard({ p, anioActual }) {
+  const color = planColor(p.plan)
+  const cobertura = p.mesesCobertura
+    ? (p.mesesCobertura === 1 ? 'mensual' : `${p.mesesCobertura} meses`)
+    : 'promoción'
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+            <h3 className="font-bold text-slate-800 truncate">{p.plan}</h3>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Cobertura {cobertura}
+            {!p.enCatalogo && <span className="text-amber-600 font-semibold"> · no está en el catálogo</span>}
+          </p>
+        </div>
+        <GrowthBadge pct={p.crecimientoYTDPct} />
+      </div>
+
+      <div>
+        <p className="text-2xl font-extrabold text-slate-800 tabular-nums">{formatCurrency(p.ingresos)}</p>
+        <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${Math.min(p.pctIngresos, 100)}%`, background: color }} />
+          </div>
+          <span className="text-xs font-semibold text-slate-500 tabular-nums whitespace-nowrap">{p.pctIngresos}% del ingreso</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+        <MiniStat label="Ventas" value={p.ventas.toLocaleString('es-CO')} />
+        <MiniStat label="Ticket promedio" value={formatCurrency(p.ticketPromedio)} />
+        <MiniStat
+          label="Pantallas vigentes" value={p.pantallasVigentes}
+          extra={p.pantallasVencidas > 0 ? `+${p.pantallasVencidas} vencidas` : null}
+        />
+        <MiniStat label="Clientes activos" value={p.clientesActivos} />
+      </div>
+
+      {p.pctRenovacion != null && (
+        <div>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-slate-500 font-medium">Fidelidad (renovaciones)</span>
+            <span className="font-bold text-slate-700 tabular-nums">{p.pctRenovacion}%</span>
+          </div>
+          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full ${p.pctRenovacion >= 70 ? 'bg-emerald-500' : p.pctRenovacion >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+              style={{ width: `${p.pctRenovacion}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">{p.renovaciones.toLocaleString('es-CO')} renovaciones · {p.activaciones.toLocaleString('es-CO')} activaciones</p>
+        </div>
+      )}
+
+      <p className="text-[11px] text-slate-400 border-t border-slate-100 pt-2.5 mt-auto">
+        Año corrido {anioActual}: <strong className="text-slate-600">{formatCurrency(p.ingresosYTD)}</strong>
+        {p.ingresosYTDAnterior > 0 && <> · mismo periodo {anioActual - 1}: {formatCurrency(p.ingresosYTDAnterior)}</>}
+      </p>
+    </div>
+  )
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -249,7 +366,7 @@ function PlanDrawer({ editing, form, setForm, onSubmit, onClose }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <FieldLabel>Precio *</FieldLabel>
-                <CurrencyInput value={form.precio} onChange={v => setForm({ ...form, precio: v })} decimals={0}
+                <CurrencyInput value={form.precio} onChange={e => setForm({ ...form, precio: e.target.value })} decimals={0}
                   className="border-slate-200 focus:ring-sky-400 text-sm rounded-xl" required />
               </div>
               <div>
@@ -313,6 +430,7 @@ function PlanDrawer({ editing, form, setForm, onSubmit, onClose }) {
 export default function PlansPage() {
   const { showToast } = useUi()
   const [plans, setPlans] = useState([])
+  const [perf, setPerf] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const [search, setSearch] = useState('')
@@ -324,8 +442,12 @@ export default function PlansPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await api.get('/admin/plans')
-      setPlans(data)
+      const [catalogoRes, perfRes] = await Promise.all([
+        api.get('/admin/plans'),
+        api.get('/admin/plans/performance'),
+      ])
+      setPlans(catalogoRes.data)
+      setPerf(perfRes.data)
     } catch (e) {
       showToast('Error al cargar los planes.', 'error')
     } finally {
@@ -345,15 +467,40 @@ export default function PlansPage() {
     )
   }, [plans, search])
 
-  /* ── Stats ── */
+  /* ── Stats del catálogo (sección de configuración) ── */
   const stats = useMemo(() => {
     const total = plans.length
     const activos = plans.filter(p => p.activo).length
-    const inactivos = total - activos
-    const sumPrecioActivos = plans.filter(p => p.activo).reduce((sum, p) => sum + (Number(p.precio) || 0), 0)
-    const precioPromedio = activos > 0 ? sumPrecioActivos / activos : 0
-    return { total, activos, inactivos, precioPromedio }
+    return { total, activos }
   }, [plans])
+
+  /* ── Derivados del desempeño por plan ── */
+  const planesPrincipales = useMemo(() => perf?.planes.filter(p => p.ventas >= 10) || [], [perf])
+  const planesMenores = useMemo(() => perf?.planes.filter(p => p.ventas < 10) || [], [perf])
+
+  const renovGlobal = useMemo(() => {
+    if (!perf) return null
+    const r = perf.planes.reduce((s, p) => s + p.renovaciones, 0)
+    const a = perf.planes.reduce((s, p) => s + p.activaciones, 0)
+    return r + a > 0 ? Number(((r / (r + a)) * 100).toFixed(1)) : null
+  }, [perf])
+
+  const donutData = useMemo(
+    () => (perf ? perf.planes.filter(p => p.ingresos > 0).map(p => ({ name: p.plan, value: p.ingresos, pct: p.pctIngresos })) : []),
+    [perf]
+  )
+
+  const serieKeys = useMemo(() => {
+    if (!perf) return []
+    const keys = [...perf.topPlanes]
+    if (perf.serieMensual.some(m => m.Otros != null)) keys.push('Otros')
+    return keys
+  }, [perf])
+
+  const planesFueraDeCatalogo = useMemo(
+    () => planesPrincipales.filter(p => !p.enCatalogo),
+    [planesPrincipales]
+  )
 
   /* ── Handlers ── */
   const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true) }
@@ -415,14 +562,14 @@ export default function PlansPage() {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/15 border border-sky-500/25 mb-4">
                 <Activity size={12} className="text-sky-400" />
-                <span className="text-sky-400 text-xs font-semibold tracking-widest uppercase">Catálogo</span>
+                <span className="text-sky-400 text-xs font-semibold tracking-widest uppercase">Desempeño comercial</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight"
                   style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
                 Planes
               </h1>
               <p className="text-slate-400 text-sm mt-2">
-                Configura los planes y precios para las suscripciones
+                Qué plan vende, retiene y sostiene el negocio — datos reales de Pagos y Planificador
               </p>
             </div>
             <button onClick={openNew}
@@ -432,16 +579,116 @@ export default function PlansPage() {
           </div>
         </div>
 
-        {/* ── KPI CARDS ── */}
+        {/* ── KPIs de desempeño ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard icon={Layers}       label="Total Planes"  value={stats.total}          loading={loading} gradFrom="#0ea5e9" gradTo="#38bdf8" delay={2} />
-          <KpiCard icon={CheckCircle2} label="Activos"       value={stats.activos}        loading={loading} gradFrom="#10b981" gradTo="#34d399" delay={3} sub="Disponibles para venta" />
-          <KpiCard icon={XCircle}      label="Inactivos"     value={stats.inactivos}      loading={loading} gradFrom="#64748b" gradTo="#94a3b8" delay={4} sub="Ocultos del catálogo" />
-          <KpiCard icon={DollarSign}   label="Precio Prom."  value={formatCurrency(stats.precioPromedio)} loading={loading} gradFrom="#8b5cf6" gradTo="#a78bfa" delay={5} sub="De planes activos" />
+          <KpiCard icon={Wallet}    label="Ingresos por planes" value={perf ? formatCurrency(perf.totales.ingresos) : '—'} loading={loading} gradFrom="#f97316" gradTo="#fb923c" delay={2} sub="Histórico · sin cortesías ni cambios de plan" />
+          <KpiCard icon={Monitor}   label="Base instalada"      value={perf ? `${perf.totales.pantallasVigentes} pantallas` : '—'} loading={loading} gradFrom="#0ea5e9" gradTo="#38bdf8" delay={3} sub="Vigentes hoy, según la última venta de cada una" />
+          <KpiCard icon={Trophy}    label="Plan líder"          value={perf?.planes[0]?.plan || '—'} loading={loading} gradFrom="#8b5cf6" gradTo="#a78bfa" delay={4} sub={perf?.planes[0] ? `${perf.planes[0].pctIngresos}% del ingreso histórico` : ''} />
+          <KpiCard icon={RefreshCw} label="Renovación global"   value={renovGlobal != null ? `${renovGlobal}%` : '—'} loading={loading} gradFrom="#10b981" gradTo="#34d399" delay={5} sub="De las ventas son renovaciones" />
         </div>
 
-        {/* ── SEARCH & TABLE ── */}
-        <div className="pl-a4">
+        {/* ── Desempeño por plan ── */}
+        {perf && planesPrincipales.length > 0 && (
+          <div className="pl-a3 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {planesPrincipales.map(p => <PlanPerfCard key={p.plan} p={p} anioActual={perf.anioActual} />)}
+            </div>
+            <ChartInsight text={narrarPlanes(perf)} />
+          </div>
+        )}
+
+        {/* ── Charts: composición del ingreso + tendencia mensual ── */}
+        {perf && donutData.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 pl-a4">
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 lg:col-span-2">
+              <h3 className="font-bold text-slate-800">Composición del ingreso por plan</h3>
+              <p className="text-xs text-slate-400 mb-2">Histórico de ventas de licencias ($ COP)</p>
+              <ResponsiveContainer width="100%" height={230}>
+                <PieChart>
+                  <Pie data={donutData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={52} outerRadius={88} paddingAngle={3} label={renderDonutLabel} labelLine={false}>
+                    {donutData.map((d, i) => <Cell key={i} fill={planColor(d.name)} />)}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-1.5 mt-1">
+                {donutData.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-slate-600">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: planColor(d.name) }} />
+                      {d.name}
+                    </span>
+                    <span className="font-semibold text-slate-700 tabular-nums">{d.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 lg:col-span-3">
+              <h3 className="font-bold text-slate-800">Ingresos por plan — últimos 12 meses</h3>
+              <p className="text-xs text-slate-400 mb-2">Barras apiladas: aporte de cada plan al ingreso del mes ($ COP)</p>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={perf.serieMensual} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#78716c' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`)} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {serieKeys.map(k => (
+                    <Bar key={k} dataKey={k} name={k} stackId="planes" fill={planColor(k)} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* ── Promociones y planes menores ── */}
+        {perf && planesMenores.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 pl-a4">
+            <h3 className="font-bold text-slate-800">Promociones y planes menores</h3>
+            <p className="text-xs text-slate-400 mb-3">Con pocas ventas registradas — no entran en el análisis principal</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                    <th className="py-2 pr-4 font-semibold">Plan</th>
+                    <th className="py-2 pr-4 font-semibold text-right">Ventas</th>
+                    <th className="py-2 pr-4 font-semibold text-right">Ingresos</th>
+                    <th className="py-2 font-semibold text-right">Pantallas vigentes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {planesMenores.map(p => (
+                    <tr key={p.plan}>
+                      <td className="py-2.5 pr-4 font-medium text-slate-700">{p.plan}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-slate-600">{p.ventas}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-slate-600">{formatCurrency(p.ingresos)}</td>
+                      <td className="py-2.5 text-right tabular-nums text-slate-600">{p.pantallasVigentes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── CATÁLOGO DE VENTA (configuración) ── */}
+        <div className="pl-a4 pt-2">
+          <div className="mb-3">
+            <h2 className="text-lg font-bold text-slate-800">Catálogo de venta</h2>
+            <p className="text-xs text-slate-400">
+              {stats.total} plan{stats.total === 1 ? '' : 'es'} definido{stats.total === 1 ? '' : 's'} · {stats.activos} activo{stats.activos === 1 ? '' : 's'} — es la plantilla de configuración para crear suscripciones, no el histórico de ventas
+            </p>
+          </div>
+          {planesFueraDeCatalogo.length > 0 && (
+            <div className="flex gap-2.5 items-start bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+              <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">
+                El catálogo no coincide con los planes que realmente se venden: <strong>{planesFueraDeCatalogo.map(p => p.plan).join(', ')}</strong> no existe{planesFueraDeCatalogo.length === 1 ? '' : 'n'} aquí. Créalos para alinear la configuración con la operación real.
+              </p>
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-4">
             <div className="relative flex-1 max-w-sm">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
