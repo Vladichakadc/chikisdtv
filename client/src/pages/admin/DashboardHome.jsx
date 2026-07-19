@@ -20,6 +20,7 @@ import { cn } from '../../utils/cn'
 import { calcDias, getRowVariant, diasLabel } from './planificador/rowHelpers'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
+import { ExecutiveDashboardHero } from './dashboard/ExecutiveDashboardHero'
 import {
   BiCard, GrowthBadge, SmartTag, ChartTooltip, ChartInsight,
   PIE_COLORS, MES_LABELS, LABEL_STYLE, formatCompactCurrency, renderDonutLabel,
@@ -29,21 +30,70 @@ const CSS = `
   @keyframes dash-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
   @keyframes dash-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
   @keyframes dash-orb-2   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(-25px,15px) scale(1.05) } }
+  @keyframes dash-glow   { 0%,100% { box-shadow: 0 0 0 0 rgba(249,115,22,.4) } 50% { box-shadow: 0 0 0 8px rgba(249,115,22,0) } }
+  @keyframes dash-pulse  { 0%,100% { opacity: 1 } 50% { opacity: 0.8 } }
   .dash-a1 { animation: dash-fade-up .45s cubic-bezier(.22,1,.36,1) both }
   .dash-a2 { animation: dash-fade-up .45s cubic-bezier(.22,1,.36,1) .06s both }
   .dash-a3 { animation: dash-fade-up .45s cubic-bezier(.22,1,.36,1) .12s both }
   .dash-orb-1 { animation: dash-orb-1 8s ease-in-out infinite }
   .dash-orb-2 { animation: dash-orb-2 11s ease-in-out infinite }
   .dash-cta {
-    background: linear-gradient(135deg, #8b5cf6, #6366f1);
-    box-shadow: 0 4px 18px rgba(99,102,241,.4);
-    transition: all .22s ease; border: none; color: white;
+    background: linear-gradient(135deg, #f97316, #fb923c);
+    box-shadow: 0 4px 18px rgba(249,115,22,.4);
+    transition: all .22s cubic-bezier(.22,1,.36,1);
+    border: none;
+    color: white;
+    font-weight: 600;
   }
-  .dash-cta:hover { box-shadow: 0 7px 24px rgba(99,102,241,.55); transform: translateY(-2px) }
-  .dash-kpi { transition: transform .25s ease, box-shadow .25s ease }
-  .dash-kpi:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.12) }
+  .dash-cta:hover {
+    box-shadow: 0 12px 32px rgba(249,115,22,.5);
+    transform: translateY(-3px);
+    background: linear-gradient(135deg, #fb923c, #fdba74);
+  }
+  .dash-card {
+    transition: all .3s cubic-bezier(.22,1,.36,1);
+    border: 1px solid rgba(255,255,255,.1);
+    background: linear-gradient(135deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+  }
+  .dash-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 40px rgba(0,0,0,.15);
+    border-color: rgba(249,115,22,.3);
+    background: linear-gradient(135deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  }
+  .dash-kpi {
+    transition: all .25s cubic-bezier(.22,1,.36,1);
+    position: relative;
+  }
+  .dash-kpi:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 40px rgba(0,0,0,.15), 0 0 20px rgba(249,115,22,.2);
+  }
+  .dash-kpi::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(249,115,22,.1), transparent);
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity .25s ease;
+    pointer-events: none;
+  }
+  .dash-kpi:hover::before {
+    opacity: 1;
+  }
+  .dash-chart-card {
+    transition: all .3s ease;
+  }
+  .dash-chart-card:hover {
+    box-shadow: 0 12px 32px rgba(0,0,0,.12);
+  }
   @media (prefers-reduced-motion: reduce) {
-    .dash-a1, .dash-a2, .dash-a3, .dash-orb-1, .dash-orb-2 { animation: none !important; transition: none !important }
+    .dash-a1, .dash-a2, .dash-a3, .dash-orb-1, .dash-orb-2, .dash-card, .dash-kpi { animation: none !important; transition: none !important }
+    .dash-kpi::before { display: none !important }
   }
 `
 
@@ -59,7 +109,11 @@ const COLOR_MAP = {
 }
 function StatCard({ icon, title, value, color, subtitle, onClick }) {
   const tone = Object.entries(COLOR_MAP).find(([k]) => color?.includes(k))?.[1] || 'indigo'
-  return <KpiCard icon={icon} label={title} value={value} sub={subtitle} tone={tone} onClick={onClick} />
+  return (
+    <div className="dash-kpi" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+      <KpiCard icon={icon} label={title} value={value} sub={subtitle} tone={tone} />
+    </div>
+  )
 }
 
 // ─── Narrativas de las gráficas que permanecen en el Dashboard ───────────────
@@ -507,56 +561,23 @@ export default function DashboardHome() {
 
       <style>{CSS}</style>
 
-      {/* ── HERO HEADER ── */}
-      <div className="dash-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)' }}>
-        <div className="dash-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.25] pointer-events-none" style={{ background: 'radial-gradient(circle,#a855f7,transparent 70%)' }} />
-        <div className="dash-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#6366f1,transparent 70%)' }} />
-        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
-
-        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/25 mb-4">
-              <Activity size={12} className="text-indigo-300" />
-              <span className="text-indigo-300 text-xs font-semibold tracking-widest uppercase">Operaciones</span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
-              Dashboard
-            </h1>
-            <p className="text-indigo-100/70 text-sm mt-2 max-w-xl">
-              Pulso diario de ChikisdTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-indigo-400 font-bold hover:text-white transition-colors">Análisis Financiero</button>
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {import.meta.env.DEV && (
-              <>
-                <input
-                  type="file" accept=".sqlite" id="restore-db-input" className="hidden"
-                  onChange={handleRestoreLocalBackup}
-                />
-                <button
-                  onClick={() => document.getElementById('restore-db-input').click()}
-                  disabled={restoringBackup}
-                  className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2"
-                >
-                  <Upload size={15} /> {restoringBackup ? 'Cargando…' : 'BD Local'}
-                </button>
-              </>
-            )}
-            <button
-              onClick={handleDownloadBackup} disabled={downloadingBackup}
-              className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2"
-            >
-              <Download size={15} /> {downloadingBackup ? 'Descargando…' : 'Respaldo'}
-            </button>
-            <button
-              onClick={handleSync} disabled={syncing}
-              className="dash-cta px-5 py-2.5 rounded-2xl text-sm font-bold flex items-center gap-2"
-            >
-              <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando…' : 'Sincronizar'}
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* ── HERO EJECUTIVO CORPORATIVO ── */}
+      <ExecutiveDashboardHero
+        stats={{
+          totalIngresos: bi?.kpis?.ingresosTotales,
+          totalClients: stats.totalClients,
+          churnRate: bi?.kpis?.churnPct,
+          marginPercent: bi?.kpis?.margenPctTotal,
+        }}
+        trendData={bi?.porMes?.slice(-12).map(m => ({ mes: m.label, ingresos: m.ingresos }))}
+        onDownloadBackup={handleDownloadBackup}
+        onRestoreBackup={handleRestoreLocalBackup}
+        onSync={handleSync}
+        downloadingBackup={downloadingBackup}
+        restoringBackup={restoringBackup}
+        syncing={syncing}
+        isDev={import.meta.env.DEV}
+      />
 
       {/* ─── KPIs operativos: clientes, catálogo y capacidad ─────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 dash-a2">
