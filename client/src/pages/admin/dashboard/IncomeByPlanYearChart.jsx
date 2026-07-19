@@ -66,31 +66,45 @@ export function IncomeByPlanYearChart({ data, tiposPlanes = [], loading = false,
   }, [data, tiposPlanes])
 
   // Tooltip personalizado
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = ({ active, payload }) => {
     if (!active || !payload?.length) return null
 
-    return (
-      <div style={{
-        background: 'rgba(255,255,255,0.97)',
-        border: '1px solid #fed7aa',
-        borderRadius: 8,
-        padding: '10px 14px',
-        fontSize: 12,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
-      }}>
-        <p style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
-          Año {label.anio}
-        </p>
-        {payload.map((entry, idx) => (
-          <p key={idx} style={{ color: entry.color, fontWeight: 600, fontSize: 11 }}>
-            {entry.name}: ${entry.value.toLocaleString('es-CO')}
+    try {
+      const data = payload[0]?.payload
+      const anio = data?.anio
+      const total = data?.total
+
+      if (!anio || total === undefined) return null
+
+      return (
+        <div style={{
+          background: 'rgba(255,255,255,0.97)',
+          border: '1px solid #fed7aa',
+          borderRadius: 8,
+          padding: '10px 14px',
+          fontSize: 12,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
+        }}>
+          <p style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+            Año {anio}
           </p>
-        ))}
-        <p style={{ color: '#059669', fontWeight: 700, marginTop: 6, fontSize: 11, borderTop: '1px solid #f0f0f0', paddingTop: 6 }}>
-          Total: ${label.total.toLocaleString('es-CO')}
-        </p>
-      </div>
-    )
+          {payload.map((entry, idx) => {
+            if (entry.dataKey === 'total') return null
+            return (
+              <p key={idx} style={{ color: entry.color, fontWeight: 600, fontSize: 11 }}>
+                {entry.name}: ${Number(entry.value).toLocaleString('es-CO')}
+              </p>
+            )
+          })}
+          <p style={{ color: '#059669', fontWeight: 700, marginTop: 6, fontSize: 11, borderTop: '1px solid #f0f0f0', paddingTop: 6 }}>
+            Total: ${Number(total).toLocaleString('es-CO')}
+          </p>
+        </div>
+      )
+    } catch (err) {
+      console.error('Error en CustomTooltip:', err)
+      return null
+    }
   }
 
   return (
