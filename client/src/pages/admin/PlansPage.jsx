@@ -139,6 +139,16 @@ function narrarPlanes(perf) {
   return partes.join('')
 }
 
+// Chip de margen %: verde = sano, ámbar = vigilar, rojo = pérdida
+function MargenBadge({ pct }) {
+  if (pct == null) return null
+  const tone = pct >= 60 ? 'bg-emerald-100 text-emerald-700'
+    : pct >= 40 ? 'bg-amber-100 text-amber-700'
+    : pct >= 0 ? 'bg-orange-100 text-orange-700'
+    : 'bg-red-100 text-red-700'
+  return <span className={`inline-block px-1.5 py-0.5 rounded-full text-[11px] font-bold tabular-nums ${tone}`}>{pct.toFixed(1)}%</span>
+}
+
 function MiniStat({ label, value, extra }) {
   return (
     <div>
@@ -502,6 +512,21 @@ export default function PlansPage() {
     [planesPrincipales]
   )
 
+  // Economía de cada plan del catálogo con el costo VIGENTE por pantalla-mes:
+  // costo = pantallas × (duración/30 meses) × costo pantalla-mes
+  const costoCatalogo = (p) => {
+    const vigente = perf?.costoPantalla?.vigente
+    if (!vigente) return null
+    const meses = (Number(p.duracionDias) || 0) / 30
+    const costo = (Number(p.numeroPantallas) || 1) * meses * vigente
+    const precio = Number(p.precio) || 0
+    return {
+      costo: Math.round(costo),
+      margen: Math.round(precio - costo),
+      pct: precio > 0 ? (precio - costo) / precio * 100 : null,
+    }
+  }
+
   /* ── Handlers ── */
   const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true) }
   const openEdit = (p) => { setEditing(p); setForm({ ...EMPTY, ...p }); setShowForm(true) }
@@ -647,7 +672,9 @@ export default function PlansPage() {
         {perf && planesMenores.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 pl-a4">
             <h3 className="font-bold text-slate-800">Promociones y planes menores</h3>
-            <p className="text-xs text-slate-400 mb-3">Con pocas ventas registradas — no entran en el análisis principal</p>
+            <p className="text-xs text-slate-400 mb-3">
+              Con pocas ventas registradas — costo estimado con el costo por pantalla-mes del año de cada venta (módulo Costo Pantalla)
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -655,6 +682,8 @@ export default function PlansPage() {
                     <th className="py-2 pr-4 font-semibold">Plan</th>
                     <th className="py-2 pr-4 font-semibold text-right">Ventas</th>
                     <th className="py-2 pr-4 font-semibold text-right">Ingresos</th>
+                    <th className="py-2 pr-4 font-semibold text-right">Costo pantallas</th>
+                    <th className="py-2 pr-4 font-semibold text-right">Rentabilidad</th>
                     <th className="py-2 font-semibold text-right">Pantallas vigentes</th>
                   </tr>
                 </thead>
@@ -664,6 +693,19 @@ export default function PlansPage() {
                       <td className="py-2.5 pr-4 font-medium text-slate-700">{p.plan}</td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-slate-600">{p.ventas}</td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-slate-600">{formatCurrency(p.ingresos)}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-slate-600">
+                        {p.costoEstimado != null ? formatCurrency(p.costoEstimado) : '—'}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right">
+                        {p.margenEstimado != null ? (
+                          <span className="inline-flex items-center gap-2">
+                            <span className={`font-semibold tabular-nums ${p.margenEstimado >= 0 ? 'text-slate-700' : 'text-red-600'}`}>
+                              {formatCurrency(p.margenEstimado)}
+                            </span>
+                            <MargenBadge pct={p.margenPctEstimado} />
+                          </span>
+                        ) : '—'}
+                      </td>
                       <td className="py-2.5 text-right tabular-nums text-slate-600">{p.pantallasVigentes}</td>
                     </tr>
                   ))}
@@ -680,6 +722,11 @@ export default function PlansPage() {
             <p className="text-xs text-slate-400">
               {stats.total} plan{stats.total === 1 ? '' : 'es'} definido{stats.total === 1 ? '' : 's'} · {stats.activos} activo{stats.activos === 1 ? '' : 's'} — es la plantilla de configuración para crear suscripciones, no el histórico de ventas
             </p>
+            {perf?.costoPantalla?.vigente > 0 && (
+              <p className="text-xs text-slate-400 mt-0.5">
+                Costo pantallas estimado con el costo vigente por pantalla-mes: <strong className="text-slate-600">{formatCurrency(perf.costoPantalla.vigente)}</strong> (promedio de {perf.costoPantalla.recargasVigente} recarga{perf.costoPantalla.recargasVigente === 1 ? '' : 's'} de {perf.costoPantalla.anioVigente} en el módulo Costo Pantalla)
+              </p>
+            )}
           </div>
           {planesFueraDeCatalogo.length > 0 && (
             <div className="flex gap-2.5 items-start bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
@@ -713,12 +760,16 @@ export default function PlansPage() {
                           <th className="px-6 py-4">Precio</th>
                           <th className="px-6 py-4">Duración</th>
                           <th className="px-6 py-4 text-center">Pantallas</th>
+                          <th className="px-6 py-4 text-right">Costo pantallas</th>
+                          <th className="px-6 py-4 text-right">Rentabilidad</th>
                           <th className="px-6 py-4 text-center">Estado</th>
                           <th className="px-6 py-4 w-20"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {filtered.map(p => (
+                        {filtered.map(p => {
+                          const eco = costoCatalogo(p)
+                          return (
                           <tr key={p.id} className="pl-row hover:bg-slate-50/50">
                             <td className="px-6 py-4">
                               <p className="font-semibold text-slate-800">{p.nombre}</p>
@@ -732,6 +783,19 @@ export default function PlansPage() {
                             </td>
                             <td className="px-6 py-4 text-center text-slate-600">
                               <span className="inline-flex items-center gap-1.5"><Monitor size={14} className="text-slate-400"/> {p.numeroPantallas}</span>
+                            </td>
+                            <td className="px-6 py-4 text-right tabular-nums text-slate-600">
+                              {eco ? formatCurrency(eco.costo) : '—'}
+                            </td>
+                            <td className="px-6 py-4 text-right whitespace-nowrap">
+                              {eco ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <span className={`font-semibold tabular-nums ${eco.margen >= 0 ? 'text-slate-700' : 'text-red-600'}`}>
+                                    {formatCurrency(eco.margen)}
+                                  </span>
+                                  <MargenBadge pct={eco.pct} />
+                                </span>
+                              ) : '—'}
                             </td>
                             <td className="px-6 py-4 text-center">
                               {p.activo
@@ -753,7 +817,8 @@ export default function PlansPage() {
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>

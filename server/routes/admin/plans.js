@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Plan, Venta, Planificador } = require('../../models');
+const { Plan, Venta, Planificador, CostoPantalla } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
 
 // ============ PLANS CRUD ============
@@ -22,13 +22,18 @@ const MES_NUM = {
 };
 const mesNum = (m) => MES_NUM[(m || '').toString().trim().toUpperCase()] || 0;
 const MES_LABEL = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-// Misma convención de mensualización que /dashboard-bi (MRR normalizado)
-const MESES_POR_PLAN = { 'Plan Mensual': 1, 'Plan Semestral': 6, 'Plan Anual': 12 };
+// Misma convención de mensualización que /dashboard-bi (MRR normalizado),
+// extendida con la cobertura de las promociones para poder costearlas
+// (3+1 = 4 meses de servicio; 7 meses + 1 gratis = 8 meses de servicio).
+const MESES_POR_PLAN = {
+  'Plan Mensual': 1, 'Plan Semestral': 6, 'Plan Anual': 12,
+  '3+1 Mundial': 4, '7 MESES + 1 MES GRATIS': 8,
+};
 
 router.get('/plans/performance', asyncHandler(async (_req, res) => {
-  const [ventas, pantallas, catalogo] = await Promise.all([
+  const [ventas, pantallas, catalogo, recargas] = await Promise.all([
     Venta.findAll({
-      attributes: ['idPantalla', 'anio', 'mes', 'fecha', 'precioVenta', 'tipoPago', 'tipoPlan'],
+      attributes: ['idPantalla', 'anio', 'mes', 'fecha', 'precioVenta', 'tipoPago', 'tipoPlan', 'pantallas'],
       raw: true,
     }),
     Planificador.findAll({
@@ -36,7 +41,33 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
       raw: true,
     }),
     Plan.findAll({ raw: true }),
+    CostoPantalla.findAll({ attributes: ['anio', 'costoPantallaCOP', 'itemQuantity'], raw: true }),
   ]);
+
+  // ── Costo por pantalla-mes (módulo Costo Pantalla) ──
+  // Promedio ponderado por cantidad de cuentas recargadas, por año. Cada venta
+  // se costea con el costo del AÑO en que ocurrió (no con el costo de hoy),
+  // para que la rentabilidad histórica no quede distorsionada por la TRM actual.
+  const costoAnioAcc = {};
+  for (const r of recargas) {
+    const c = Number(r.costoPantallaCOP);
+    if (!r.anio || !c) continue;
+    const w = Number(r.itemQuantity) || 1;
+    const acc = (costoAnioAcc[r.anio] ||= { suma: 0, peso: 0, recargas: 0 });
+    acc.suma += c * w;
+    acc.peso += w;
+    acc.recargas += 1;
+  }
+  const costoPorAnio = Object.fromEntries(
+    Object.entries(costoAnioAcc).map(([anio, a]) => [anio, a.suma / a.peso])
+  );
+  const aniosConCosto = Object.keys(costoPorAnio).sort();
+  const costoGlobal = aniosConCosto.length
+    ? Object.values(costoAnioAcc).reduce((s, a) => s + a.suma, 0) / Object.values(costoAnioAcc).reduce((s, a) => s + a.peso, 0)
+    : 0;
+  const anioVigente = aniosConCosto[aniosConCosto.length - 1] || null;
+  const costoVigente = anioVigente ? costoPorAnio[anioVigente] : 0;
+  const costoDeAnio = (anio) => costoPorAnio[anio] || costoGlobal;
 
   const hoy = new Date();
   const anioHoy = hoy.getFullYear();
@@ -56,7 +87,7 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
     plan: nombre,
     ventas: 0, ingresos: 0, renovaciones: 0, activaciones: 0,
     ingresosYTD: 0, ventasYTD: 0, ingresosYTDAnterior: 0,
-    mensualizado: 0,
+    mensualizado: 0, costoEstimado: 0, ventasCosteadas: 0,
     pantallasVigentes: 0, pantallasVencidas: 0, clientesActivos: new Set(),
     conDeuda: 0, montoDeuda: 0,
   });
@@ -72,6 +103,13 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
     p.ventas += 1;
     p.ingresos += monto;
     p.mensualizado += monto / (MESES_POR_PLAN[nombre] || 1);
+    // Costo estimado de servir la venta: meses de cobertura × pantallas
+    // vendidas × costo por pantalla-mes del año de la venta (Costo Pantalla)
+    const meses = MESES_POR_PLAN[nombre];
+    if (meses) {
+      p.costoEstimado += meses * (Number(v.pantallas) || 1) * costoDeAnio(v.anio);
+      p.ventasCosteadas += 1;
+    }
     if (v.tipoPago === 'Renovacion') p.renovaciones += 1;
     else if (v.tipoPago === 'Activacion Pantalla') p.activaciones += 1;
     const anio = Number(v.anio);
@@ -103,6 +141,12 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
       const crecimientoYTDPct = p.ingresosYTDAnterior > 0
         ? Number((((p.ingresosYTD - p.ingresosYTDAnterior) / p.ingresosYTDAnterior) * 100).toFixed(1))
         : null;
+      const costeable = p.ventasCosteadas > 0;
+      const costoEstimado = costeable ? Math.round(p.costoEstimado) : null;
+      const margenEstimado = costeable ? Math.round(p.ingresos - p.costoEstimado) : null;
+      const margenPctEstimado = costeable && p.ingresos > 0
+        ? Number((((p.ingresos - p.costoEstimado) / p.ingresos) * 100).toFixed(1))
+        : null;
       return {
         plan: p.plan,
         enCatalogo: nombresCatalogo.has(p.plan.trim().toLowerCase()),
@@ -119,6 +163,9 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
         ingresosYTDAnterior: Math.round(p.ingresosYTDAnterior),
         crecimientoYTDPct,
         mensualizado: Math.round(p.mensualizado),
+        costoEstimado,
+        margenEstimado,
+        margenPctEstimado,
         pantallasVigentes: p.pantallasVigentes,
         pantallasVencidas: p.pantallasVencidas,
         clientesActivos: p.clientesActivos.size,
@@ -151,6 +198,12 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
     planes: lista,
     topPlanes,
     serieMensual,
+    costoPantalla: {
+      vigente: Math.round(costoVigente),
+      anioVigente,
+      recargasVigente: anioVigente ? costoAnioAcc[anioVigente].recargas : 0,
+      promedioHistorico: Math.round(costoGlobal),
+    },
     totales: {
       ingresos: Math.round(totalIngresos),
       ventas: lista.reduce((s, p) => s + p.ventas, 0),
