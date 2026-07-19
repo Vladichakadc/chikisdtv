@@ -206,8 +206,8 @@ router.delete('/payments/ventas-licencia/:idVM', asyncHandler(async (req, res) =
 
 // Ingresos por tipo de plan y año (para gráfica de composición por años)
 router.get('/payments/ventas-licencia-by-plan-year', asyncHandler(async (_req, res) => {
-  const { sequelize } = require('../../config/database');
   const { Sequelize } = require('sequelize');
+  const { Op } = Sequelize;
 
   const data = await Venta.findAll({
     attributes: [
@@ -217,8 +217,8 @@ router.get('/payments/ventas-licencia-by-plan-year', asyncHandler(async (_req, r
       [Sequelize.fn('COUNT', Sequelize.col('idVM')), 'cantidadVentas']
     ],
     where: {
-      anio: { [Sequelize.Op.not]: null },
-      tipoPlan: { [Sequelize.Op.not]: null }
+      anio: { [Op.not]: null },
+      tipoPlan: { [Op.not]: null }
     },
     group: ['anio', 'tipoPlan'],
     raw: true,
