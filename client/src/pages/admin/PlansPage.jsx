@@ -17,18 +17,18 @@ import {
   Search, Plus, Pencil, Trash2, X,
   CheckCircle2, XCircle,
   Activity, AlertTriangle, Layers, Monitor, Calendar,
-  Wallet, Trophy, RefreshCw, AlertCircle,
+  Wallet, Trophy, RefreshCw, AlertCircle, ZoomIn,
 } from 'lucide-react'
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, PieChart, Pie, Cell,
+  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, PieChart, Pie, Cell, LabelList,
 } from 'recharts'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
-import { GrowthBadge, ChartInsight, ChartTooltip, renderDonutLabel } from './dashboard/biShared'
+import { GrowthBadge, ChartInsight, ChartTooltip, renderDonutLabel, formatCompactCurrency, LABEL_STYLE } from './dashboard/biShared'
 
 /* ══════════════════════════════════════════════════════════════
    DESIGN TOKENS (Huashu — brand Cyan/Sky para Planes)
@@ -137,6 +137,104 @@ function narrarPlanes(perf) {
     partes.push(` La fidelidad más alta la tiene **${fiel.plan}**: ${fiel.pctRenovacion}% de sus ventas son renovaciones.`)
   }
   return partes.join('')
+}
+
+// Detecta viewport móvil (breakpoint sm de Tailwind) de forma reactiva
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const onChange = (e) => setIsMobile(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return isMobile
+}
+
+// ── Controles del gráfico de serie mensual: año + planes visibles ──
+// En móvil cada grupo se desliza horizontalmente (sin cortar targets táctiles);
+// en escritorio conviven en una sola fila con wrap.
+function SerieControls({ anios, anio, onAnio, keys, activos, onToggle }) {
+  return (
+    <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-x-4 sm:gap-y-2 sm:flex-wrap">
+      <div className="overflow-x-auto pb-1 sm:pb-0 sm:overflow-visible">
+        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold w-max">
+          <button
+            onClick={() => onAnio(null)}
+            className={`px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg whitespace-nowrap transition-all ${anio == null ? 'bg-white shadow text-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            Últimos 12m
+          </button>
+          {anios.map(a => (
+            <button
+              key={a}
+              onClick={() => onAnio(a)}
+              className={`px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg whitespace-nowrap transition-all ${anio === a ? 'bg-white shadow text-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 sm:overflow-visible sm:flex-wrap">
+        {keys.map(k => {
+          const on = activos.has(k)
+          return (
+            <button
+              key={k}
+              onClick={() => onToggle(k)}
+              title={on ? `Ocultar ${k}` : `Mostrar ${k}`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-full text-xs font-semibold border whitespace-nowrap flex-shrink-0 transition-all ${on ? 'text-white border-transparent shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'}`}
+              style={on ? { background: planColor(k) } : undefined}
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? '#fff' : planColor(k) }} />
+              {k}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Gráfico de barras apiladas con etiqueta del total mensual ──
+// La etiqueta muestra el total de los planes VISIBLES (honestidad: lo que se
+// ve sumado, no un total oculto); el detalle por plan vive en el tooltip.
+// Los chips de SerieControls hacen de leyenda interactiva — no se duplica una
+// leyenda estática. En móvil (`compact`) las etiquetas se ocultan para evitar
+// colisiones de texto y los ejes se aligeran; el tooltip conserva los valores.
+function SeriePlanChart({ data, keys, className, compact = false }) {
+  return (
+    <div className={className}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data} margin={{ top: compact ? 8 : 26, right: compact ? 4 : 10, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} vertical={false} />
+          <XAxis
+            dataKey="label" tick={{ fontSize: compact ? 10 : 11, fill: '#78716c' }}
+            tickLine={false} axisLine={{ stroke: '#e2e8f0' }} minTickGap={compact ? 14 : 4}
+          />
+          <YAxis
+            tick={{ fontSize: compact ? 10 : 11, fill: '#78716c' }} width={compact ? 40 : 60}
+            tickLine={false} axisLine={false}
+            tickFormatter={(v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`)}
+          />
+          <Tooltip content={<ChartTooltip />} />
+          {keys.map(k => (
+            <Bar key={k} dataKey={k} name={k} stackId="planes" fill={planColor(k)} />
+          ))}
+          {/* Línea invisible que sostiene la etiqueta del total del mes en el
+              tope del stack, sin depender de qué serie quede de última */}
+          <Line type="monotone" dataKey="__total" name="Total mes" stroke="#475569" strokeWidth={0} dot={false} activeDot={false} legendType="none" isAnimationActive={false}>
+            {!compact && (
+              <LabelList dataKey="__total" position="top" formatter={(v) => (v > 0 ? formatCompactCurrency(v) : '')} style={{ ...LABEL_STYLE, fontSize: 10 }} />
+            )}
+          </Line>
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
 }
 
 // Chip de margen %: verde = sano, ámbar = vigilar, rojo = pérdida
@@ -439,6 +537,7 @@ function PlanDrawer({ editing, form, setForm, onSubmit, onClose }) {
 ══════════════════════════════════════════════════════════════ */
 export default function PlansPage() {
   const { showToast } = useUi()
+  const isMobile = useIsMobile()
   const [plans, setPlans] = useState([])
   const [perf, setPerf] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -512,6 +611,59 @@ export default function PlansPage() {
     [planesPrincipales]
   )
 
+  /* ── Serie mensual: ventana por año, planes visibles y lupa ── */
+  const [serieAnio, setSerieAnio] = useState(null)          // null = últimos 12 meses
+  const [seriePlanesOcultos, setSeriePlanesOcultos] = useState(() => new Set())
+  const [chartZoom, setChartZoom] = useState(false)
+
+  const aniosSerie = useMemo(
+    () => (perf ? [...new Set(perf.serieMensual.map(m => m.key.slice(0, 4)))].sort((a, b) => b.localeCompare(a)) : []),
+    [perf]
+  )
+  const serieActivos = useMemo(
+    () => new Set(serieKeys.filter(k => !seriePlanesOcultos.has(k))),
+    [serieKeys, seriePlanesOcultos]
+  )
+  const keysVisibles = useMemo(() => serieKeys.filter(k => serieActivos.has(k)), [serieKeys, serieActivos])
+
+  const serieVisible = useMemo(() => {
+    if (!perf) return []
+    const rows = serieAnio == null
+      ? perf.serieMensual.slice(-12)
+      : perf.serieMensual.filter(m => m.key.startsWith(serieAnio))
+    return rows.map(r => {
+      const out = { ...r }
+      let total = 0
+      for (const k of serieKeys) {
+        out[k] = r[k] || 0
+        if (serieActivos.has(k)) total += r[k] || 0
+      }
+      out.__total = total
+      return out
+    })
+  }, [perf, serieAnio, serieKeys, serieActivos])
+
+  const toggleSeriePlan = (k) => {
+    setSeriePlanesOcultos(prev => {
+      const next = new Set(prev)
+      if (next.has(k)) next.delete(k)
+      else next.add(k)
+      // Nunca dejar el gráfico vacío: si se ocultó el último plan, se muestran todos
+      if (serieKeys.every(x => next.has(x))) return new Set()
+      return next
+    })
+  }
+
+  const tituloSerie = serieAnio == null ? 'últimos 12 meses' : serieAnio
+
+  // Cerrar la lupa con Escape
+  useEffect(() => {
+    if (!chartZoom) return
+    const onKey = (e) => { if (e.key === 'Escape') setChartZoom(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [chartZoom])
+
   // Economía de cada plan del catálogo con el costo VIGENTE por pantalla-mes:
   // costo = pantallas × (duración/30 meses) × costo pantalla-mes
   const costoCatalogo = (p) => {
@@ -583,7 +735,7 @@ export default function PlansPage() {
           <div className="absolute inset-0 opacity-[.03] pointer-events-none"
                style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
 
-          <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div className="relative px-5 py-6 sm:px-7 sm:py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-5">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/15 border border-sky-500/25 mb-4">
                 <Activity size={12} className="text-sky-400" />
@@ -605,7 +757,7 @@ export default function PlansPage() {
         </div>
 
         {/* ── KPIs de desempeño ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <KpiCard icon={Wallet}    label="Ingresos por planes" value={perf ? formatCurrency(perf.totales.ingresos) : '—'} loading={loading} gradFrom="#f97316" gradTo="#fb923c" delay={2} sub="Histórico · sin cortesías ni cambios de plan" />
           <KpiCard icon={Monitor}   label="Base instalada"      value={perf ? `${perf.totales.pantallasVigentes} pantallas` : '—'} loading={loading} gradFrom="#0ea5e9" gradTo="#38bdf8" delay={3} sub="Vigentes hoy, según la última venta de cada una" />
           <KpiCard icon={Trophy}    label="Plan líder"          value={perf?.planes[0]?.plan || '—'} loading={loading} gradFrom="#8b5cf6" gradTo="#a78bfa" delay={4} sub={perf?.planes[0] ? `${perf.planes[0].pctIngresos}% del ingreso histórico` : ''} />
@@ -615,7 +767,7 @@ export default function PlansPage() {
         {/* ── Desempeño por plan ── */}
         {perf && planesPrincipales.length > 0 && (
           <div className="pl-a3 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
               {planesPrincipales.map(p => <PlanPerfCard key={p.plan} p={p} anioActual={perf.anioActual} />)}
             </div>
             <ChartInsight text={narrarPlanes(perf)} />
@@ -624,8 +776,8 @@ export default function PlansPage() {
 
         {/* ── Charts: composición del ingreso + tendencia mensual ── */}
         {perf && donutData.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 pl-a4">
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 lg:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4 pl-a4">
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 lg:col-span-2">
               <h3 className="font-bold text-slate-800">Composición del ingreso por plan</h3>
               <p className="text-xs text-slate-400 mb-2">Histórico de ventas de licencias ($ COP)</p>
               <ResponsiveContainer width="100%" height={230}>
@@ -649,28 +801,32 @@ export default function PlansPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 lg:col-span-3">
-              <h3 className="font-bold text-slate-800">Ingresos por plan — últimos 12 meses</h3>
-              <p className="text-xs text-slate-400 mb-2">Barras apiladas: aporte de cada plan al ingreso del mes ($ COP)</p>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={perf.serieMensual} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#78716c' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`)} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  {serieKeys.map(k => (
-                    <Bar key={k} dataKey={k} name={k} stackId="planes" fill={planColor(k)} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 lg:col-span-3">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-slate-800">Ingresos por plan — {tituloSerie}</h3>
+                  <p className="text-xs text-slate-400">Barras apiladas ($ COP) · la etiqueta sobre cada barra es el total del mes de los planes visibles</p>
+                </div>
+                <button
+                  onClick={() => setChartZoom(true)} title="Ampliar gráfico"
+                  className="p-2 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors flex-shrink-0"
+                >
+                  <ZoomIn size={17} />
+                </button>
+              </div>
+              <div className="mb-3">
+                <SerieControls anios={aniosSerie} anio={serieAnio} onAnio={setSerieAnio} keys={serieKeys} activos={serieActivos} onToggle={toggleSeriePlan} />
+              </div>
+              {serieVisible.length > 0
+                ? <SeriePlanChart data={serieVisible} keys={keysVisibles} className="h-60 sm:h-72" compact={isMobile} />
+                : <div className="py-16 text-center text-sm text-slate-400">Sin ventas registradas en {tituloSerie}.</div>}
             </div>
           </div>
         )}
 
         {/* ── Promociones y planes menores ── */}
         {perf && planesMenores.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 pl-a4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 pl-a4">
             <h3 className="font-bold text-slate-800">Promociones y planes menores</h3>
             <p className="text-xs text-slate-400 mb-3">
               Con pocas ventas registradas — costo estimado con el costo por pantalla-mes del año de cada venta (módulo Costo Pantalla)
@@ -828,6 +984,41 @@ export default function PlansPage() {
         </div>
 
       </div>
+
+      {/* ── LUPA: gráfico de serie mensual ampliado ──
+           En móvil es una hoja a pantalla completa; en escritorio, un modal centrado */}
+      {chartZoom && perf && (
+        <div
+          className="pl-overlay fixed inset-0 bg-black/60 backdrop-blur-[3px] z-[70] flex items-stretch sm:items-center justify-center p-0 sm:p-8"
+          onClick={() => setChartZoom(false)}
+        >
+          <div
+            className="pl-confirm bg-white w-full h-full sm:h-auto sm:rounded-2xl sm:shadow-2xl sm:max-w-6xl sm:max-h-[92vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-slate-100 flex-shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-800">Ingresos por plan — {tituloSerie}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Barras apiladas ($ COP){isMobile ? ' · toca una barra para ver el detalle' : ' · la etiqueta sobre cada barra es el total del mes de los planes visibles · Esc para cerrar'}
+                </p>
+              </div>
+              <button
+                onClick={() => setChartZoom(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all flex-shrink-0"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto flex-1">
+              <SerieControls anios={aniosSerie} anio={serieAnio} onAnio={setSerieAnio} keys={serieKeys} activos={serieActivos} onToggle={toggleSeriePlan} />
+              {serieVisible.length > 0
+                ? <SeriePlanChart data={serieVisible} keys={keysVisibles} className="h-[60vh] sm:h-[460px]" compact={isMobile} />
+                : <div className="py-16 text-center text-sm text-slate-400">Sin ventas registradas en {tituloSerie}.</div>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── DRAWER ── */}
       {showForm && (
