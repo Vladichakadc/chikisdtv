@@ -1,15 +1,48 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Tv, Loader2 } from 'lucide-react'
+import { Tv, Loader2, Lock, Mail } from 'lucide-react'
 import api from '../config/api'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+
+const STYLES = `
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+  }
+  .fade-in { animation: fadeInUp 0.6s ease-out forwards; }
+  .fade-in-1 { animation-delay: 0.1s; opacity: 0; }
+  .fade-in-2 { animation-delay: 0.2s; opacity: 0; }
+  .fade-in-3 { animation-delay: 0.3s; opacity: 0; }
+  .fade-in-4 { animation-delay: 0.4s; opacity: 0; }
+  .floating { animation: float 3s ease-in-out infinite; }
+  .loading-shimmer { animation: shimmer 2s infinite; }
+  .input-focus:focus-within {
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  }
+  .button-hover:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(249, 115, 22, 0.3);
+  }
+  .error-pulse {
+    animation: fadeInUp 0.4s ease-out;
+  }
+`
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [focusedField, setFocusedField] = useState(null)
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -35,49 +68,126 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-accent via-slate-800 to-black p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-primary rounded-2xl text-white mb-4">
-            <Tv size={32} />
-          </div>
-          <h1 className="text-3xl font-bold text-brand-accent">ChikisdTV</h1>
-          <p className="text-gray-500 mt-1">Portal de Gestión IPTV</p>
-        </div>
+    <>
+      <style>{STYLES}</style>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-brand-accent/5 to-black p-4 relative overflow-hidden">
+        {/* Decorative Elements */}
+        <div className="absolute top-0 right-0 w-72 h-72 bg-brand-primary/10 rounded-full blur-3xl opacity-50 floating" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl opacity-50" />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Correo electrónico"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            placeholder="admin@chikisdtv.com"
-          />
-          <Input
-            label="Contraseña"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            placeholder="••••••••"
-          />
+        {/* Main Card */}
+        <div className="relative z-10 bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
+          {/* Header Accent */}
+          <div className="h-1 bg-gradient-to-r from-brand-primary via-blue-500 to-brand-primary" />
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
-              {error}
+          <div className="p-8 sm:p-10">
+            {/* Logo Section */}
+            <div className="text-center mb-8 fade-in fade-in-1">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-brand-primary to-blue-600 rounded-2xl text-white mb-4 shadow-lg hover:shadow-xl transition-shadow">
+                <Tv size={40} className="floating" />
+              </div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-accent to-blue-600 bg-clip-text text-transparent">
+                ChikisdTV
+              </h1>
+              <p className="text-gray-500 mt-2 text-sm font-medium tracking-wide">
+                PLATAFORMA DE GESTIÓN IPTV PROFESIONAL
+              </p>
             </div>
-          )}
 
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? <Loader2 className="animate-spin" size={18} /> : 'Iniciar sesión'}
-          </Button>
-        </form>
+            {/* Subtitle */}
+            <p className="text-center text-gray-600 text-sm mb-8 fade-in fade-in-2">
+              Accede a tu panel de control para gestionar suscripciones y clientes
+            </p>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
-          ChikisdTV © 2026
-        </p>
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Email Input */}
+              <div className="fade-in fade-in-3 input-focus">
+                <div className="relative">
+                  <Mail className="absolute left-4 top-3.5 text-gray-400" size={18} />
+                  <Input
+                    label="Correo Electrónico"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onFocus={() => setFocusedField('email')}
+                    onBlur={() => setFocusedField(null)}
+                    required
+                    placeholder="admin@chikisdtv.com"
+                    className="pl-10"
+                    style={{
+                      transition: 'all 0.3s ease',
+                      borderColor: focusedField === 'email' ? '#f97316' : undefined,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Password Input */}
+              <div className="fade-in fade-in-4 input-focus">
+                <div className="relative">
+                  <Lock className="absolute left-4 top-3.5 text-gray-400" size={18} />
+                  <Input
+                    label="Contraseña"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
+                    required
+                    placeholder="••••••••"
+                    className="pl-10"
+                    style={{
+                      transition: 'all 0.3s ease',
+                      borderColor: focusedField === 'password' ? '#f97316' : undefined,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Error State */}
+              {error && (
+                <div className="error-pulse bg-gradient-to-r from-red-50 to-red-100 border border-red-200 text-red-700 text-sm p-4 rounded-lg flex items-start gap-3">
+                  <span className="text-lg">⚠️</span>
+                  <div>
+                    <p className="font-medium">{error}</p>
+                    <p className="text-xs text-red-600 mt-1">Verifica tus credenciales e intenta nuevamente</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="button-hover w-full py-3 px-4 bg-gradient-to-r from-brand-primary to-blue-600 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 hover:shadow-lg disabled:opacity-80 disabled:cursor-not-allowed mt-6"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>Iniciando sesión...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Iniciar Sesión</span>
+                    <span>→</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Footer */}
+            <div className="mt-8 pt-6 border-t border-gray-100">
+              <p className="text-center text-xs text-gray-400">
+                ChikisdTV © 2026 • Plataforma IPTV
+              </p>
+              <p className="text-center text-xs text-gray-500 mt-2">
+                Demo: admin@chikisdtv.com / admin123
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
