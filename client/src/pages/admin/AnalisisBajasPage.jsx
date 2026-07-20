@@ -3,7 +3,7 @@ import {
   UserX, BarChart3, Calendar, ArrowDownCircle, Tv, Activity,
   TrendingDown, TrendingUp, DollarSign, Clock, Shield, Zap,
   AlertTriangle, Target, Lightbulb, Percent, Users, Wallet,
-  HeartCrack, Scale, ArrowUpDown,
+  HeartCrack, Scale, ArrowUpDown, Filter, SlidersHorizontal, X,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis,
@@ -30,6 +30,40 @@ const CSS = `
   .abj-a3 { animation: abj-fade-up .45s .16s cubic-bezier(.22,1,.36,1) both }
   .abj-orb-1 { animation: abj-orb-1 8s ease-in-out infinite }
   .abj-orb-2 { animation: abj-orb-2 11s ease-in-out infinite }
+  .abj-pill {
+    display:inline-flex; align-items:center; gap:5px;
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .2s; border: 1px solid transparent;
+    user-select: none;
+  }
+  .abj-pill:hover { transform: translateY(-1px); }
+  .abj-pill.off { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+  .abj-pill.on  { background: linear-gradient(135deg,#f43f5e,#e11d48); color: #fff; border-color: #e11d48; box-shadow: 0 2px 8px rgba(225,29,72,.3); }
+  .abj-pill.on-amber { background: linear-gradient(135deg,#f59e0b,#d97706); color: #fff; border-color: #d97706; box-shadow: 0 2px 8px rgba(217,119,6,.3); }
+  .abj-pill.on-violet { background: linear-gradient(135deg,#8b5cf6,#7c3aed); color: #fff; border-color: #7c3aed; box-shadow: 0 2px 8px rgba(124,58,237,.3); }
+  .abj-pill.on-cyan { background: linear-gradient(135deg,#06b6d4,#0891b2); color: #fff; border-color: #0891b2; box-shadow: 0 2px 8px rgba(8,145,178,.3); }
+  .abj-filter-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 12px 16px; border-radius: 16px;
+    background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);
+    border: 1px solid #f1f5f9; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .abj-filter-label {
+    font-size: 11px; font-weight: 700; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: .08em;
+    margin-right: 4px;
+  }
+  .abj-filter-sep { width: 1px; height: 24px; background: #e2e8f0; margin: 0 4px; }
+  .abj-chart-controls {
+    display: flex; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 3px;
+  }
+  .abj-chart-btn {
+    padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    cursor: pointer; transition: all .18s; border: none; background: transparent; color: #64748b;
+  }
+  .abj-chart-btn.active {
+    background: #fff; color: #e11d48; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
 `
 
 // BajaCard → KpiCard global (dark Huashu)
@@ -55,6 +89,17 @@ export default function AnalisisBajasPage() {
   const { data: bajas, loading } = useApiResource('/admin/bajas')
   const [bi, setBi] = useState(null)
 
+  // ── Filtros globales ──────────────────────────────────────────────────────
+  const [filtroAnio, setFiltroAnio]             = useState('todos')
+  const [filtroPlan, setFiltroPlan]             = useState('todos')
+  const [filtroDispositivo, setFiltroDispositivo] = useState('todos')
+  const [filtroCortesia, setFiltroCortesia]     = useState('todos') // todos, SI, NO
+  const [filtroDevolucion, setFiltroDevolucion]  = useState('todos') // todos, SI, NO
+
+  // Controles por gráfica
+  const [netGrowthPeriodo, setNetGrowthPeriodo] = useState('12') // 6, 12, todos
+  const [lifetimeAnio, setLifetimeAnio]         = useState('todos')
+
   useEffect(() => {
     api.get('/admin/dashboard-bi')
       .then(r => setBi(r.data))
@@ -65,27 +110,52 @@ export default function AnalisisBajasPage() {
   const ltv  = bi?.ltv  || {}
   const bajasPorAnio = bi?.bajasPorAnioDetalle || []
 
-  // ── Métricas operativas ─────────────────────────────────────────────────────
+  // ── Opciones de filtro (extraídas de datos) ─────────────────────────────────
+  const filterOptions = useMemo(() => {
+    const anios = [...new Set((bajas || []).map(b => b.anio).filter(Boolean))].sort((a, b) => b - a)
+    const planes = [...new Set((bajas || []).map(b => (b.tipoPlan || '').trim()).filter(Boolean))].sort()
+    const dispositivos = [...new Set((bajas || []).map(b => (b.tipoFire || '').trim()).filter(Boolean))].sort()
+    return { anios, planes, dispositivos }
+  }, [bajas])
+
+  // ── Bajas filtradas (todas las métricas dependen de esto) ───────────────────
+  const bajasFiltradas = useMemo(() => {
+    if (!bajas) return []
+    return bajas.filter(b => {
+      if (filtroAnio !== 'todos' && String(b.anio) !== String(filtroAnio)) return false
+      if (filtroPlan !== 'todos' && (b.tipoPlan || '').trim() !== filtroPlan) return false
+      if (filtroDispositivo !== 'todos' && (b.tipoFire || '').trim() !== filtroDispositivo) return false
+      if (filtroCortesia !== 'todos' && (b.cortesia || '') !== filtroCortesia) return false
+      if (filtroDevolucion !== 'todos' && (b.devolucion || '') !== filtroDevolucion) return false
+      return true
+    })
+  }, [bajas, filtroAnio, filtroPlan, filtroDispositivo, filtroCortesia, filtroDevolucion])
+
+  const hayFiltrosActivos = filtroAnio !== 'todos' || filtroPlan !== 'todos' || filtroDispositivo !== 'todos' || filtroCortesia !== 'todos' || filtroDevolucion !== 'todos'
+  const limpiarFiltros = () => { setFiltroAnio('todos'); setFiltroPlan('todos'); setFiltroDispositivo('todos'); setFiltroCortesia('todos'); setFiltroDevolucion('todos') }
+
+  // ── Métricas operativas (usan bajasFiltradas) ───────────────────────────────
   const stats = useMemo(() => {
-    const total = bajas?.length || 0
-    const devueltos = bajas?.filter(b => b.devolucion === 'SI').length || 0
-    const cortesias = bajas?.filter(b => b.cortesia === 'SI').length || 0
+    const src = bajasFiltradas
+    const total = src.length
+    const devueltos = src.filter(b => b.devolucion === 'SI').length
+    const cortesias = src.filter(b => b.cortesia === 'SI').length
     const anioActual = new Date().getFullYear()
-    const bajasYTD = bajas?.filter(b => Number(b.anio) === anioActual).length || 0
-    const bajasYTDPrev = bajas?.filter(b => Number(b.anio) === anioActual - 1).length || 0
+    const bajasYTD = src.filter(b => Number(b.anio) === anioActual).length
+    const bajasYTDPrev = src.filter(b => Number(b.anio) === anioActual - 1).length
 
     // Velocidad de churn (últimos 3 meses)
     const now = new Date()
     const hace3M = new Date(now.getFullYear(), now.getMonth() - 3, 1)
-    const bajasRecientes = bajas?.filter(b => {
+    const bajasRecientes = src.filter(b => {
       if (!b.fechaBaja) return false
       return new Date(b.fechaBaja) >= hace3M
-    }).length || 0
+    }).length
     const velocidadChurn = (bajasRecientes / 3).toFixed(1)
 
     // Vida media del cliente (fecha activación → fecha baja)
     const vidas = []
-    bajas?.forEach(b => {
+    src.forEach(b => {
       if (b.fecha && b.fechaBaja) {
         const dias = (new Date(b.fechaBaja) - new Date(b.fecha)) / 86400000
         if (dias > 0 && dias < 3650) vidas.push(dias)
@@ -96,11 +166,11 @@ export default function AnalisisBajasPage() {
 
     // Mes pico
     const meses = {}
-    bajas?.forEach(b => { if (b.mes) meses[b.mes] = (meses[b.mes] || 0) + 1 })
+    src.forEach(b => { if (b.mes) meses[b.mes] = (meses[b.mes] || 0) + 1 })
     const mesMasAlto = Object.keys(meses).length ? Object.entries(meses).sort((a, b) => b[1] - a[1])[0] : null
 
     return { total, devueltos, cortesias, bajasYTD, bajasYTDPrev, velocidadChurn, vidaMediaDias, vidaMediaMeses, mesMasAlto, anioActual }
-  }, [bajas])
+  }, [bajasFiltradas])
 
   // ── Métricas financieras (cruce con BI) ─────────────────────────────────────
   const fin = useMemo(() => {
@@ -121,29 +191,29 @@ export default function AnalisisBajasPage() {
     return { ticketPromedio, arpu, revenueLost, revenueLostPrev, mrrPerdido, costoDesperdiciadoCortesias, netGrowthRate, ventasYTD }
   }, [kpis, stats, bi])
 
-  // ── Churn por tipo de plan ──────────────────────────────────────────────────
+  // ── Churn por tipo de plan (filtrado) ────────────────────────────────────────
   const churnPorPlan = useMemo(() => {
     const counts = {}
-    bajas?.forEach(b => {
+    bajasFiltradas.forEach(b => {
       const plan = (b.tipoPlan || '').trim() || 'Sin clasificar'
       counts[plan] = (counts[plan] || 0) + 1
     })
-    const total = bajas?.length || 1
+    const total = bajasFiltradas.length || 1
     return Object.entries(counts)
       .map(([plan, cant]) => ({ plan, cant, pct: Number((cant / total * 100).toFixed(1)) }))
       .sort((a, b) => b.cant - a.cant)
-  }, [bajas])
+  }, [bajasFiltradas])
 
-  // ── Churn por tipo de dispositivo ───────────────────────────────────────────
+  // ── Churn por tipo de dispositivo (filtrado) ────────────────────────────────
   const churnPorDispositivo = useMemo(() => {
     const counts = {}
     const devCounts = {}
-    bajas?.forEach(b => {
+    bajasFiltradas.forEach(b => {
       const tipo = (b.tipoFire || '').trim() || 'Sin clasificar'
       counts[tipo] = (counts[tipo] || 0) + 1
       if (b.devolucion === 'SI') devCounts[tipo] = (devCounts[tipo] || 0) + 1
     })
-    const total = bajas?.length || 1
+    const total = bajasFiltradas.length || 1
     return Object.entries(counts)
       .map(([tipo, cant]) => ({
         tipo, cant,
@@ -152,13 +222,13 @@ export default function AnalisisBajasPage() {
       }))
       .sort((a, b) => b.cant - a.cant)
       .slice(0, 8)
-  }, [bajas])
+  }, [bajasFiltradas])
 
-  // ── Net Growth mensual (ventas - bajas últimos 12M) ─────────────────────────
+  // ── Net Growth mensual (ventas - bajas, con control de periodo) ──────────────
   const netGrowthData = useMemo(() => {
     if (!bi?.porMes?.length) return []
     const bajasMap = {}
-    bajas?.forEach(b => {
+    bajasFiltradas.forEach(b => {
       if (!b.anio || !b.mes) return
       const mesIdx = MESES.indexOf(b.mes)
       if (mesIdx < 0) return
@@ -166,21 +236,23 @@ export default function AnalisisBajasPage() {
       bajasMap[key] = (bajasMap[key] || 0) + 1
     })
 
-    const last12 = bi.porMes.slice(-12)
+    const n = netGrowthPeriodo === 'todos' ? bi.porMes.length : netGrowthPeriodo === '6' ? 6 : 12
+    const slice = bi.porMes.slice(-n)
     let acumulado = 0
-    return last12.map(m => {
+    return slice.map(m => {
       const ventas = m.numVentas || 0
       const bajasM = bajasMap[m.key] || 0
       const net = ventas - bajasM
       acumulado += net
       return { label: m.label, ventas, bajas: bajasM, net, acumulado }
     })
-  }, [bi, bajas])
+  }, [bi, bajasFiltradas, netGrowthPeriodo])
 
-  // ── Customer Lifetime Distribution ──────────────────────────────────────────
+  // ── Customer Lifetime Distribution (con filtro de año propio) ────────────────
   const lifetimeData = useMemo(() => {
     const buckets = { '<1M': 0, '1-3M': 0, '3-6M': 0, '6-12M': 0, '>12M': 0 }
-    bajas?.forEach(b => {
+    const src = lifetimeAnio === 'todos' ? bajasFiltradas : bajasFiltradas.filter(b => String(b.anio) === String(lifetimeAnio))
+    src.forEach(b => {
       if (!b.fecha || !b.fechaBaja) return
       const dias = (new Date(b.fechaBaja) - new Date(b.fecha)) / 86400000
       if (dias <= 0 || dias > 3650) return
@@ -192,7 +264,7 @@ export default function AnalisisBajasPage() {
     })
     const colors = { '<1M': '#ef4444', '1-3M': '#f97316', '3-6M': '#eab308', '6-12M': '#22c55e', '>12M': '#06b6d4' }
     return Object.entries(buckets).map(([rango, cant]) => ({ rango, cant, color: colors[rango] }))
-  }, [bajas])
+  }, [bajasFiltradas, lifetimeAnio])
 
   // ── Impacto financiero del churn por año ────────────────────────────────────
   const impactoFinanciero = useMemo(() => {
@@ -212,16 +284,16 @@ export default function AnalisisBajasPage() {
   // ── Bajas por mes calendario (existente mejorada) ───────────────────────────
   const bajasPorMesCalendario = useMemo(() => {
     const counts = {}
-    bajas?.forEach(b => { if (b.mes) counts[b.mes] = (counts[b.mes] || 0) + 1 })
+    bajasFiltradas.forEach(b => { if (b.mes) counts[b.mes] = (counts[b.mes] || 0) + 1 })
     const max = Math.max(...Object.values(counts), 1)
     return MESES.map(m => ({ mes: m.slice(0, 3), mesNombre: m, total: counts[m] || 0, max }))
-  }, [bajas])
+  }, [bajasFiltradas])
 
-  // ── 2025 vs 2026 mensual (existente) ────────────────────────────────────────
+  // ── 2025 vs 2026 mensual (filtrado) ─────────────────────────────────────────
   const bajasMensualReciente = useMemo(() => {
     const mesIdx = Object.fromEntries(MESES.map((m, i) => [m, i]))
     const map = {}
-    bajas?.forEach(b => {
+    bajasFiltradas.forEach(b => {
       const anio = Number(b.anio)
       if (!b.mes || anio < 2025) return
       const idx = mesIdx[b.mes] ?? -1
@@ -230,12 +302,12 @@ export default function AnalisisBajasPage() {
       map[idx][String(anio)] = (map[idx][String(anio)] || 0) + 1
     })
     return MESES.map((_, i) => map[i] || { mesNum: i, mes: MESES[i].slice(0, 3), '2025': 0, '2026': 0 })
-  }, [bajas])
+  }, [bajasFiltradas])
 
-  // ── Motivos de cancelación (existente) ──────────────────────────────────────
+  // ── Motivos de cancelación (filtrado) ───────────────────────────────────────
   const bajasPorMotivo = useMemo(() => {
     const counts = {}
-    bajas?.forEach(b => {
+    bajasFiltradas.forEach(b => {
       const m = (b.motivo || '').trim() || 'Sin especificar'
       counts[m] = (counts[m] || 0) + 1
     })
@@ -243,7 +315,7 @@ export default function AnalisisBajasPage() {
       .map(([motivo, total]) => ({ motivo: motivo.length > 30 ? motivo.slice(0, 28) + '…' : motivo, total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 8)
-  }, [bajas])
+  }, [bajasFiltradas])
 
   // ── Recomendaciones estratégicas auto-generadas ─────────────────────────────
   const recomendaciones = useMemo(() => {
@@ -293,6 +365,54 @@ export default function AnalisisBajasPage() {
   return (
     <div className="p-6 space-y-6 pb-12">
       <style>{CSS}</style>
+
+      {/* ── BARRA DE FILTROS GLOBAL ── */}
+      <div className="abj-filter-bar mb-2">
+        <SlidersHorizontal size={14} className="text-gray-400" />
+        <span className="abj-filter-label">Año</span>
+        <span className={`abj-pill ${filtroAnio === 'todos' ? 'on' : 'off'}`} onClick={() => setFiltroAnio('todos')}>Todos</span>
+        {filterOptions.anios.map(a => (
+          <span key={a} className={`abj-pill ${String(filtroAnio) === String(a) ? 'on' : 'off'}`} onClick={() => setFiltroAnio(a)}>{a}</span>
+        ))}
+
+        <div className="abj-filter-sep" />
+        <span className="abj-filter-label">Plan</span>
+        <span className={`abj-pill ${filtroPlan === 'todos' ? 'on-amber' : 'off'}`} onClick={() => setFiltroPlan('todos')}>Todos</span>
+        {filterOptions.planes.map(p => (
+          <span key={p} className={`abj-pill ${filtroPlan === p ? 'on-amber' : 'off'}`} onClick={() => setFiltroPlan(p)}>{p}</span>
+        ))}
+
+        <div className="abj-filter-sep" />
+        <span className="abj-filter-label">Dispositivo</span>
+        <span className={`abj-pill ${filtroDispositivo === 'todos' ? 'on-violet' : 'off'}`} onClick={() => setFiltroDispositivo('todos')}>Todos</span>
+        {filterOptions.dispositivos.slice(0, 5).map(d => (
+          <span key={d} className={`abj-pill ${filtroDispositivo === d ? 'on-violet' : 'off'}`} onClick={() => setFiltroDispositivo(d)}>{d}</span>
+        ))}
+
+        <div className="abj-filter-sep" />
+        <span className="abj-filter-label">Cortesía</span>
+        {['todos', 'SI', 'NO'].map(v => (
+          <span key={v} className={`abj-pill ${filtroCortesia === v ? 'on-cyan' : 'off'}`} onClick={() => setFiltroCortesia(v)}>{v === 'todos' ? 'Todas' : v}</span>
+        ))}
+
+        <div className="abj-filter-sep" />
+        <span className="abj-filter-label">Devolución</span>
+        {['todos', 'SI', 'NO'].map(v => (
+          <span key={v} className={`abj-pill ${filtroDevolucion === v ? 'on-cyan' : 'off'}`} onClick={() => setFiltroDevolucion(v)}>{v === 'todos' ? 'Todas' : v}</span>
+        ))}
+
+        {hayFiltrosActivos && (
+          <>
+            <div className="abj-filter-sep" />
+            <span className="abj-pill off" onClick={limpiarFiltros} style={{ color: '#ef4444', borderColor: '#fecaca' }}>
+              <X size={12} /> Limpiar filtros
+            </span>
+            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+              {bajasFiltradas.length} de {bajas?.length || 0} bajas
+            </span>
+          </>
+        )}
+      </div>
 
       {/* ── HERO HEADER ── */}
       <div className="abj-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#701a75 0%,#4c0519 100%)' }}>
@@ -509,12 +629,19 @@ export default function AnalisisBajasPage() {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {netGrowthData.length > 0 && (
         <Card className="border-rose-100">
-          <CardHeader className="border-rose-50">
-            <CardTitle>
-              <ArrowUpDown size={15} className="inline mr-1.5" />
-              Net Growth — Altas vs Bajas (últimos 12 meses)
-            </CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Ventas netas menos cancelaciones · La línea muestra el crecimiento acumulado de la base de clientes</p>
+          <CardHeader className="border-rose-50 flex-row justify-between items-start">
+            <div>
+              <CardTitle>
+                <ArrowUpDown size={15} className="inline mr-1.5" />
+                Net Growth — Altas vs Bajas {netGrowthPeriodo !== 'todos' ? `(últimos ${netGrowthPeriodo} meses)` : '(histórico completo)'}
+              </CardTitle>
+              <p className="text-sm text-gray-400 mt-0.5">Ventas netas menos cancelaciones · La línea muestra el crecimiento acumulado de la base de clientes</p>
+            </div>
+            <div className="abj-chart-controls">
+              <button className={`abj-chart-btn ${netGrowthPeriodo === '6' ? 'active' : ''}`} onClick={() => setNetGrowthPeriodo('6')}>6M</button>
+              <button className={`abj-chart-btn ${netGrowthPeriodo === '12' ? 'active' : ''}`} onClick={() => setNetGrowthPeriodo('12')}>12M</button>
+              <button className={`abj-chart-btn ${netGrowthPeriodo === 'todos' ? 'active' : ''}`} onClick={() => setNetGrowthPeriodo('todos')}>Todos</button>
+            </div>
           </CardHeader>
           <CardBody>
             <ResponsiveContainer width="100%" height={280}>
@@ -550,9 +677,17 @@ export default function AnalisisBajasPage() {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {lifetimeData.some(d => d.cant > 0) && (
         <Card className="border-rose-100">
-          <CardHeader className="border-rose-50">
-            <CardTitle>Distribución de vida útil del cliente</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">¿Cuánto tiempo permanecen los clientes antes de darse de baja? — Driver para optimizar retención por cohorte</p>
+          <CardHeader className="border-rose-50 flex-row justify-between items-start">
+            <div>
+              <CardTitle>Distribución de vida útil del cliente</CardTitle>
+              <p className="text-sm text-gray-400 mt-0.5">¿Cuánto tiempo permanecen los clientes antes de darse de baja? — Driver para optimizar retención por cohorte</p>
+            </div>
+            <div className="abj-chart-controls">
+              <button className={`abj-chart-btn ${lifetimeAnio === 'todos' ? 'active' : ''}`} onClick={() => setLifetimeAnio('todos')}>Histórico</button>
+              {filterOptions.anios.slice(0, 3).map(a => (
+                <button key={a} className={`abj-chart-btn ${String(lifetimeAnio) === String(a) ? 'active' : ''}`} onClick={() => setLifetimeAnio(a)}>{a}</button>
+              ))}
+            </div>
           </CardHeader>
           <CardBody>
             <ResponsiveContainer width="100%" height={220}>

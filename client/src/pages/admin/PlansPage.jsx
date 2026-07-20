@@ -550,6 +550,14 @@ export default function PlansPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [ofertaPlan, setOfertaPlan] = useState(null)
 
+  // Botón único del hero: abre la oferta rápida con el plan activo más
+  // económico como punto de partida (dentro del modal se cambia de plan)
+  const abrirOferta = () => {
+    const base = [...plans].filter(p => p.activo).sort((a, b) => a.precio - b.precio)[0] || plans[0]
+    if (!base) { showToast('No hay planes en el Catálogo de venta para ofertar.', 'error'); return }
+    setOfertaPlan(base)
+  }
+
   const load = async () => {
     setLoading(true)
     try {
@@ -751,10 +759,20 @@ export default function PlansPage() {
                 Qué plan vende, retiene y sostiene el negocio — datos reales de Pagos y Planificador
               </p>
             </div>
-            <button onClick={openNew}
-              className="pl-cta shrink-0 px-5 py-3 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
-              <Plus size={17} /> Nuevo Plan
-            </button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+              <button
+                onClick={abrirOferta}
+                title="Generar oferta rápida para WhatsApp — imagen o texto, en COP o USD"
+                className="shrink-0 px-5 py-3 rounded-2xl text-sm font-bold text-white flex items-center gap-2 transition-all shadow-lg shadow-emerald-950/40 hover:brightness-110 hover:shadow-emerald-950/60"
+                style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)' }}
+              >
+                <Megaphone size={16} /> Oferta rápida
+              </button>
+              <button onClick={openNew}
+                className="pl-cta shrink-0 px-5 py-3 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
+                <Plus size={17} /> Nuevo Plan
+              </button>
+            </div>
           </div>
         </div>
 
@@ -962,12 +980,6 @@ export default function PlansPage() {
                             </td>
                             <td className="px-4 py-4 text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <button onClick={() => setOfertaPlan(p)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all"
-                                  title="Oferta rápida para WhatsApp — imagen o texto, en COP o USD">
-                                  <Megaphone size={13} />
-                                  Oferta
-                                </button>
                                 <button onClick={() => openEdit(p)}
                                   className="pl-action-btn w-8 h-8 rounded-lg flex items-center justify-center text-sky-500 hover:bg-sky-50"
                                   title="Editar">
