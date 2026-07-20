@@ -108,7 +108,7 @@ function CustomDot(props) {
 
 // ─── Componente principal ───────────────────────────────────────────────────
 export function MomentumAnalysisChart({ data, kMomentum }) {
-  const [periodo, setPeriodo] = useState('todos') // todos, 12, 6, 3
+  const [periodo, setPeriodo] = useState('12') // todos, 12, 6, 3
   const [comparativa, setComparativa] = useState('none') // none, yoy, mom
   const [analisis, setAnalisis] = useState({
     volatilidad: true,
