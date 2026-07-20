@@ -15,6 +15,11 @@ import { IncomeByPlanYearChart } from './dashboard/IncomeByPlanYearChart'
 
 const fmtCOP = (v) => (v == null || v === '' ? '—' : formatCurrency(v))
 
+// Cortesia (regalo, $0) y Cambio de Plan (registro administrativo, no es una
+// transacción real) no cuentan como ingreso — misma exclusión que ya aplican
+// dashboard-bi y /plans/performance, para que las cifras coincidan entre módulos.
+const esIngresoReal = (r) => r.tipoPago !== 'Cortesia' && r.tipoPago !== 'Cambio de Plan'
+
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const MES_ABREV = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const normMes = m => (m || '').trim().toLowerCase()
@@ -217,7 +222,7 @@ export default function AnalisisPagosPage() {
 
   const stats = useMemo(() => {
     const total       = searched.length
-    const ingresos    = searched.reduce((s, r) => s + (Number(r.precioVenta) || 0), 0)
+    const ingresos    = searched.filter(esIngresoReal).reduce((s, r) => s + (Number(r.precioVenta) || 0), 0)
     const renovaciones = searched.filter(r => r.tipoPago === 'Renovacion').length
     const activaciones = searched.filter(r => r.tipoPago?.startsWith('Activacion')).length
     return { total, ingresos, renovaciones, activaciones }
@@ -225,7 +230,7 @@ export default function AnalisisPagosPage() {
 
   const porMedioPago = useMemo(() => {
     const map = {}
-    for (const r of searched) {
+    for (const r of searched.filter(esIngresoReal)) {
       const medio = (r.medioPago || '').trim() || 'Sin registrar'
       map[medio] = (map[medio] || 0) + (Number(r.precioVenta) || 0)
     }
@@ -236,7 +241,7 @@ export default function AnalisisPagosPage() {
 
   const porTipoPlan = useMemo(() => {
     const map = {}
-    for (const r of searched) {
+    for (const r of searched.filter(esIngresoReal)) {
       const plan = (r.tipoPlan || '').trim() || 'Sin clasificar'
       if (!map[plan]) map[plan] = { plan, ingresos: 0, ventas: 0 }
       map[plan].ingresos += Number(r.precioVenta) || 0
@@ -253,7 +258,7 @@ export default function AnalisisPagosPage() {
 
   // ── Evolución mensual de ingresos + ticket promedio (histórico completo, sin filtro global) ──
   const serieMensual = useMemo(() => {
-    let src = rows
+    let src = rows.filter(esIngresoReal)
     if (evolAnio !== 'todos') src = src.filter(r => String(r.anio) === evolAnio)
     const map = {}
     for (const r of src) {
@@ -283,7 +288,7 @@ export default function AnalisisPagosPage() {
   // ── Concentración de ingresos por cliente (Pareto 80/20) ──────────────────
   const pareto = useMemo(() => {
     const map = {}
-    for (const r of rows) {
+    for (const r of rows.filter(esIngresoReal)) {
       const key = r.customerId || r.nickname || `${r.nombre || ''} ${r.apellido || ''}`.trim() || 'Sin identificar'
       if (!map[key]) map[key] = { cliente: r.nickname || `${r.nombre || ''} ${r.apellido || ''}`.trim() || key, ingresos: 0, ventas: 0 }
       map[key].ingresos += Number(r.precioVenta) || 0
@@ -311,7 +316,7 @@ export default function AnalisisPagosPage() {
     const anioHoy = hoy.getFullYear()
     const mesHoy = hoy.getMonth() + 1
     let ytd = 0, ytdAnt = 0, ventasYtd = 0, ventasYtdAnt = 0
-    for (const r of rows) {
+    for (const r of rows.filter(esIngresoReal)) {
       const anio = Number(r.anio)
       const mm = MES_NUM[normMes(r.mes)] || 0
       if (!anio || !mm || mm > mesHoy) continue

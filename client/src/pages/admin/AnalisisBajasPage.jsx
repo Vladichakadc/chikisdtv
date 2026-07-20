@@ -836,7 +836,10 @@ export default function AnalisisBajasPage() {
               const meses26 = bajasMensualReciente.filter(m => m['2026'] > 0).length
               const ritmo = meses26 > 0 ? (total26 / meses26).toFixed(1) : 0
               const proyAnual = meses26 > 0 ? Math.round(total26 / meses26 * 12) : 0
-              const varPct = total25 > 0 ? ((total26 - total25) / total25 * 100).toFixed(1) : null
+              // Comparar la PROYECCIÓN anualizada (no el total parcial) contra el año
+              // completo anterior — comparar total26 (año en curso) vs total25 (año
+              // completo) subestima el churn real solo porque 2026 lleva menos meses.
+              const varPct = total25 > 0 && meses26 > 0 ? ((proyAnual - total25) / total25 * 100).toFixed(1) : null
               return `En **2025** se registraron **${total25} bajas** en el año completo. En lo corrido de **2026** van **${total26} bajas** (${meses26} mes${meses26 !== 1 ? 'es' : ''}, ritmo: ${ritmo}/mes → proyección anual ~${proyAnual}).${varPct ? ` Al ritmo actual el año cerraría con un **${Number(varPct) >= 0 ? '+' : ''}${varPct}% vs 2025** — ${Number(varPct) > 10 ? 'tendencia preocupante que requiere acciones de retención.' : Number(varPct) < -10 ? 'tendencia positiva, el churn está mejorando.' : 'variación dentro de rangos normales.'}` : ''}`
             })()} />
           </CardBody>
