@@ -17,7 +17,7 @@ import {
   Search, Plus, Pencil, Trash2, X,
   CheckCircle2, XCircle,
   Activity, AlertTriangle, Layers, Monitor, Calendar,
-  Wallet, Trophy, RefreshCw, AlertCircle, ZoomIn,
+  Wallet, Trophy, RefreshCw, AlertCircle, ZoomIn, Megaphone,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -29,6 +29,7 @@ import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
 import { GrowthBadge, ChartInsight, ChartTooltip, renderDonutLabel, formatCompactCurrency, LABEL_STYLE } from './dashboard/biShared'
+import { OfertaRapidaModal } from './plans/OfertaRapidaModal'
 
 /* ══════════════════════════════════════════════════════════════
    DESIGN TOKENS (Huashu — brand Cyan/Sky para Planes)
@@ -547,6 +548,7 @@ export default function PlansPage() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [ofertaPlan, setOfertaPlan] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -960,6 +962,12 @@ export default function PlansPage() {
                             </td>
                             <td className="px-4 py-4 text-right">
                               <div className="flex items-center justify-end gap-1">
+                                <button onClick={() => setOfertaPlan(p)}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all"
+                                  title="Oferta rápida para WhatsApp — imagen o texto, en COP o USD">
+                                  <Megaphone size={13} />
+                                  Oferta
+                                </button>
                                 <button onClick={() => openEdit(p)}
                                   className="pl-action-btn w-8 h-8 rounded-lg flex items-center justify-center text-sky-500 hover:bg-sky-50"
                                   title="Editar">
@@ -1032,6 +1040,16 @@ export default function PlansPage() {
       )}
 
       {/* ── CONFIRM DELETE ── */}
+      {/* Oferta rápida para WhatsApp (desde el Catálogo de venta) */}
+      {ofertaPlan && (
+        <OfertaRapidaModal
+          plan={ofertaPlan}
+          planes={plans}
+          trmInicial={perf?.costoPantalla?.trmVigente}
+          onClose={() => setOfertaPlan(null)}
+        />
+      )}
+
       {deleteTarget && (
         <ConfirmDialog
           name={deleteTarget.nombre}

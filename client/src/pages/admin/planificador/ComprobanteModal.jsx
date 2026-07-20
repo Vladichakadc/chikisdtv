@@ -14,12 +14,8 @@ import api from '../../../config/api'
 import { cn } from '../../../utils/cn'
 import { useUi } from '../../../context/UiContext'
 import { formatDate, formatCurrency } from '../../../utils/excelUtils'
+import { MARCA_CLIENTE, PAGO_NEQUI, PAGO_LLAVE } from '../../../config/negocio'
 import { calcDias, diasLabel } from './rowHelpers'
-
-// ── Datos de negocio del mensaje de renovación (editar aquí si cambian) ────
-const MARCA_CLIENTE = 'FLUJOTV'
-const PAGO_NEQUI = '3187342097'
-const PAGO_LLAVE = '@ved227'
 
 // Familias del catálogo que entran en la oferta (en este orden). Los meses de
 // regalo son la política comercial: Semestral paga 6 y goza 7; Anual paga 12

@@ -41,8 +41,14 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
       raw: true,
     }),
     Plan.findAll({ raw: true }),
-    CostoPantalla.findAll({ attributes: ['anio', 'costoPantallaCOP', 'itemQuantity'], raw: true }),
+    CostoPantalla.findAll({ attributes: ['anio', 'costoPantallaCOP', 'itemQuantity', 'fecha', 'trm'], raw: true }),
   ]);
+
+  // TRM más reciente registrada en Costo Pantalla — se usa como tasa por
+  // defecto para cotizar la oferta rápida en dólares (editable en la UI)
+  const trmVigente = recargas
+    .filter(r => Number(r.trm) > 0)
+    .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')))[0]?.trm || null;
 
   // ── Costo por pantalla-mes (módulo Costo Pantalla) ──
   // Promedio ponderado por cantidad de cuentas recargadas, por año. Cada venta
@@ -203,6 +209,7 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
       anioVigente,
       recargasVigente: anioVigente ? costoAnioAcc[anioVigente].recargas : 0,
       promedioHistorico: Math.round(costoGlobal),
+      trmVigente,
     },
     totales: {
       ingresos: Math.round(totalIngresos),
