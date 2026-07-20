@@ -445,19 +445,6 @@ table(
   [70, 200, 225]
 );
 
-h2('6.8 Portal de Usuario (/api/user)');
-table(
-  ['Metodo', 'Endpoint', 'Descripcion'],
-  [
-    ['GET', '/api/user/me', 'Perfil del usuario actual'],
-    ['GET', '/api/user/my-summary', 'Resumen para el dashboard'],
-    ['GET', '/api/user/my-subscriptions', 'Mis suscripciones'],
-    ['GET', '/api/user/my-payments', 'Mis pagos'],
-    ['GET', '/api/user/my-devices', 'Mis dispositivos']
-  ],
-  [70, 200, 225]
-);
-
 // ============ Frontend Routes ============
 h1('7. Rutas del Frontend');
 
@@ -485,18 +472,6 @@ table(
   [160, 170, 165]
 );
 
-h2('7.3 Rutas portal cliente (rol=user)');
-table(
-  ['Ruta', 'Componente', 'Proposito'],
-  [
-    ['/dashboard', 'UserDashboardHome.jsx', 'Resumen personal'],
-    ['/dashboard/subscription', 'UserSubscriptionPage.jsx', 'Mi suscripcion'],
-    ['/dashboard/payments', 'UserPaymentsPage.jsx', 'Mis pagos'],
-    ['/dashboard/devices', 'UserDevicesPage.jsx', 'Mis dispositivos']
-  ],
-  [160, 170, 165]
-);
-
 // ============ Seguridad ============
 doc.addPage();
 h1('8. Seguridad');
@@ -508,9 +483,9 @@ bullet('Envio automatico via interceptor de Axios (Authorization: Bearer)');
 bullet('Verificacion en middleware verifyToken antes de cada ruta protegida');
 
 h2('Autorizacion');
-bullet('Sistema de roles: admin y user');
+bullet('ChikisdTV es una herramienta interna: solo el rol admin puede iniciar sesion en el panel');
 bullet('Middleware requireRole bloquea acceso a rutas /api/admin/* para usuarios sin rol admin');
-bullet('Portal de usuario solo accede a sus propios datos (filtrado por req.user.id)');
+bullet('El login rechaza explicitamente cualquier cuenta con rol distinto de admin');
 
 h2('Contrasenas');
 bullet('Hash con bcryptjs (cost factor 10)');
@@ -614,30 +589,6 @@ bullet('Registro de equipos por cliente con tipo (Smart TV, PC, Celular, Tablet)
 bullet('Asociacion opcional a suscripcion especifica');
 bullet('Direccion MAC o identificador unico');
 bullet('Activar / desactivar dispositivo');
-
-doc.addPage();
-h2('10.2 Portal del cliente (rol user)');
-h3('Mi Resumen');
-bullet('Estado de mi suscripcion activa');
-bullet('Numero de mis dispositivos activos');
-bullet('Pagos pendientes a mi nombre');
-bullet('Total acumulado pagado');
-bullet('Detalle visible del plan vigente con fecha de vencimiento');
-
-h3('Mi Suscripcion');
-bullet('Historial completo de mis suscripciones');
-bullet('Plan, precio, fechas de inicio y vencimiento');
-bullet('Estados visibles con badges de color');
-
-h3('Mis Pagos');
-bullet('Historial cronologico de mis pagos');
-bullet('Monto, metodo de pago y fecha');
-bullet('Plan al que se aplico el pago');
-
-h3('Mis Dispositivos');
-bullet('Listado de mis equipos registrados');
-bullet('Tipo y MAC de cada dispositivo');
-bullet('Plan asignado a cada equipo');
 
 // ============ Conclusion ============
 h1('11. Conclusion');

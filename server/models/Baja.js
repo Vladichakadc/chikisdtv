@@ -16,7 +16,11 @@ const Baja = sequelize.define('Baja', {
   cortesia: { type: DataTypes.STRING },
   pantallas: { type: DataTypes.INTEGER, defaultValue: 1, comment: 'Número de pantallas' },
   fechaBaja: { type: DataTypes.DATEONLY, comment: 'Fecha de la baja' },
-  fecha: { type: DataTypes.DATEONLY, comment: 'Fecha de activación original' },
+  // OJO: pese al nombre del campo original en Excel, NO es la fecha de activación
+  // del cliente — está casi siempre a pocos días de fechaBaja (fecha de inicio del
+  // último ciclo de facturación). Para la vida real del cliente usar el cruce con
+  // Venta.tipoPago='Activacion Pantalla' (ver dashboard-bi → activacionPorCliente).
+  fecha: { type: DataTypes.DATEONLY, comment: 'Fecha de inicio del último ciclo (NO es la activación original; ver comentario)' },
   anio: { type: DataTypes.INTEGER },
   mes: { type: DataTypes.STRING },
   itemQuantity: { type: DataTypes.INTEGER, defaultValue: 1 },

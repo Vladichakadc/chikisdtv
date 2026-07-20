@@ -28,11 +28,8 @@ app.use(withRLS);
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'ChikisdTV', time: new Date().toISOString() }));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'ChikisdTV', time: new Date().toISOString() }));
 
-const userRoutes = require('./routes/user');
-
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/user', userRoutes);
 
 // Sirve el frontend en producción.
 // Doble condición: NODE_ENV=production O la carpeta dist existe (Railway no siempre

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import {
-  DollarSign, ShoppingCart, RotateCcw, Zap, Calendar, ChevronDown, Activity
+  DollarSign, ShoppingCart, RotateCcw, Zap, Calendar, ChevronDown, Activity,
+  Receipt, Users, LineChart as LineChartIcon, Lightbulb, Scale, Filter,
 } from 'lucide-react'
 import api from '../../config/api'
 import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
@@ -8,14 +9,16 @@ import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts'
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts'
 import { ChartInsight, PIE_COLORS, LABEL_STYLE, renderDonutLabel } from './dashboard/biShared'
 import { IncomeByPlanYearChart } from './dashboard/IncomeByPlanYearChart'
 
 const fmtCOP = (v) => (v == null || v === '' ? '—' : formatCurrency(v))
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const MES_ABREV = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const normMes = m => (m || '').trim().toLowerCase()
+const MES_NUM = Object.fromEntries(MESES.map((m, i) => [normMes(m), i + 1]))
 
 const CSS = `
   @keyframes pg-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
@@ -24,10 +27,55 @@ const CSS = `
   .pg-a1 { animation: pg-fade-up .45s cubic-bezier(.22,1,.36,1) both }
   .pg-orb-1 { animation: pg-orb-1 8s ease-in-out infinite }
   .pg-orb-2 { animation: pg-orb-2 11s ease-in-out infinite }
+  .pg-chart-controls { display: flex; flex-wrap: wrap; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 3px; }
+  .pg-chart-btn {
+    padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    cursor: pointer; transition: all .18s; border: none; background: transparent; color: #64748b;
+    white-space: nowrap;
+  }
+  .pg-chart-btn.active { background: #fff; color: #047857; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .pg-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .pg-filter-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em;
+  }
 `
 
 // PagoCard → KpiCard global (dark Huashu)
 const PagoCard = (props) => <KpiCard {...props} tone="emerald" />
+
+function ChartChips({ options, value, onChange }) {
+  return (
+    <div className="pg-chart-controls">
+      {options.map(o => (
+        <button key={o.key} type="button" className={`pg-chart-btn ${String(value) === String(o.key) ? 'active' : ''}`} onClick={() => onChange(o.key)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+function ChartControlsRow({ children }) {
+  return (
+    <div className="pg-filter-row">
+      <span className="pg-filter-tag"><Filter size={11} /> Esta gráfica</span>
+      {children}
+    </div>
+  )
+}
+function PremiumTooltip({ active, payload, label, formatter }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.97)', border: '1px solid #e2e8f0', borderLeft: '3px solid #059669', borderRadius: 10, padding: '10px 14px', fontSize: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.10)', minWidth: 180 }}>
+      <p style={{ fontWeight: 700, color: '#1e293b', marginBottom: 5 }}>{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color || '#64748b', fontWeight: 600 }}>
+          {p.name}: {formatter ? formatter(p.value, p.name) : p.value}
+        </p>
+      ))}
+    </div>
+  )
+}
 
 export default function AnalisisPagosPage() {
   const [rows, setRows] = useState([])
@@ -199,6 +247,116 @@ export default function AnalisisPagosPage() {
       .sort((a, b) => b.ingresos - a.ingresos)
   }, [searched])
 
+  // ── Controles locales de las gráficas nuevas (independientes del filtro global) ──
+  const [evolAnio, setEvolAnio]     = useState('todos')
+  const [paretoTopN, setParetoTopN] = useState('10')
+
+  // ── Evolución mensual de ingresos + ticket promedio (histórico completo, sin filtro global) ──
+  const serieMensual = useMemo(() => {
+    let src = rows
+    if (evolAnio !== 'todos') src = src.filter(r => String(r.anio) === evolAnio)
+    const map = {}
+    for (const r of src) {
+      const mm = MES_NUM[normMes(r.mes)] || 0
+      if (!mm || !r.anio) continue
+      const key = `${r.anio}-${String(mm).padStart(2, '0')}`
+      if (!map[key]) map[key] = { key, ingresos: 0, ventas: 0 }
+      map[key].ingresos += Number(r.precioVenta) || 0
+      map[key].ventas += 1
+    }
+    const hoy = new Date()
+    const keyHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+    return Object.values(map).sort((a, b) => a.key.localeCompare(b.key)).map(x => {
+      const [anio, mm] = x.key.split('-')
+      return {
+        label: `${MES_ABREV[Number(mm) - 1]} ${anio.slice(2)}`,
+        ingresos: Math.round(x.ingresos),
+        ventas: x.ventas,
+        ticket: x.ventas > 0 ? Math.round(x.ingresos / x.ventas) : 0,
+        // El mes en curso está incompleto — no es comparable con meses cerrados
+        // (evita que una "caída" de fin de mes se lea como una señal real).
+        parcial: x.key === keyHoy,
+      }
+    })
+  }, [rows, evolAnio])
+
+  // ── Concentración de ingresos por cliente (Pareto 80/20) ──────────────────
+  const pareto = useMemo(() => {
+    const map = {}
+    for (const r of rows) {
+      const key = r.customerId || r.nickname || `${r.nombre || ''} ${r.apellido || ''}`.trim() || 'Sin identificar'
+      if (!map[key]) map[key] = { cliente: r.nickname || `${r.nombre || ''} ${r.apellido || ''}`.trim() || key, ingresos: 0, ventas: 0 }
+      map[key].ingresos += Number(r.precioVenta) || 0
+      map[key].ventas += 1
+    }
+    const list = Object.values(map).sort((a, b) => b.ingresos - a.ingresos)
+    const total = list.reduce((s, c) => s + c.ingresos, 0)
+    let acc = 0
+    const withCum = list.map(c => {
+      acc += c.ingresos
+      return { ...c, ingresos: Math.round(c.ingresos), pctAcum: total > 0 ? Number(((acc / total) * 100).toFixed(1)) : 0 }
+    })
+    const n80 = withCum.findIndex(c => c.pctAcum >= 80) + 1
+    return { list: withCum, total: Math.round(total), n80: n80 || withCum.length, totalClientes: withCum.length }
+  }, [rows])
+
+  const paretoChartData = useMemo(() => {
+    const n = paretoTopN === 'todos' ? pareto.list.length : Number(paretoTopN)
+    return pareto.list.slice(0, n)
+  }, [pareto, paretoTopN])
+
+  // ── Tendencia YTD vs mismo período del año anterior (estable, no depende del filtro de la página) ──
+  const trendStats = useMemo(() => {
+    const hoy = new Date()
+    const anioHoy = hoy.getFullYear()
+    const mesHoy = hoy.getMonth() + 1
+    let ytd = 0, ytdAnt = 0, ventasYtd = 0, ventasYtdAnt = 0
+    for (const r of rows) {
+      const anio = Number(r.anio)
+      const mm = MES_NUM[normMes(r.mes)] || 0
+      if (!anio || !mm || mm > mesHoy) continue
+      const monto = Number(r.precioVenta) || 0
+      if (anio === anioHoy) { ytd += monto; ventasYtd += 1 }
+      else if (anio === anioHoy - 1) { ytdAnt += monto; ventasYtdAnt += 1 }
+    }
+    const growthIngresos = ytdAnt > 0 ? Number((((ytd - ytdAnt) / ytdAnt) * 100).toFixed(1)) : null
+    const ticketYtd = ventasYtd > 0 ? ytd / ventasYtd : 0
+    const ticketYtdAnt = ventasYtdAnt > 0 ? ytdAnt / ventasYtdAnt : 0
+    const growthTicket = ticketYtdAnt > 0 ? Number((((ticketYtd - ticketYtdAnt) / ticketYtdAnt) * 100).toFixed(1)) : null
+    return { ytd, ytdAnt, growthIngresos, ticketYtd: Math.round(ticketYtd), growthTicket }
+  }, [rows])
+
+  // ── Recomendaciones narrativas para alta gerencia ──────────────────────────
+  const recomendaciones = useMemo(() => {
+    const out = []
+    if (trendStats.growthIngresos != null) {
+      out.push(trendStats.growthIngresos >= 0
+        ? `Los ingresos de este año van **${trendStats.growthIngresos.toFixed(1)}% por encima** del mismo período del año anterior (${fmtCOP(trendStats.ytd)} vs ${fmtCOP(trendStats.ytdAnt)}).`
+        : `Los ingresos de este año van **${Math.abs(trendStats.growthIngresos).toFixed(1)}% por debajo** del mismo período del año anterior (${fmtCOP(trendStats.ytd)} vs ${fmtCOP(trendStats.ytdAnt)}) — vale la pena revisar qué canal o plan explica la caída antes de que se acumule más.`)
+    }
+    if (porMedioPago.length > 0) {
+      const totalMedios = porMedioPago.reduce((s, p) => s + p.value, 0)
+      const pctTop = totalMedios > 0 ? (porMedioPago[0].value / totalMedios) * 100 : 0
+      if (pctTop >= 55) {
+        out.push(`**${porMedioPago[0].name}** concentra el **${pctTop.toFixed(0)}%** del recaudo — una dependencia alta de un solo canal de pago; si cambian sus condiciones o falla, el impacto en caja sería inmediato. Conviene incentivar un segundo canal activo.`)
+      }
+    }
+    if (pareto.totalClientes >= 5) {
+      const pctClientes = (pareto.n80 / pareto.totalClientes) * 100
+      out.push(`El **80%** de los ingresos proviene de solo **${pareto.n80} de ${pareto.totalClientes} clientes** (${pctClientes.toFixed(1)}% de la base) — ${pctClientes < 20 ? 'concentración alta: perder a los clientes top tendría un impacto financiero desproporcionado, conviene un plan de retención dedicado a ese grupo.' : 'la base de ingresos está razonablemente distribuida entre clientes.'}`)
+    }
+    if (porTipoPlan.length > 0) {
+      out.push(`**${porTipoPlan[0].plan}** es la línea que más ingresos genera (${fmtCOP(porTipoPlan[0].ingresos)}, ticket promedio ${fmtCOP(porTipoPlan[0].ticket)}) — es la referencia a proteger en cualquier ajuste de precios.`)
+    }
+    if (trendStats.growthTicket != null && Math.abs(trendStats.growthTicket) >= 5) {
+      out.push(trendStats.growthTicket > 0
+        ? `El ticket promedio subió **${trendStats.growthTicket.toFixed(1)}%** frente al año anterior (${fmtCOP(trendStats.ticketYtd)} actual) — buena señal de mix de planes más altos o menos descuentos.`
+        : `El ticket promedio bajó **${Math.abs(trendStats.growthTicket).toFixed(1)}%** frente al año anterior (${fmtCOP(trendStats.ticketYtd)} actual) — revisar si hay presión de descuentos o migración hacia planes más económicos.`)
+    }
+    if (out.length === 0) out.push('No se detectan alertas relevantes: ingresos, concentración de canal y de clientes se mantienen en rangos estables.')
+    return out
+  }, [trendStats, porMedioPago, pareto, porTipoPlan])
+
   if (loading) {
     return (
       <div className="p-12 text-center">
@@ -304,7 +462,7 @@ export default function AnalisisPagosPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <PagoCard icon={ShoppingCart} label="Total Registros" value={stats.total.toLocaleString()} variant="solid" sub={(selectedYears !== null || selectedMonths !== null) ? 'Resultados filtrados' : 'Histórico completo'}
           onClick={() => setExplain({
             title: 'Total Registros', value: stats.total.toLocaleString(), icon: ShoppingCart,
@@ -312,12 +470,19 @@ export default function AnalisisPagosPage() {
             comoSeCalcula: 'Conteo simple de las filas de la tabla de ventas que pasan el filtro activo. **Sin filtros, coincide con el histórico completo.**',
             origen: 'Tabla de ventas de licencias de este módulo.',
           })} />
-        <PagoCard icon={DollarSign} label="Ingresos Totales" value={fmtCOP(stats.ingresos)} variant="light" sub="Licencias vendidas"
+        <PagoCard icon={DollarSign} label="Ingresos Totales" value={fmtCOP(stats.ingresos)} variant="light" sub="YTD vs año anterior" trend={trendStats.growthIngresos}
           onClick={() => setExplain({
             title: 'Ingresos Totales', value: fmtCOP(stats.ingresos), icon: DollarSign,
-            queEs: 'La plata que ha entrado por ventas de licencias en la vista actual.',
-            comoSeCalcula: 'Se **suma el precio de venta** de cada registro visible.',
+            queEs: 'La plata que ha entrado por ventas de licencias en la vista actual. La tendencia (↑/↓) compara lo corrido de este año contra el mismo período del año anterior, sin importar el filtro activo.',
+            comoSeCalcula: 'Se **suma el precio de venta** de cada registro visible. Tendencia: (YTD actual − YTD año anterior) / YTD año anterior.',
             origen: 'Campo precio de venta de cada fila de este módulo.',
+          })} />
+        <PagoCard icon={Receipt} label="Ticket Promedio" value={fmtCOP(stats.total > 0 ? stats.ingresos / stats.total : 0)} variant="outline" sub="YTD vs año anterior" trend={trendStats.growthTicket}
+          onClick={() => setExplain({
+            title: 'Ticket Promedio', value: fmtCOP(stats.total > 0 ? stats.ingresos / stats.total : 0), icon: Receipt,
+            queEs: 'Cuánto deja en promedio cada venta — sube si se venden más planes largos/caros o si hay menos descuentos, baja en el caso contrario.',
+            comoSeCalcula: 'Ingresos totales de la vista ÷ número de registros. Tendencia: ticket promedio YTD vs mismo período del año anterior.',
+            origen: 'Campos precio de venta de cada fila de este módulo.',
           })} />
         <PagoCard icon={RotateCcw} label="Renovaciones" value={stats.renovaciones.toLocaleString()} variant="outline" sub="Clientes recurrentes"
           onClick={() => setExplain({
@@ -334,6 +499,54 @@ export default function AnalisisPagosPage() {
             origen: 'Campo tipo de pago de cada venta de este módulo.',
           })} />
       </div>
+
+      {/* Evolución mensual de ingresos y ticket promedio (histórico completo) */}
+      {serieMensual.length >= 2 && (
+        <Card className="border-orange-100 mb-4">
+          <CardHeader className="border-orange-50">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <LineChartIcon size={18} className="text-emerald-600" />
+                <div>
+                  <CardTitle>Evolución mensual de ingresos</CardTitle>
+                  <p className="text-sm text-gray-400 mt-0.5">Barras = ingresos del mes · línea = ticket promedio · histórico completo, independiente del filtro superior</p>
+                </div>
+              </div>
+              <ChartControlsRow>
+                <ChartChips options={[{ key: 'todos', label: 'Todos' }, ...yearOptions.map(y => ({ key: y, label: y }))]} value={evolAnio} onChange={setEvolAnio} />
+              </ChartControlsRow>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={serieMensual} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#a7f3d0" opacity={0.4} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#78716c' }} interval="preserveStartEnd" />
+                <YAxis yAxisId="cop" tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`} tick={{ fontSize: 10, fill: '#78716c' }} width={52} />
+                <YAxis yAxisId="ticket" orientation="right" tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`} tick={{ fontSize: 10, fill: '#78716c' }} width={52} />
+                <Tooltip content={<PremiumTooltip formatter={(v, name) => name === 'Ventas' ? v : fmtCOP(v)} />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar yAxisId="cop" dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[3, 3, 0, 0]}>
+                  {serieMensual.map((m, i) => <Cell key={i} fill="#10b981" fillOpacity={m.parcial ? 0.35 : 1} stroke={m.parcial ? '#10b981' : 'none'} strokeDasharray={m.parcial ? '3 2' : undefined} />)}
+                </Bar>
+                <Line yAxisId="ticket" dataKey="ticket" name="Ticket promedio" stroke="#6366f1" strokeWidth={2} dot={false} connectNulls />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={(() => {
+              if (serieMensual.length < 2) return null
+              // Compara los últimos dos meses CERRADOS — el mes en curso está
+              // incompleto y su caída natural de fin de mes no es una señal real.
+              const cerrados = serieMensual.filter(m => !m.parcial)
+              const ultimo = cerrados[cerrados.length - 1]
+              const penultimo = cerrados[cerrados.length - 2]
+              const momPct = ultimo && penultimo && penultimo.ingresos > 0 ? ((ultimo.ingresos - penultimo.ingresos) / penultimo.ingresos) * 100 : null
+              const pico = cerrados.length > 0 ? cerrados.reduce((a, b) => (b.ingresos > a.ingresos ? b : a)) : null
+              const mesEnCurso = serieMensual[serieMensual.length - 1]?.parcial ? serieMensual[serieMensual.length - 1] : null
+              return `${pico ? `El mes de mayor recaudo fue **${pico.label}** (${fmtCOP(pico.ingresos)}).` : ''} ${momPct != null ? `De ${penultimo.label} a ${ultimo.label} (últimos meses cerrados) los ingresos ${momPct >= 0 ? 'subieron' : 'bajaron'} **${Math.abs(momPct).toFixed(1)}%** mes a mes.` : ''} ${mesEnCurso ? `**${mesEnCurso.label}** está en curso — su valor parcial (${fmtCOP(mesEnCurso.ingresos)} hasta hoy) todavía no es comparable con un mes cerrado.` : ''} Usa este gráfico para detectar estacionalidad y anticipar meses flojos con campañas de renovación.`
+            })()} />
+          </CardBody>
+        </Card>
+      )}
 
       {/* Composición financiera */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -413,6 +626,61 @@ export default function AnalisisPagosPage() {
               return totalB - totalA;
             })[0]}** como la línea de negocio principal. Monitorea la diversificación: planes únicos concentran riesgo, mientras mezclas balanceadas ofrecen resiliencia. Los planes largos (semestral/anual) adelantan caja pero pueden ocultar churn; los mensuales dan señal temprana de fuga.`
             : 'Agregando datos de ingresos por tipo de plan...'} />
+        </CardBody>
+      </Card>
+
+      {/* Concentración de ingresos por cliente (Pareto 80/20) */}
+      {pareto.totalClientes >= 5 && (
+        <Card className="border-orange-100">
+          <CardHeader className="border-orange-50">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-emerald-600" />
+                <div>
+                  <CardTitle>Concentración de ingresos por cliente</CardTitle>
+                  <p className="text-sm text-gray-400 mt-0.5">Barras = ingresos por cliente · línea = % acumulado del total (regla 80/20) · histórico completo</p>
+                </div>
+              </div>
+              <ChartControlsRow>
+                <ChartChips options={[{ key: '10', label: 'Top 10' }, { key: '20', label: 'Top 20' }, { key: 'todos', label: 'Todos' }]} value={paretoTopN} onChange={setParetoTopN} />
+              </ChartControlsRow>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart data={paretoChartData} margin={{ top: 10, right: 12, left: 0, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#a7f3d0" opacity={0.4} />
+                <XAxis dataKey="cliente" tick={{ fontSize: 9, fill: '#78716c' }} interval={0} angle={-35} textAnchor="end" height={60} />
+                <YAxis yAxisId="cop" tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`} tick={{ fontSize: 10, fill: '#78716c' }} width={52} />
+                <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10, fill: '#78716c' }} width={40} />
+                <Tooltip content={<PremiumTooltip formatter={(v, name) => name === '% acumulado' ? `${Number(v).toFixed(1)}%` : fmtCOP(v)} />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar yAxisId="cop" dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[3, 3, 0, 0]} />
+                <Line yAxisId="pct" dataKey="pctAcum" name="% acumulado" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <ChartInsight text={`El **80%** de los ingresos históricos proviene de solo **${pareto.n80} de ${pareto.totalClientes} clientes** (${((pareto.n80 / pareto.totalClientes) * 100).toFixed(1)}% de la base). ${((pareto.n80 / pareto.totalClientes) * 100) < 20 ? 'Es una concentración alta — un plan de fidelización dedicado a ese grupo protege una porción desproporcionada del ingreso.' : 'La base de clientes está razonablemente diversificada, lo que reduce el riesgo de depender de pocas cuentas.'}`} />
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Recomendaciones para la toma de decisiones */}
+      <Card className="border-orange-100">
+        <CardHeader className="border-orange-50">
+          <div className="flex items-center gap-2">
+            <Lightbulb size={18} className="text-emerald-600" />
+            <CardTitle>Recomendaciones para la toma de decisiones</CardTitle>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <ul className="space-y-3">
+            {recomendaciones.map((r, i) => (
+              <li key={i} className="flex gap-3 text-sm text-gray-600 leading-relaxed">
+                <Scale size={15} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                <span>{r.split('**').map((chunk, j) => j % 2 === 1 ? <strong key={j} className="text-gray-800">{chunk}</strong> : chunk)}</span>
+              </li>
+            ))}
+          </ul>
         </CardBody>
       </Card>
     </div>

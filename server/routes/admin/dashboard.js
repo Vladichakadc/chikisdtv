@@ -127,7 +127,8 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const costos = await CostoPantalla.findAll({ attributes: ['anio', 'mes', 'costoCOP', 'impuesto4x100COP'] });
   // Atributos combinados: cubre tanto el agregado por año/mes (abajo) como el
   // desglose por tipo de dispositivo más adelante (antes eran dos SELECT separados)
-  const bajas  = await Baja.findAll({ attributes: ['anio', 'mes', 'devolucion', 'tipoFire', 'pantallas'], raw: true });
+  // customerId/fechaBaja/tipoPlan se usan para reconstruir la vida real del cliente (ver "vida real" más abajo).
+  const bajas  = await Baja.findAll({ attributes: ['anio', 'mes', 'devolucion', 'tipoFire', 'pantallas', 'customerId', 'fechaBaja', 'tipoPlan'], raw: true });
 
   // ─── Agregación por año ───────────────────────────────────────────────────
   const anios = [...new Set([
@@ -152,6 +153,11 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const ventasCountPorAnio = countBy(ventas, v => v.anio);
   const costosPorAnio = sumBy(costos, c => c.anio, c => Number(c.costoCOP || 0) + Number(c.impuesto4x100COP || 0));
   const bajasCountPorAnio = countBy(bajas, b => String(b.anio));
+  // Altas REALES (solo activaciones nuevas) — distinto de numVentas, que mezcla
+  // renovaciones (~82% del histórico) con activaciones y no sirve para medir
+  // crecimiento neto de clientes (ver "Net Growth" en Análisis de Bajas).
+  const ventasActivacion = ventas.filter(v => v.tipoPago === 'Activacion Pantalla');
+  const activacionesCountPorAnio = countBy(ventasActivacion, v => v.anio);
 
   let prevIngresos = null;
   let prevCostos = null;
@@ -173,6 +179,7 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
       crecimientoIngresosPct: crecimientoIngresosPct != null ? Number(crecimientoIngresosPct.toFixed(1)) : null,
       crecimientoCostosPct: crecimientoCostosPct != null ? Number(crecimientoCostosPct.toFixed(1)) : null,
       numVentas: ventasCountPorAnio[anio] || 0,
+      numActivaciones: activacionesCountPorAnio[anio] || 0,
       numBajas: bajasCountPorAnio[anio] || 0,
     };
   });
@@ -181,6 +188,7 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const monthKey = (anio, mes) => `${anio}-${String(mesNum(mes)).padStart(2, '0')}`;
   const ingresosPorMes = sumBy(ventas, v => monthKey(v.anio, v.mes), v => v.precioVenta);
   const ventasCountPorMes = countBy(ventas, v => monthKey(v.anio, v.mes));
+  const activacionesCountPorMes = countBy(ventasActivacion, v => monthKey(v.anio, v.mes));
   const costosPorMes = sumBy(costos, c => monthKey(c.anio, c.mes), c => Number(c.costoCOP || 0) + Number(c.impuesto4x100COP || 0));
 
   const monthKeys = [...new Set([...Object.keys(ingresosPorMes), ...Object.keys(costosPorMes)])]
@@ -199,6 +207,7 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
       costos: costosVal,
       margen: ingresos - costosVal,
       numVentas: ventasCountPorMes[key] || 0,
+      numActivaciones: activacionesCountPorMes[key] || 0,
     };
   });
 
@@ -554,6 +563,18 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     .sort((a, b) => b.ltvHistorico - a.ltvHistorico)
     .slice(0, 20);
 
+  // ─── Vida real del cliente en Bajas ──────────────────────────────────────
+  // El campo Baja.fecha (importado del Excel original) NO es la fecha de
+  // activación original pese a su nombre: en el 80% de los registros está a
+  // menos de 15 días de fechaBaja (verificado cruzando con el historial de
+  // Ventas), o sea que es más parecida a la fecha de inicio del último ciclo
+  // de facturación. La vida real se reconstruye cruzando cada baja con la
+  // PRIMERA venta "Activacion Pantalla" del mismo customerId (primeraActiv,
+  // ya calculado arriba para el LTV) — se expone el mapa completo para que
+  // el front pueda recalcular vida media / distribución con filtros propios
+  // por año o por plan sin duplicar esta lógica.
+  const activacionPorCliente = primeraActiv;
+
   const payload = {
     porAnio,
     porMes: porMesConMrr,
@@ -561,6 +582,7 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     mrrPorTipoPlan,
     paretoIngresos,
     bajasPorAnioDetalle,
+    activacionPorCliente,
     paisesClientes,
     planificadorAlertas,
     pantallasConDeuda,
