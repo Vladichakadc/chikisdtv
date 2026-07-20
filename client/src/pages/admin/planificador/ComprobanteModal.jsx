@@ -147,6 +147,7 @@ export function ComprobanteModal({ row, onClose }) {
   const [pago, setPago] = useState(null)
   const [telefono, setTelefono] = useState(null)
   const [pantallasCliente, setPantallasCliente] = useState(1)
+  const [pantallasDetalle, setPantallasDetalle] = useState([])
   const [catalogo, setCatalogo] = useState([])
   const [cargando, setCargando] = useState(true)
   const [copiado, setCopiado] = useState(false)
@@ -163,6 +164,7 @@ export function ComprobanteModal({ row, onClose }) {
         setPago(r.data.pago)
         setTelefono(r.data.telefono)
         setPantallasCliente(r.data.pantallasCliente || 1)
+        setPantallasDetalle(r.data.pantallasDetalle || [])
         setCatalogo(r.data.catalogo || [])
       })
       .catch(() => { if (vivo) showToast('No se pudo consultar el último pago del nickname.', 'error') })
@@ -276,6 +278,19 @@ export function ComprobanteModal({ row, onClose }) {
   const estadoCss = chipStyle(row.estadoReal)
   const alertaCss = chipStyle(row.alertaReal)
   const dias = diasRestantesDe(row)
+
+  // Comprobante consolidado: si el cliente tiene 2+ pantallas AL DÍA (fecha
+  // vigente, sin deuda y con pago registrado) el precio pasa a ser la suma de
+  // los últimos pagos de esas pantallas, con el detalle por pantalla.
+  const pantallasAlDia = pantallasDetalle.filter(p => p.alDia)
+  const consolidado = pantallasAlDia.length >= 2
+  const sumaAlDia = pantallasAlDia.reduce((s, p) => s + (Number(p.pago?.precioVenta) || 0), 0)
+  const pantallasExcluidas = consolidado ? pantallasDetalle.filter(p => !p.alDia) : []
+  const motivoExclusion = (p) => {
+    if (p.debe) return 'debe'
+    if (p.dias == null || p.dias <= 0) return 'vencida'
+    return 'sin pago'
+  }
 
   return (
     <div
@@ -427,17 +442,45 @@ export function ComprobanteModal({ row, onClose }) {
                 </FilaCampo>
               </div>
 
-              {/* Precio: último pago registrado del nickname en Pagos */}
+              {/* Detalle por pantalla cuando el cliente tiene 2+ pantallas al día */}
+              {!cargando && consolidado && (
+                <div className="mx-5 mt-2 pt-2" style={{ borderTop: '1px solid #f1f5f9' }}>
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                    Pantallas al día del cliente ({pantallasAlDia.length})
+                  </p>
+                  {pantallasAlDia.map(p => (
+                    <div key={p.idPantalla} className="flex items-center justify-between gap-2" style={{ padding: '3px 0' }}>
+                      <span className="text-[11px] font-semibold text-slate-700 truncate" style={{ fontFamily: 'ui-monospace,monospace' }}>{p.nickname}</span>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">vence {formatDate(p.finPlan)}</span>
+                      <span className="text-[11px] font-bold text-slate-800 whitespace-nowrap">{formatCurrency(p.pago?.precioVenta)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Precio: último pago del nickname, o la suma de las pantallas al día */}
               <div className="mx-5 mt-2 pt-3 pb-2 flex items-center justify-between" style={{ borderTop: '2px dashed #e2e8f0' }}>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Precio</p>
-                  {pago?.fecha && <p className="text-[10px] text-slate-400">último pago · {formatDate(pago.fecha)}</p>}
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                    {consolidado ? 'Precio total' : 'Precio'}
+                  </p>
+                  {consolidado
+                    ? <p className="text-[10px] text-slate-400">{pantallasAlDia.length} pantallas al día</p>
+                    : pago?.fecha && <p className="text-[10px] text-slate-400">último pago · {formatDate(pago.fecha)}</p>}
                 </div>
                 <span className="text-2xl font-extrabold" style={{ color: '#ea580c' }}>
-                  {cargando ? <Loader2 size={20} className="animate-spin text-slate-300" /> : pago?.precioVenta != null ? formatCurrency(pago.precioVenta) : '—'}
+                  {cargando
+                    ? <Loader2 size={20} className="animate-spin text-slate-300" />
+                    : consolidado ? formatCurrency(sumaAlDia)
+                    : pago?.precioVenta != null ? formatCurrency(pago.precioVenta) : '—'}
                 </span>
               </div>
-              {!cargando && !pago && (
+              {!cargando && consolidado && pantallasExcluidas.length > 0 && (
+                <p className="px-5 pb-1 text-[10px]" style={{ color: '#b45309' }}>
+                  No incluidas: {pantallasExcluidas.map(p => `${p.nickname} (${motivoExclusion(p)})`).join(' · ')}
+                </p>
+              )}
+              {!cargando && !consolidado && !pago && (
                 <p className="px-5 pb-1 text-[10px]" style={{ color: '#b45309' }}>
                   Sin pagos registrados para este nickname en el módulo de Pagos.
                 </p>
@@ -445,7 +488,7 @@ export function ComprobanteModal({ row, onClose }) {
 
               <div className="px-5 pb-4 pt-1 flex items-center justify-between text-[10px] text-slate-400" style={{ borderTop: '1px solid #f8fafc' }}>
                 <span>Pantalla {row.idPantalla}{row.customerId ? ` · ${row.customerId}` : ''}</span>
-                <span>Emitido {formatDate(new Date().toISOString().slice(0, 10))}</span>
+                <span>Emitido {(() => { const d = new Date(); return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}` })()}</span>
               </div>
             </div>
 
