@@ -4,11 +4,11 @@ import {
   Users, Package, FileText, Tv, DollarSign, AlertCircle, Clock, TrendingUp,
   Wallet, PiggyBank, Percent, BarChart3, Lightbulb, Activity,
   Trophy, Hourglass, RefreshCw, Calendar, Receipt, Download, Upload, ShieldAlert,
-  CheckCircle2, ChevronRight,
+  CheckCircle2, ChevronRight, Filter, GitCompareArrows, Minus,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, Area, PieChart, Pie, Cell, LabelList,
+  Tooltip, Legend, Area, PieChart, Pie, Cell, LabelList, ReferenceLine,
 } from 'recharts'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
@@ -90,6 +90,20 @@ const CSS = `
   }
   .dash-chart-card:hover {
     box-shadow: 0 12px 32px rgba(0,0,0,.12);
+  }
+  .dash-chart-controls { display: flex; flex-wrap: wrap; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 3px; }
+  .dash-chart-btn {
+    padding: 5px 12px; border-radius: 8px; font-size: 11.5px; font-weight: 700;
+    cursor: pointer; transition: all .18s; border: none; background: transparent; color: #64748b;
+    white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .dash-chart-btn.active { background: #fff; color: #c2410c; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .dash-chart-btn.active.blue { color: #1d4ed8; }
+  .dash-chart-btn:not(.active):hover { color: #334155; }
+  .dash-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .dash-filter-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em;
   }
   @media (prefers-reduced-motion: reduce) {
     .dash-a1, .dash-a2, .dash-a3, .dash-orb-1, .dash-orb-2, .dash-card, .dash-kpi { animation: none !important; transition: none !important }
@@ -253,6 +267,45 @@ function narrarVentasLicenciaMes(resumen, mes, anio) {
   return partes.join('')
 }
 
+function narrarVentasLicenciaComparativo(comparativo, anio) {
+  if (!comparativo?.length) return null
+  // Solo meses CERRADOS cuentan para el marcador: ni el mes en curso (parcial,
+  // perdería siempre por incompleto) ni los meses futuros del año en curso
+  // (todavía no existen — contarlos como "-100%" sería un falso negativo).
+  const idxParcial = comparativo.findIndex(m => m.parcial)
+  const cerrados = comparativo.filter((m, i) =>
+    (idxParcial === -1 || i < idxParcial) && (m.ingresos > 0 || m.ingresosAnterior > 0))
+  if (!cerrados.length) return `Sin datos suficientes para comparar ${anio} contra ${anio - 1} todavía.`
+  const mesesArriba = cerrados.filter(m => m.ingresos > m.ingresosAnterior).length
+  const totalActual = cerrados.reduce((s, m) => s + m.ingresos, 0)
+  const totalAnterior = cerrados.reduce((s, m) => s + m.ingresosAnterior, 0)
+  const varPct = totalAnterior > 0 ? ((totalActual - totalAnterior) / totalAnterior) * 100 : null
+  const mesParcial = comparativo.find(m => m.parcial)
+  const brechaMax = cerrados.reduce((peor, m) => {
+    const delta = m.ingresosAnterior > 0 ? ((m.ingresos - m.ingresosAnterior) / m.ingresosAnterior) * 100 : null
+    return (delta != null && (peor == null || delta < peor.delta)) ? { label: m.label, delta } : peor
+  }, null)
+  const partes = []
+  partes.push(`En **${mesesArriba} de ${cerrados.length} meses cerrados**, ${anio} vendió más que el mismo mes de **${anio - 1}**.`)
+  if (varPct != null) {
+    partes.push(` En conjunto, esos meses suman ${formatCurrency(totalActual)} vs. ${formatCurrency(totalAnterior)} (**${varPct >= 0 ? '+' : ''}${varPct.toFixed(1)}%**).`)
+  }
+  if (brechaMax && brechaMax.delta < -10) {
+    partes.push(` El mes más débil frente al año anterior fue **${brechaMax.label}** (${brechaMax.delta.toFixed(1)}%) — revisar qué pasó ese mes ayuda a anticipar si se repite.`)
+  }
+  // La conclusión se basa en la variación agregada en pesos (lo que de verdad
+  // mueve la caja), no solo en cuántos meses individuales ganaron o perdieron.
+  partes.push(varPct == null
+    ? ' **Conclusión**: aún no hay suficiente historial del año anterior para sacar una conclusión — vigila esta gráfica mes a mes.'
+    : varPct >= 0
+      ? ` **Conclusión**: el negocio va, en conjunto, mejor que el año pasado (${varPct >= 0 ? '+' : ''}${varPct.toFixed(1)}%) — es el momento de sostener lo que está funcionando.`
+      : ` **Conclusión**: el negocio va por detrás del año pasado (${varPct.toFixed(1)}%) — vale la pena activar acciones comerciales antes de que se acumule más rezago.`)
+  if (mesParcial) {
+    partes.push(` (**${mesParcial.label}** está en curso — no se cuenta en el marcador hasta que cierre.)`)
+  }
+  return partes.join('')
+}
+
 function narrarComposicion(tipoPago) {
   if (!tipoPago?.length) return null
   const principal = tipoPago[0]
@@ -376,6 +429,8 @@ export default function DashboardHome() {
   const [restoringBackup, setRestoringBackup] = useState(false)
   const [anioVentasLicencia, setAnioVentasLicencia] = useState(null)
   const [mesVentasLicencia, setMesVentasLicencia] = useState(null)
+  const [modoVistaVentas, setModoVistaVentas] = useState('mensual') // 'mensual' | 'comparar'
+  const [mostrarPromedioVentas, setMostrarPromedioVentas] = useState(false)
   const [showVencidasPanel, setShowVencidasPanel] = useState(false)
   const [showProximasPanel, setShowProximasPanel] = useState(false)
   const [showArpuPanel, setShowArpuPanel] = useState(false)
@@ -584,11 +639,32 @@ export default function DashboardHome() {
     for (const m of bi.porMes) {
       if (Number(m.anio) === anioVentasLicencia) porMesMap[Number(m.key.split('-')[1])] = m
     }
+    const hoy = new Date()
+    const esAnioActual = anioVentasLicencia === hoy.getFullYear()
+    const mesHoy = hoy.getMonth() + 1
     return MES_LABELS.map((label, i) => {
       const m = porMesMap[i + 1]
-      return { mes: i + 1, label, ingresos: m?.ingresos || 0, numVentas: m?.numVentas || 0 }
+      return {
+        mes: i + 1, label, ingresos: m?.ingresos || 0, numVentas: m?.numVentas || 0,
+        // Mes en curso: su valor es parcial y no es comparable con un mes cerrado.
+        parcial: esAnioActual && (i + 1) === mesHoy,
+      }
     })
   }, [bi, anioVentasLicencia])
+
+  // ─── Comparativo mes a mes vs. año anterior (misma escala, para leer si el
+  // negocio va mejor o peor que el año pasado, mes por mes) ─────────────────
+  const ventasLicenciaComparativo = useMemo(() => {
+    if (!bi || anioVentasLicencia == null) return []
+    const porMesMapAnt = {}
+    for (const m of bi.porMes) {
+      if (Number(m.anio) === anioVentasLicencia - 1) porMesMapAnt[Number(m.key.split('-')[1])] = m
+    }
+    return ventasLicenciaPorMes.map(m => ({
+      ...m,
+      ingresosAnterior: porMesMapAnt[m.mes]?.ingresos || 0,
+    }))
+  }, [bi, ventasLicenciaPorMes, anioVentasLicencia])
 
   const resumenVentasLicencia = useMemo(() => {
     if (!bi || !ventasLicenciaPorMes.length) return null
@@ -1040,37 +1116,56 @@ export default function DashboardHome() {
           {/* ─── Ventas de licencias — mes a mes, filtrable por año ────────── */}
           <Card className="border-orange-100">
             <CardHeader className="border-orange-50">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <CardTitle>Ventas de licencias — mes a mes</CardTitle>
                   <p className="text-sm text-gray-400 mt-0.5">
-                    Barras = ingresos por ventas de licencias (eje izq., con etiqueta $) · <span className="text-blue-600 font-semibold">Línea azul = N° de ventas</span> (eje der., con etiqueta de unidades)
+                    {modoVistaVentas === 'mensual'
+                      ? <>Barras = ingresos por ventas de licencias (eje izq., con etiqueta $) · <span className="text-blue-600 font-semibold">Línea azul = N° de ventas</span> (eje der.)</>
+                      : <>Barras = ingresos {anioVentasLicencia} · <span className="text-slate-500 font-semibold">Línea gris punteada = {anioVentasLicencia - 1}</span> — lee de un vistazo si el negocio va mejor o peor que el año pasado</>}
                   </p>
                 </div>
                 {aniosVentasLicencia.length > 0 && (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <label className="flex items-center gap-2 text-sm flex-shrink-0">
-                      <Calendar size={16} className="text-orange-500" />
-                      <span className="text-gray-500 font-medium">Año</span>
-                      <select
-                        value={anioVentasLicencia ?? ''}
-                        onChange={(e) => setAnioVentasLicencia(Number(e.target.value))}
-                        className="px-3 py-1.5 border border-orange-200 rounded-lg bg-white font-semibold text-brand-accent focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
-                      >
-                        {aniosVentasLicencia.map(a => <option key={a} value={a}>{a}</option>)}
-                      </select>
-                    </label>
-                    <label className="flex items-center gap-2 text-sm flex-shrink-0">
-                      <span className="text-gray-500 font-medium">Mes</span>
-                      <select
-                        value={mesVentasLicencia ?? ''}
-                        onChange={(e) => setMesVentasLicencia(e.target.value === '' ? null : Number(e.target.value))}
-                        className="px-3 py-1.5 border border-orange-200 rounded-lg bg-white font-semibold text-brand-accent focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
-                      >
-                        <option value="">Todo el año</option>
-                        {MES_LABELS.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}
-                      </select>
-                    </label>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="dash-filter-row">
+                      <span className="dash-filter-tag"><Filter size={11} /> Año</span>
+                      <div className="dash-chart-controls">
+                        {aniosVentasLicencia.map(a => (
+                          <button key={a} type="button"
+                            className={`dash-chart-btn ${anioVentasLicencia === a ? 'active' : ''}`}
+                            onClick={() => setAnioVentasLicencia(a)}
+                          >{a}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="dash-chart-controls">
+                      <button type="button"
+                        className={`dash-chart-btn ${modoVistaVentas === 'mensual' ? 'active' : ''}`}
+                        onClick={() => setModoVistaVentas('mensual')}
+                      ><BarChart3 size={12} /> Mes a mes</button>
+                      <button type="button"
+                        className={`dash-chart-btn ${modoVistaVentas === 'comparar' ? 'active' : ''}`}
+                        onClick={() => { setModoVistaVentas('comparar'); setMesVentasLicencia(null) }}
+                      ><GitCompareArrows size={12} /> Comparar vs. año anterior</button>
+                      <button type="button"
+                        className={`dash-chart-btn ${mostrarPromedioVentas ? 'active' : ''}`}
+                        onClick={() => setMostrarPromedioVentas(v => !v)}
+                      ><Minus size={12} /> Promedio</button>
+                    </div>
+                    {modoVistaVentas === 'mensual' && (
+                      <div className="dash-chart-controls">
+                        <button type="button"
+                          className={`dash-chart-btn ${mesVentasLicencia == null ? 'active' : ''}`}
+                          onClick={() => setMesVentasLicencia(null)}
+                        >Todo el año</button>
+                        {MES_LABELS.map((label, i) => (
+                          <button key={i} type="button"
+                            className={`dash-chart-btn ${mesVentasLicencia === i + 1 ? 'active' : ''}`}
+                            onClick={() => setMesVentasLicencia(i + 1)}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1135,14 +1230,19 @@ export default function DashboardHome() {
                   )}
 
                   <ResponsiveContainer width="100%" height={320}>
-                    <ComposedChart data={ventasLicenciaPorMes} margin={{ top: 54, right: 32, left: 0, bottom: 0 }}>
+                    <ComposedChart
+                      data={modoVistaVentas === 'comparar' ? ventasLicenciaComparativo : ventasLicenciaPorMes}
+                      margin={{ top: 54, right: 32, left: 0, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
                       <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#78716c' }} />
                       <YAxis
                         yAxisId="left" domain={[0, (dataMax) => Math.ceil(dataMax * 1.45)]} tick={{ fontSize: 11, fill: '#78716c' }}
                         tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${Math.round(v / 1e3)}K` : v}
                       />
-                      <YAxis yAxisId="right" orientation="right" domain={[0, (dataMax) => Math.ceil(dataMax * 1.75)]} allowDecimals={false} tick={{ fontSize: 11, fill: '#78716c' }} />
+                      {modoVistaVentas === 'mensual' && (
+                        <YAxis yAxisId="right" orientation="right" domain={[0, (dataMax) => Math.ceil(dataMax * 1.75)]} allowDecimals={false} tick={{ fontSize: 11, fill: '#78716c' }} />
+                      )}
                       <Tooltip
                         formatter={(value, name) => name === 'N° de ventas'
                           ? [`${value} venta${value === 1 ? '' : 's'}`, name]
@@ -1150,28 +1250,55 @@ export default function DashboardHome() {
                         labelFormatter={(label) => `${label} ${anioVentasLicencia}`}
                       />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Bar yAxisId="left" dataKey="ingresos" name="Ingresos" fill="#f97316" radius={[6, 6, 0, 0]} barSize={26}>
-                        {ventasLicenciaPorMes.map((m) => (
-                          <Cell key={m.mes} fill={mesVentasLicencia === m.mes ? '#c2410c' : '#f97316'} />
+                      <Bar
+                        yAxisId="left" dataKey="ingresos"
+                        name={modoVistaVentas === 'comparar' ? `Ingresos ${anioVentasLicencia}` : 'Ingresos'}
+                        fill="#f97316" radius={[6, 6, 0, 0]} barSize={26}
+                      >
+                        {(modoVistaVentas === 'comparar' ? ventasLicenciaComparativo : ventasLicenciaPorMes).map((m) => (
+                          <Cell
+                            key={m.mes}
+                            fill={mesVentasLicencia === m.mes ? '#c2410c' : '#f97316'}
+                            fillOpacity={m.parcial ? 0.35 : 1}
+                            stroke={m.parcial ? '#f97316' : 'none'}
+                            strokeDasharray={m.parcial ? '3 2' : undefined}
+                          />
                         ))}
-                        {/* Etiqueta dentro de la barra (barras altas ≥ $800 K) */}
-                        <LabelList dataKey="ingresos" position="insideTop" formatter={(v) => v >= 800_000 ? formatCompactCurrency(v) : ''} style={{ fill: '#fff', fontWeight: 700, fontSize: 10 }} />
+                        {/* Etiqueta dentro de la barra (barras altas ≥ $800 K) — texto oscuro con halo
+                            blanco: legible tanto sobre el naranja como si se desborda al fondo blanco */}
+                        <LabelList dataKey="ingresos" position="insideTop" formatter={(v) => v >= 800_000 ? formatCompactCurrency(v) : ''} style={{ ...LABEL_STYLE, fontSize: 10 }} />
                         {/* Etiqueta sobre la barra (barras pequeñas < $800 K) */}
                         <LabelList dataKey="ingresos" position="top" formatter={(v) => v > 0 && v < 800_000 ? formatCompactCurrency(v) : ''} style={{ ...LABEL_STYLE, fill: '#9a3412', fontSize: 10 }} />
                       </Bar>
-                      <Line
-                        yAxisId="right" type="monotone" dataKey="numVentas" name="N° de ventas"
-                        stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6' }}
-                        isAnimationActive={false}
-                        label={({ x, y, value }) => value > 0
-                          ? <text key={`lv-${x}`} x={x} y={y - 16} textAnchor="middle" fill="#1d4ed8" fontSize={11} fontWeight={700} stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">{value}</text>
-                          : null}
-                      />
+                      {modoVistaVentas === 'mensual' ? (
+                        <Line
+                          yAxisId="right" type="monotone" dataKey="numVentas" name="N° de ventas"
+                          stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6' }}
+                          isAnimationActive={false}
+                          label={({ x, y, value }) => value > 0
+                            ? <text key={`lv-${x}`} x={x} y={y - 16} textAnchor="middle" fill="#1d4ed8" fontSize={11} fontWeight={700} stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">{value}</text>
+                            : null}
+                        />
+                      ) : (
+                        <Line
+                          yAxisId="left" type="monotone" dataKey="ingresosAnterior" name={`Ingresos ${anioVentasLicencia - 1}`}
+                          stroke="#64748b" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3, fill: '#64748b' }}
+                          isAnimationActive={false}
+                        />
+                      )}
+                      {mostrarPromedioVentas && resumenVentasLicencia.promedioMensual > 0 && (
+                        <ReferenceLine
+                          yAxisId="left" y={resumenVentasLicencia.promedioMensual} stroke="#059669" strokeDasharray="4 3" strokeWidth={1.5}
+                          label={{ value: `Promedio ${formatCompactCurrency(resumenVentasLicencia.promedioMensual)}`, position: 'insideBottomLeft', fill: '#059669', fontSize: 10, fontWeight: 700 }}
+                        />
+                      )}
                     </ComposedChart>
                   </ResponsiveContainer>
-                  <ChartInsight text={resumenVentasLicencia.mesDetalle
-                    ? narrarVentasLicenciaMes(resumenVentasLicencia, mesVentasLicencia, anioVentasLicencia)
-                    : narrarVentasLicenciaAnio(resumenVentasLicencia, anioVentasLicencia)} />
+                  <ChartInsight text={modoVistaVentas === 'comparar'
+                    ? narrarVentasLicenciaComparativo(ventasLicenciaComparativo, anioVentasLicencia)
+                    : resumenVentasLicencia.mesDetalle
+                      ? narrarVentasLicenciaMes(resumenVentasLicencia, mesVentasLicencia, anioVentasLicencia)
+                      : narrarVentasLicenciaAnio(resumenVentasLicencia, anioVentasLicencia)} />
                 </>
               ) : (
                 <div className="py-12 text-center text-sm text-gray-400">
