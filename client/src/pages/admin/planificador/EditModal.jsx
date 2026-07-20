@@ -32,6 +32,7 @@ function Input({ value, onChange, type = 'text', ...rest }) {
 
 export function EditModal({ row, allPantallas, onClose, onSaved }) {
   const { showToast } = useUi()
+
   const [cuentasPadre, setCuentasPadre]   = useState([])
   const [selectedCuentaId, setSelectedCuentaId] = useState(row.cuentaId || '')
   const [assigningNewNickname, setAssigningNewNickname] = useState(false)
