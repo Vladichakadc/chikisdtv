@@ -28,6 +28,11 @@ router.post('/login', authLimiter, async (req, res) => {
     const valid = await bcrypt.compare(password, client.password);
     if (!valid) return res.status(401).json({ error: 'Credenciales incorrectas' });
 
+    // ChikisdTV es una herramienta interna de administración — no existe portal
+    // de cliente final. Las cuentas role='user' (importadas históricamente) no
+    // tienen acceso al panel.
+    if (client.role !== 'admin') return res.status(403).json({ error: 'Acceso restringido al equipo administrador' });
+
     if (client.estatus === 'Inactivo') return res.status(403).json({ error: 'Cuenta inactiva' });
 
 

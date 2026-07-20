@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Package, FileText, CreditCard, Tv, LogOut, Menu,
   CalendarClock, UserX, KeyRound, Monitor, GitMerge, X, Landmark, Boxes,
-  ChevronDown, ChevronsLeft, PieChart, BarChart3, LineChart, TrendingDown,
+  ChevronDown, ChevronsLeft, PieChart, BarChart3, LineChart, TrendingDown, Coins,
 } from 'lucide-react'
 import { useState, useEffect, Suspense } from 'react'
 import { cn } from '../utils/cn'
@@ -61,7 +61,14 @@ const navSections = [
   {
     label: 'Equipos',
     items: [
-      { to: '/admin/costo-pantalla', label: 'Costo Pantalla', icon: Monitor },
+      {
+        to: '/admin/costo-pantalla',
+        label: 'Costo Pantalla',
+        icon: Monitor,
+        subItems: [
+          { to: '/admin/analisis-costo-pantalla', label: 'Análisis Económico', icon: Coins },
+        ],
+      },
       {
         to: '/admin/ventas-dispositivos',
         label: 'Venta Dispositivos',

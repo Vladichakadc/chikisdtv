@@ -59,7 +59,7 @@ export default function Login() {
       if (data.mustChangePassword) {
         navigate('/change-password')
       } else {
-        navigate(data.role === 'admin' ? '/admin' : '/dashboard')
+        navigate('/admin')
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Error al iniciar sesión')
