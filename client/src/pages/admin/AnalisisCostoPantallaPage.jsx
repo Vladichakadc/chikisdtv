@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import {
   Monitor, Percent, Wallet, AlertTriangle,
   Lightbulb, Filter, Banknote, Scale, Landmark,
+  Target, CheckCircle2, XCircle, PiggyBank, CalendarClock,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, BarChart, Bar, Line, XAxis, YAxis,
@@ -109,30 +110,87 @@ export default function AnalisisCostoPantallaPage() {
     return Array.from(set).sort()
   }, [recargas])
 
-  // ── 1. Costo unitario por pantalla-mes + TRM ───────────────────────────
-  const serieCostoUnitario = useMemo(() => {
+  // ── Serie mensual base (sin filtro) — costo unitario + TRM por mes ─────
+  // Se separa del control de año del gráfico para poder reusarla también en
+  // el comparativo "este año vs el anterior" (Meta del año), que siempre
+  // necesita el histórico completo sin importar qué año esté filtrado.
+  const serieMensualBase = useMemo(() => {
     const map = {}
     for (const r of recargas) {
       const m = MES_ORDEN[(r.mes || '').toString().trim().toUpperCase()] || 0
       if (!m || !r.anio) continue
-      if (costoUnitAnio !== 'todos' && String(r.anio) !== costoUnitAnio) continue
       const key = `${r.anio}-${String(m).padStart(2, '0')}`
-      if (!map[key]) map[key] = { key, sumaCosto: 0, n: 0, sumaTrm: 0, nTrm: 0 }
+      if (!map[key]) map[key] = { sumaCosto: 0, n: 0, sumaTrm: 0, nTrm: 0 }
       const cp = Number(r.costoPantallaCOP)
       if (cp > 0) { map[key].sumaCosto += cp; map[key].n += 1 }
       if (Number(r.trm) > 0) { map[key].sumaTrm += Number(r.trm); map[key].nTrm += 1 }
     }
-    return Object.values(map).sort((a, b) => a.key.localeCompare(b.key)).map(x => {
-      const [anio, mm] = x.key.split('-')
-      return {
-        label: `${MES_ABREV[Number(mm)]} ${anio.slice(2)}`,
-        costoUnitario: x.n > 0 ? Math.round(x.sumaCosto / x.n) : null,
-        trm: x.nTrm > 0 ? Math.round(x.sumaTrm / x.nTrm) : null,
-      }
-    })
-  }, [recargas, costoUnitAnio])
+    return map
+  }, [recargas])
 
-  // ── 2. Margen por plan (ingresos vs costo estimado de servir el plan) ──
+  // ── Costo unitario por pantalla-mes + TRM, para la gráfica (con filtro de año) ──
+  const serieCostoUnitario = useMemo(() => {
+    const hoy = new Date()
+    const keyHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+    return Object.entries(serieMensualBase)
+      .filter(([key]) => costoUnitAnio === 'todos' || key.startsWith(costoUnitAnio))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, x]) => {
+        const [anio, mm] = key.split('-')
+        return {
+          label: `${MES_ABREV[Number(mm)]} ${anio.slice(2)}`,
+          costoUnitario: x.n > 0 ? Math.round(x.sumaCosto / x.n) : null,
+          trm: x.nTrm > 0 ? Math.round(x.sumaTrm / x.nTrm) : null,
+          // Mes en curso: costo parcial, no comparable con un mes cerrado.
+          parcial: key === keyHoy,
+        }
+      })
+  }, [serieMensualBase, costoUnitAnio])
+
+  // ── META DEL AÑO: costo por pantalla YTD (meses cerrados) vs mismo
+  // período del año anterior — responde directo a la meta 2026 de bajar el
+  // costo de licencias para subir la rentabilidad. Usa solo meses cerrados
+  // (excluye el mes en curso, que siempre estaría incompleto).
+  const metaAnio = useMemo(() => {
+    const hoy = new Date()
+    const anioActual = hoy.getFullYear()
+    const mesesCerrados = hoy.getMonth() // meses 1..mesesCerrados ya terminaron
+    if (mesesCerrados < 1) return null
+    let sumaActual = 0, nActual = 0, sumaAnterior = 0, nAnterior = 0
+    for (let m = 1; m <= mesesCerrados; m++) {
+      const kA = `${anioActual}-${String(m).padStart(2, '0')}`
+      const kP = `${anioActual - 1}-${String(m).padStart(2, '0')}`
+      const a = serieMensualBase[kA]
+      const p = serieMensualBase[kP]
+      if (a?.n) { sumaActual += a.sumaCosto; nActual += a.n }
+      if (p?.n) { sumaAnterior += p.sumaCosto; nAnterior += p.n }
+    }
+    if (nActual === 0 || nAnterior === 0) return null
+    const costoActual = sumaActual / nActual
+    const costoAnterior = sumaAnterior / nAnterior
+    const varPct = Number((((costoActual - costoAnterior) / costoAnterior) * 100).toFixed(1))
+    const pantallas = perf?.totales?.pantallasVigentes || 0
+    const ahorroPorPantalla = costoAnterior - costoActual // positivo = se está ahorrando
+    const impactoMensual = Math.round(ahorroPorPantalla * pantallas)
+    const impactoAnualizado = impactoMensual * 12
+    return {
+      anioActual, anioAnterior: anioActual - 1, mesesCerrados,
+      costoActual: Math.round(costoActual), costoAnterior: Math.round(costoAnterior),
+      varPct, cumpleMeta: varPct < 0, pantallas, impactoMensual, impactoAnualizado,
+    }
+  }, [serieMensualBase, perf])
+
+  // ── Costo por pantalla, año completo por año completo (de /plans/performance) ──
+  const costoPorAnioChart = useMemo(() => {
+    const rows = perf?.costoPantalla?.porAnio || []
+    return rows.map((r, i) => {
+      const prev = rows[i - 1]
+      const varPct = prev ? Number((((r.costoPorPantalla - prev.costoPorPantalla) / prev.costoPorPantalla) * 100).toFixed(1)) : null
+      return { ...r, varPct }
+    })
+  }, [perf])
+
+  // ── Margen por plan (ingresos vs costo estimado de servir el plan) ──
   const planesMargen = useMemo(() => {
     if (!perf?.planes) return []
     const list = margenSoloCosteables ? perf.planes.filter(p => p.costoEstimado != null) : perf.planes
@@ -147,7 +205,7 @@ export default function AnalisisCostoPantallaPage() {
       .sort((a, b) => b.ingresos - a.ingresos)
   }, [perf, margenSoloCosteables])
 
-  // ── 3. Estructura del costo por año: recarga directa vs impuesto 4x1000 ─
+  // ── Gasto TOTAL por año: recarga directa vs impuesto 4x1000 (no por pantalla) ──
   const estructuraCosto = useMemo(() => {
     const map = {}
     for (const r of recargas) {
@@ -162,7 +220,7 @@ export default function AnalisisCostoPantallaPage() {
     })
   }, [recargas])
 
-  // ── 4. Eficiencia por medio de pago ─────────────────────────────────────
+  // ── Eficiencia por medio de pago ─────────────────────────────────────
   const eficienciaPago = useMemo(() => {
     let rows = recargas
     if (eficienciaAnio !== 'todos') rows = rows.filter(r => String(r.anio) === eficienciaAnio)
@@ -179,7 +237,7 @@ export default function AnalisisCostoPantallaPage() {
       .sort((a, b) => b.recargas - a.recargas)
   }, [recargas, eficienciaAnio])
 
-  // ── 5. Sensibilidad cambiaria (TRM) sobre el costo total mensual ───────
+  // ── Sensibilidad cambiaria (TRM) sobre el costo total mensual ───────
   const sensibilidad = useMemo(() => {
     if (!perf?.costoPantalla || !perf?.totales) return []
     const trmBase = perf.costoPantalla.trmVigente || 0
@@ -201,9 +259,6 @@ export default function AnalisisCostoPantallaPage() {
   // ── KPIs ─────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
     const cp = perf?.costoPantalla
-    const costoVigente = cp?.vigente || 0
-    const promedioHist = cp?.promedioHistorico || 0
-    const trendCosto = promedioHist > 0 ? Number((((costoVigente - promedioHist) / promedioHist) * 100).toFixed(1)) : null
 
     const trms = recargas.filter(r => Number(r.trm) > 0).map(r => Number(r.trm))
     const trmPromHist = trms.length ? trms.reduce((s, v) => s + v, 0) / trms.length : 0
@@ -214,29 +269,26 @@ export default function AnalisisCostoPantallaPage() {
     const costoCosteable = costeables.reduce((s, p) => s + p.costoEstimado, 0)
     const margenPct = ingCosteable > 0 ? Number((((ingCosteable - costoCosteable) / ingCosteable) * 100).toFixed(1)) : null
 
-    const pantallas = perf?.totales?.pantallasVigentes || 0
-    const exposicionMensual = costoVigente * pantallas
-
     const esc = sensibilidad
     const impacto20 = esc.length === 4 ? esc[3].costoTotalMensual - esc[1].costoTotalMensual : null
 
-    return { costoVigente, promedioHist, trendCosto, trmVigente: cp?.trmVigente || 0, trmPromHist, trendTrm, margenPct, ingCosteable, costoCosteable, pantallas, exposicionMensual, impacto20 }
+    return { trmVigente: cp?.trmVigente || 0, trmPromHist, trendTrm, margenPct, ingCosteable, costoCosteable, impacto20 }
   }, [perf, recargas, sensibilidad])
 
-  // ── Recomendaciones narrativas ──────────────────────────────────────────
+  // ── Recomendaciones narrativas — la primera siempre habla de la meta del año ──
   const recomendaciones = useMemo(() => {
     const out = []
-    if (kpis.trendCosto != null && Math.abs(kpis.trendCosto) >= 5) {
-      out.push(kpis.trendCosto > 0
-        ? `El costo por pantalla-mes está **${kpis.trendCosto.toFixed(1)}% por encima** del promedio histórico (${fmtC(kpis.costoVigente)} vs ${fmtC(kpis.promedioHist)}) — si los precios de venta no se ajustan, el margen se sigue comprimiendo.`
-        : `El costo por pantalla-mes está **${Math.abs(kpis.trendCosto).toFixed(1)}% por debajo** del promedio histórico — un viento a favor que se puede aprovechar para mejorar el margen o ser más competitivo en precio.`)
+    if (metaAnio) {
+      out.push(metaAnio.cumpleMeta
+        ? `**Meta del año en camino**: el costo por pantalla de ${metaAnio.anioActual} (${fmtC(metaAnio.costoActual)}, ${metaAnio.mesesCerrados} meses cerrados) está **${Math.abs(metaAnio.varPct).toFixed(1)}% por debajo** de ${metaAnio.anioAnterior} (${fmtC(metaAnio.costoAnterior)}) — si se sostiene el ritmo, el ahorro anualizado sería de **${fmtC(metaAnio.impactoAnualizado)}**. Vale la pena documentar qué cambió (proveedor, volumen, TRM) para no perder esa ganancia.`
+        : `**Meta del año en riesgo**: el costo por pantalla de ${metaAnio.anioActual} (${fmtC(metaAnio.costoActual)}, ${metaAnio.mesesCerrados} meses cerrados) está **${Math.abs(metaAnio.varPct).toFixed(1)}% por encima** de ${metaAnio.anioAnterior} (${fmtC(metaAnio.costoAnterior)}) — al ritmo actual el sobrecosto anualizado sería de **${fmtC(Math.abs(metaAnio.impactoAnualizado))}**, justo lo contrario a la meta de subir la rentabilidad bajando el costo de licencias.`)
     }
     const peorPlan = planesMargen.filter(p => p.margenPct != null).sort((a, b) => a.margenPct - b.margenPct)[0]
     if (peorPlan && peorPlan.margenPct < 40) {
       out.push(`El plan **${peorPlan.plan}** tiene el margen más bajo (**${peorPlan.margenPct.toFixed(1)}%**) — ingresos de ${fmtC(peorPlan.ingresos)} frente a un costo estimado de ${fmtC(peorPlan.costo)}. Es candidato a revisión de precio.`)
     }
     if (kpis.impacto20 != null && kpis.impacto20 > 0) {
-      out.push(`Una subida del dólar del **20%** sobre la TRM actual (${fmtC(kpis.trmVigente)}) elevaría el costo mensual total en **${fmtC(kpis.impacto20)}** (sobre ${kpis.pantallas} pantallas activas) sin que cambie ni un peso de ingreso — es el principal riesgo no controlable del negocio.`)
+      out.push(`Una subida del dólar del **20%** sobre la TRM actual (${fmtC(kpis.trmVigente)}) elevaría el costo mensual total en **${fmtC(kpis.impacto20)}** — el principal riesgo no controlable para cumplir la meta de bajar el costo.`)
     }
     if (eficienciaPago.length >= 2) {
       const ordenado = [...eficienciaPago].filter(m => m.recargas >= 3).sort((a, b) => a.costoPromedio - b.costoPromedio)
@@ -244,13 +296,13 @@ export default function AnalisisCostoPantallaPage() {
         const barato = ordenado[0], caro = ordenado[ordenado.length - 1]
         const diffPct = ((caro.costoPromedio - barato.costoPromedio) / barato.costoPromedio) * 100
         if (diffPct >= 5) {
-          out.push(`Recargar por **${caro.medio}** cuesta en promedio **${diffPct.toFixed(1)}% más** por cuenta que por **${barato.medio}** (${fmtC(caro.costoPromedio)} vs ${fmtC(barato.costoPromedio)}) — priorizar ${barato.medio} cuando el proveedor lo permita reduce el costo unitario sin ningún otro cambio.`)
+          out.push(`Recargar por **${caro.medio}** cuesta en promedio **${diffPct.toFixed(1)}% más** por cuenta que por **${barato.medio}** (${fmtC(caro.costoPromedio)} vs ${fmtC(barato.costoPromedio)}) — priorizar ${barato.medio} cuando el proveedor lo permita ayuda directamente a la meta de bajar el costo.`)
         }
       }
     }
     if (out.length === 0) out.push('No se detectan alertas relevantes: el costo por pantalla, los márgenes por plan y la exposición cambiaria se mantienen dentro de rangos estables.')
     return out
-  }, [kpis, planesMargen, eficienciaPago])
+  }, [metaAnio, kpis, planesMargen, eficienciaPago])
 
   return (
     <div>
@@ -270,34 +322,118 @@ export default function AnalisisCostoPantallaPage() {
             Análisis Económico · Costo Pantalla
           </h1>
           <p className="text-orange-100/70 text-sm mt-2 max-w-2xl">
-            Unidad económica del negocio: costo real por pantalla, márgenes por plan y exposición al riesgo cambiario — para decisiones de precio y compra.
+            {metaAnio
+              ? `Meta ${metaAnio.anioActual}: bajar el costo de licencias por pantalla para subir la rentabilidad. Esta página muestra si vamos cumpliendo esa meta, año contra año, y qué la está moviendo.`
+              : 'Costo real por pantalla, comparado año contra año, para decisiones de precio y compra.'}
           </p>
         </div>
       </div>
 
+      {/* ── META DEL AÑO: la pregunta que responde toda la página ── */}
+      {metaAnio && (
+        <Card className={`mb-6 acp-a2 border-2 ${metaAnio.cumpleMeta ? 'border-emerald-200' : 'border-red-200'}`}>
+          <CardBody>
+            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-5">
+              <div className={`flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center ${metaAnio.cumpleMeta ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                {metaAnio.cumpleMeta ? <CheckCircle2 size={28} className="text-emerald-600" /> : <XCircle size={28} className="text-red-600" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Target size={14} className={metaAnio.cumpleMeta ? 'text-emerald-600' : 'text-red-600'} />
+                  <span className={`text-xs font-bold uppercase tracking-wide ${metaAnio.cumpleMeta ? 'text-emerald-600' : 'text-red-600'}`}>
+                    Meta {metaAnio.anioActual}: bajar el costo de licencias por pantalla
+                  </span>
+                </div>
+                <p className="text-lg font-bold text-gray-800 leading-snug">
+                  {metaAnio.cumpleMeta
+                    ? <>Vamos cumpliendo la meta: el costo por pantalla está <span className="text-emerald-600">{Math.abs(metaAnio.varPct).toFixed(1)}% más bajo</span> que en {metaAnio.anioAnterior}.</>
+                    : <>Vamos por encima de la meta: el costo por pantalla está <span className="text-red-600">{Math.abs(metaAnio.varPct).toFixed(1)}% más alto</span> que en {metaAnio.anioAnterior}.</>}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {fmtC(metaAnio.costoActual)} en {metaAnio.anioActual} vs {fmtC(metaAnio.costoAnterior)} en {metaAnio.anioAnterior} · promedio de los primeros {metaAnio.mesesCerrados} mes{metaAnio.mesesCerrados === 1 ? '' : 'es'} cerrados de cada año, sobre {metaAnio.pantallas.toLocaleString()} pantallas activas.
+                </p>
+              </div>
+              <div className={`flex-shrink-0 text-right px-5 py-3 rounded-2xl ${metaAnio.cumpleMeta ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wide ${metaAnio.cumpleMeta ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {metaAnio.cumpleMeta ? 'Ahorro anualizado' : 'Sobrecosto anualizado'}
+                </p>
+                <p className={`text-2xl font-extrabold ${metaAnio.cumpleMeta ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {fmtC(Math.abs(metaAnio.impactoAnualizado))}
+                </p>
+                <p className="text-[11px] text-gray-400">si se mantiene el ritmo actual</p>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       {/* ── KPIs ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 acp-a2">
-        <KpiCard icon={Monitor} label="Costo / pantalla (vigente)" value={fmtC(kpis.costoVigente)} loading={loading}
-          tone="orange" delay={2} trend={kpis.trendCosto} sub={`vs histórico ${fmtC(kpis.promedioHist)}`} />
-        <KpiCard icon={Banknote} label="TRM vigente" value={kpis.trmVigente ? `$${kpis.trmVigente.toLocaleString('es-CO')}` : '—'} loading={loading}
-          tone="sky" delay={3} trend={kpis.trendTrm} sub={`vs promedio histórico $${Math.round(kpis.trmPromHist).toLocaleString('es-CO')}`} />
+        <KpiCard icon={Monitor} label={metaAnio ? `Costo / pantalla YTD ${metaAnio.anioActual}` : 'Costo / pantalla'}
+          value={fmtC(metaAnio?.costoActual ?? perf?.costoPantalla?.vigente ?? 0)} loading={loading}
+          tone="orange" delay={2} trend={metaAnio?.varPct} invertTrendColor
+          sub={metaAnio ? `vs ${fmtC(metaAnio.costoAnterior)} en ${metaAnio.anioAnterior}` : 'Sin histórico suficiente para comparar'} />
+        <KpiCard icon={PiggyBank} label={metaAnio?.cumpleMeta === false ? 'Sobrecosto anualizado' : 'Ahorro anualizado'}
+          value={metaAnio ? fmtC(Math.abs(metaAnio.impactoAnualizado)) : '—'} loading={loading}
+          tone={metaAnio?.cumpleMeta === false ? 'red' : 'emerald'} delay={3}
+          sub="Si se sostiene el ritmo actual todo el año" />
         <KpiCard icon={Percent} label="Margen bruto (costo pantalla)" value={kpis.margenPct != null ? `${kpis.margenPct.toFixed(1)}%` : '—'} loading={loading}
           tone={kpis.margenPct != null && kpis.margenPct < 40 ? 'red' : 'emerald'} delay={4}
           sub={`${fmtC(kpis.ingCosteable - kpis.costoCosteable)} sobre ${fmtC(kpis.ingCosteable)} en ingresos`} />
-        <KpiCard icon={Wallet} label="Exposición mensual actual" value={fmtC(kpis.exposicionMensual)} loading={loading}
-          tone="indigo" delay={5} sub={`${kpis.pantallas.toLocaleString()} pantallas activas`} />
+        <KpiCard icon={Banknote} label="TRM vigente" value={kpis.trmVigente ? `$${kpis.trmVigente.toLocaleString('es-CO')}` : '—'} loading={loading}
+          tone="sky" delay={5} trend={kpis.trendTrm} invertTrendColor
+          sub={`vs promedio histórico $${Math.round(kpis.trmPromHist).toLocaleString('es-CO')}`} />
         <KpiCard icon={AlertTriangle} label="Riesgo cambiario (TRM +20%)" value={kpis.impacto20 != null ? `+${fmtC(kpis.impacto20)}` : '—'} loading={loading}
           tone="red" delay={6} sub="Costo adicional/mes sin cambio de ingresos" />
       </div>
 
-      {/* ── 1. Costo unitario por pantalla-mes + TRM ── */}
+      {/* ── Costo por pantalla, año contra año ── */}
+      {costoPorAnioChart.length > 0 && (
+        <Card className="border-orange-100 mb-6 acp-a3">
+          <CardHeader className="border-orange-50">
+            <div className="flex items-center gap-2">
+              <CalendarClock size={18} className="text-orange-600" />
+              <div>
+                <CardTitle>Costo por pantalla — año contra año</CardTitle>
+                <p className="text-sm text-gray-400 mt-0.5">Cuánto cuesta en promedio mantener una pantalla un mes, cada año · esta es la línea que la meta {metaAnio?.anioActual ?? ''} busca bajar</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart data={costoPorAnioChart} margin={{ top: 26, right: 12, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
+                <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
+                <YAxis tickFormatter={(v) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1e3)}K`} tick={{ fontSize: 10, fill: '#78716c' }} width={52} />
+                <Tooltip content={<PremiumTooltip formatter={(v, name) => name === 'Recargas' ? v : fmtC(v)} />} />
+                <Bar dataKey="costoPorPantalla" name="Costo por pantalla-mes" radius={[6, 6, 0, 0]} barSize={48}>
+                  {costoPorAnioChart.map((r, i) => (
+                    <Cell key={i} fill={r.varPct == null ? '#94a3b8' : r.varPct < 0 ? '#10b981' : '#ef4444'} />
+                  ))}
+                  <LabelList dataKey="costoPorPantalla" position="top" formatter={(v) => fmtC(v)} style={{ fontSize: 11, fill: '#57534e', fontWeight: 700 }} />
+                  <LabelList dataKey="varPct" position="insideTop" formatter={(v) => v == null ? '' : `${v >= 0 ? '+' : ''}${v}%`} style={{ fontSize: 11, fill: '#fff', fontWeight: 800 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <ChartInsight text={(() => {
+              if (costoPorAnioChart.length < 2) return null
+              const primero = costoPorAnioChart[0]
+              const ultimo = costoPorAnioChart[costoPorAnioChart.length - 1]
+              const varTotal = Number((((ultimo.costoPorPantalla - primero.costoPorPantalla) / primero.costoPorPantalla) * 100).toFixed(1))
+              return `Entre **${primero.anio}** y **${ultimo.anio}** el costo por pantalla pasó de ${fmtC(primero.costoPorPantalla)} a ${fmtC(ultimo.costoPorPantalla)} (${varTotal >= 0 ? '+' : ''}${varTotal}%). Verde = el año bajó el costo frente al anterior (a favor de la meta); rojo = subió.`
+            })()} />
+          </CardBody>
+        </Card>
+      )}
+
+      {/* ── Costo unitario por pantalla-mes + TRM (detalle mensual) ── */}
       {serieCostoUnitario.length >= 2 && (
         <Card className="border-orange-100 mb-6 acp-a3">
           <CardHeader className="border-orange-50">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <CardTitle>Costo unitario por pantalla-mes y TRM</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">Costo promedio de servir una pantalla por un mes (Costo Pantalla COP) · línea azul = TRM promedio pagada</p>
+                <CardTitle>Costo por pantalla, mes a mes</CardTitle>
+                <p className="text-sm text-gray-400 mt-0.5">Detalle mensual del costo de arriba · línea azul = TRM promedio pagada ese mes</p>
               </div>
               <ChartControlsRow>
                 <ChartChips options={[{ key: 'todos', label: 'Todos' }, ...aniosDisponibles.map(a => ({ key: a, label: a }))]} value={costoUnitAnio} onChange={setCostoUnitAnio} />
@@ -313,7 +449,11 @@ export default function AnalisisCostoPantallaPage() {
                 <YAxis yAxisId="trm" orientation="right" tickFormatter={(v) => `$${v.toLocaleString('es-CO')}`} tick={{ fontSize: 10, fill: '#78716c' }} width={54} domain={['auto', 'auto']} />
                 <Tooltip content={<PremiumTooltip formatter={(v, name) => name === 'TRM promedio' ? `$${Number(v).toLocaleString('es-CO')}` : fmtC(v)} />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar yAxisId="cop" dataKey="costoUnitario" name="Costo unitario / pantalla" fill="#f97316" radius={[3, 3, 0, 0]} />
+                <Bar yAxisId="cop" dataKey="costoUnitario" name="Costo unitario / pantalla" fill="#f97316" radius={[3, 3, 0, 0]}>
+                  {serieCostoUnitario.map((m, i) => (
+                    <Cell key={i} fill="#f97316" fillOpacity={m.parcial ? 0.35 : 1} stroke={m.parcial ? '#f97316' : 'none'} strokeDasharray={m.parcial ? '3 2' : undefined} />
+                  ))}
+                </Bar>
                 <Line yAxisId="trm" dataKey="trm" name="TRM promedio" stroke="#3b82f6" strokeWidth={2} dot={false} connectNulls />
               </ComposedChart>
             </ResponsiveContainer>
@@ -322,13 +462,14 @@ export default function AnalisisCostoPantallaPage() {
               if (conDatos.length < 2) return null
               const primera = conDatos[0], ultima = conDatos[conDatos.length - 1]
               const varCosto = ((ultima.costoUnitario - primera.costoUnitario) / primera.costoUnitario) * 100
-              return `Entre **${primera.label}** y **${ultima.label}** el costo unitario por pantalla pasó de ${fmtC(primera.costoUnitario)} a ${fmtC(ultima.costoUnitario)} (${varCosto >= 0 ? '+' : ''}${varCosto.toFixed(1)}%). ${varCosto > 5 ? 'Este es un costo variable creciente que erosiona margen si el precio de venta no se revisa.' : varCosto < -5 ? 'El costo por pantalla viene bajando — una oportunidad para mejorar margen o precio competitivo.' : 'El costo se mantiene estable en el período.'}`
+              const notaParcial = ultima.parcial ? ` **${ultima.label}** está en curso — su valor todavía no es comparable con un mes cerrado.` : ''
+              return `Entre **${primera.label}** y **${ultima.label}** el costo unitario por pantalla pasó de ${fmtC(primera.costoUnitario)} a ${fmtC(ultima.costoUnitario)} (${varCosto >= 0 ? '+' : ''}${varCosto.toFixed(1)}%). ${varCosto > 5 ? 'Este es un costo variable creciente que erosiona margen si el precio de venta no se revisa.' : varCosto < -5 ? 'El costo por pantalla viene bajando — a favor de la meta del año.' : 'El costo se mantiene estable en el período.'}${notaParcial}`
             })()} />
           </CardBody>
         </Card>
       )}
 
-      {/* ── 2. Margen por plan ── */}
+      {/* ── Margen por plan ── */}
       {planesMargen.length > 0 && (
         <Card className="border-orange-100 mb-6 acp-a3">
           <CardHeader className="border-orange-50">
@@ -367,12 +508,12 @@ export default function AnalisisCostoPantallaPage() {
         </Card>
       )}
 
-      {/* ── 3. Estructura del costo por año ── */}
+      {/* ── Gasto total por año (composición) ── */}
       {estructuraCosto.length > 0 && (
         <Card className="border-orange-100 mb-6 acp-a3">
           <CardHeader className="border-orange-50">
-            <CardTitle>Estructura del costo por año</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Costo directo de recarga vs. impuesto 4×1000 bancario — historial completo</p>
+            <CardTitle>Gasto total en recargas, por año</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Plata total pagada al proveedor cada año (no por pantalla) — recarga directa vs. impuesto 4×1000 bancario</p>
           </CardHeader>
           <CardBody>
             <ResponsiveContainer width="100%" height={230}>
@@ -392,7 +533,7 @@ export default function AnalisisCostoPantallaPage() {
         </Card>
       )}
 
-      {/* ── 4. Eficiencia por medio de pago ── */}
+      {/* ── Eficiencia por medio de pago ── */}
       {eficienciaPago.length > 0 && (
         <Card className="border-orange-100 mb-6 acp-a3">
           <CardHeader className="border-orange-50">
@@ -423,12 +564,12 @@ export default function AnalisisCostoPantallaPage() {
         </Card>
       )}
 
-      {/* ── 5. Sensibilidad cambiaria (TRM) ── */}
+      {/* ── Sensibilidad cambiaria (TRM) ── */}
       {sensibilidad.length > 0 && (
         <Card className="border-orange-100 mb-6 acp-a3">
           <CardHeader className="border-orange-50">
-            <CardTitle>Sensibilidad al tipo de cambio (TRM)</CardTitle>
-            <p className="text-sm text-gray-400 mt-0.5">Impacto en el costo total mensual (base: {kpis.pantallas.toLocaleString()} pantallas activas) si la TRM se mueve respecto al valor vigente</p>
+            <CardTitle>¿Qué pasa si sube el dólar? (sensibilidad TRM)</CardTitle>
+            <p className="text-sm text-gray-400 mt-0.5">Impacto en el costo total mensual (base: {(perf?.totales?.pantallasVigentes || 0).toLocaleString()} pantallas activas) si la TRM se mueve respecto al valor vigente</p>
           </CardHeader>
           <CardBody>
             <ResponsiveContainer width="100%" height={220}>

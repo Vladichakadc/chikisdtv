@@ -110,6 +110,7 @@ export function KpiCard({
   onClick,
   badge,    // { text, color, bg } — badge semáforo opcional
   trend,    // number % — variación vs período anterior (opcional)
+  invertTrendColor = false, // true para métricas donde BAJAR es bueno (ej. costos): invierte verde/rojo sin tocar el signo mostrado
   className = '',
 }) {
   injectStyles()
@@ -125,8 +126,7 @@ export function KpiCard({
   // Colores del indicador de trend
   const trendColor = trend == null ? null
     : Math.abs(trend) < 0.1 ? '#94a3b8'
-    : trend > 0 ? '#10b981'
-    : '#ef4444'
+    : (trend > 0) !== invertTrendColor ? '#10b981' : '#ef4444'
   const trendArrow = trend == null ? null
     : Math.abs(trend) < 0.1 ? '→'
     : trend > 0 ? '↑'
