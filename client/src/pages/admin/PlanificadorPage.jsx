@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { todayStr } from '../../utils/dateUtils'
 import {
@@ -9,8 +9,9 @@ import {
   XCircle, Wallet, Gift, DollarSign, Percent, Package,
   Users, Maximize2, Minimize2, KeyRound, Copy, Check,
   Building2, ExternalLink, ChevronDown,
-  Eye, EyeOff, Pencil, Trash2, Receipt,
+  Eye, EyeOff, Pencil, Trash2, Receipt, Loader2,
 } from 'lucide-react'
+import * as htmlToImage from 'html-to-image'
 import { cn } from '../../utils/cn'
 import api from '../../config/api'
 import { useUi } from '../../context/UiContext'
@@ -452,6 +453,8 @@ export default function PlanificadorPage() {
   const [estatusExpanded, setEstatusExpanded]   = useState(false)
   const [showEstatusPwd, setShowEstatusPwd]     = useState(false)
   const [copied, setCopied]                     = useState(false)
+  const [copiandoImg, setCopiandoImg]           = useState(false)
+  const estatusTablaRef = useRef(null)
   const [showCpPanel, setShowCpPanel]           = useState(false)
   const [cpPanelVariante, setCpPanelVariante]   = useState('vencida')
   const [showCapacidad, setShowCapacidad]       = useState(false)
@@ -694,53 +697,36 @@ export default function PlanificadorPage() {
     })
   }
 
-  const handleCopyWhatsApp = () => {
-    const tipoPlanLabel = (d) => {
-      if (d === 14) return 'Plan Anual'
-      if (d === 7)  return 'Plan Semestral'
-      if (d === 1)  return 'Plan Mensual'
-      return null
-    }
-    const lines = [
-      `*Estatus Cliente* — ${rows.length} ${rows.length === 1 ? 'registro' : 'registros'}`,
-      '',
-    ]
-    rows.forEach(row => {
-      const nombre   = [row.nombre, row.apellido].filter(Boolean).join(' ') || 'Sin asignar'
-      const d        = row.duracionPlan != null ? Math.floor(Number(row.duracionPlan)) : null
-      const plan     = tipoPlanLabel(d)
-      const diasR    = calcDias(row.duracionReal) ?? row.diasVencimientoReal
-      const finReal  = row.duracionReal ? formatDate(row.duracionReal) : null
-      const iniReal  = row.inicioReal   ? formatDate(row.inicioReal)   : null
-
-      const partes = [`*${nombre}*  |  Pantalla: ${row.idPantalla}`]
-      if (row.customerId) partes[0] += `  |  ID: ${row.customerId}`
-      if (row.nickname)   partes.push(`Nickname: ${row.nickname}`)
-
-      const planPartes = []
-      if (plan)    planPartes.push(plan)
-      if (iniReal) planPartes.push(`Ini: ${iniReal}`)
-      if (finReal) planPartes.push(`Fin: ${finReal}`)
-      if (diasR != null) planPartes.push(`${diasR}d`)
-      if (planPartes.length) partes.push(planPartes.join('  |  '))
-
-      const estadoPartes = []
-      if (row.estadoReal) estadoPartes.push(`Estado: ${row.estadoReal}`)
-      if (row.alertaReal) estadoPartes.push(`Alerta: ${row.alertaReal}`)
-      if (estadoPartes.length) partes.push(estadoPartes.join('  |  '))
-
-      if (row.debe) partes.push(`*DEBE${row.montoDebe ? ': ' + formatCurrency(row.montoDebe) : ''}*`)
-
-      lines.push(partes.join('\n'))
-      lines.push('')
-    })
-
-    navigator.clipboard.writeText(lines.join('\n'))
-      .then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
+  // Copia el Estatus Cliente como IMAGEN (mismo comportamiento que el botón
+  // Copiar del comprobante de renovación): captura la tabla completa —
+  // incluidas las filas fuera del scroll — y la deja en el portapapeles.
+  // La columna Comprobante (botones "Generar") se excluye de la captura.
+  const handleCopiarImagenEstatus = async () => {
+    const el = estatusTablaRef.current
+    if (!el || copiandoImg) return
+    setCopiandoImg(true)
+    try {
+      const colExcluida = el.querySelector('th[data-nocapture]')?.offsetWidth || 0
+      const blob = await htmlToImage.toBlob(el, {
+        // Con listas muy largas se baja la resolución para no exceder el
+        // tamaño máximo de canvas del navegador
+        pixelRatio: el.scrollHeight > 6000 ? 1 : 2,
+        backgroundColor: '#ffffff',
+        cacheBust: true,
+        width: el.scrollWidth - colExcluida,
+        height: el.scrollHeight,
+        style: { maxHeight: 'none', overflow: 'visible' },
+        filter: (n) => !(n.hasAttribute && n.hasAttribute('data-nocapture')),
       })
-      .catch(() => showToast('No se pudo copiar al portapapeles', 'error'))
+      await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2200)
+      showToast('Estatus copiado como imagen — pégalo donde lo necesites.', 'success')
+    } catch (e) {
+      showToast(`No se pudo copiar la imagen: ${e.message || e}`, 'error')
+    } finally {
+      setCopiandoImg(false)
+    }
   }
 
   const togglePwd = (id) => setHidePwd(p => ({ ...p, [id]: !p[id] }))
@@ -1109,11 +1095,14 @@ export default function PlanificadorPage() {
             </div>
             <div className="flex items-center gap-1.5">
               <button
-                onClick={handleCopyWhatsApp}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white/80 hover:bg-white/20 border border-white/20 transition-colors"
-                title="Copiar para WhatsApp"
+                onClick={handleCopiarImagenEstatus}
+                disabled={copiandoImg}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-50"
+                title="Copiar como imagen — mismo formato del panel"
               >
-                {copied ? <Check size={12} /> : <Copy size={12} />}
+                {copiandoImg
+                  ? <Loader2 size={15} className="animate-spin" />
+                  : copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
                 {copied ? 'Copiado' : 'Copiar'}
               </button>
               <button
@@ -1154,7 +1143,7 @@ export default function PlanificadorPage() {
           </div>
 
           {/* Tabla */}
-          <div className={cn(
+          <div ref={estatusTablaRef} className={cn(
             'overflow-auto [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-ui-border hover:[&::-webkit-scrollbar-thumb]:bg-brand-light',
             estatusExpanded ? 'max-h-[80vh]' : 'max-h-[58vh]'
           )}>
@@ -1178,7 +1167,7 @@ export default function PlanificadorPage() {
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Estado R.</th>
                   <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Alerta R.</th>
                   <th className="sticky top-0 z-10 bg-slate-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Debe</th>
-                  <th className="sticky top-0 z-10 bg-orange-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Comprobante</th>
+                  <th data-nocapture className="sticky top-0 z-10 bg-orange-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Comprobante</th>
                 </tr>
               </thead>
               <tbody>
@@ -1226,7 +1215,7 @@ export default function PlanificadorPage() {
                           ? <Badge variant="error">{row.montoDebe ? formatCurrency(row.montoDebe) : 'Debe'}</Badge>
                           : <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-b border-gray-100 text-center">
+                      <td data-nocapture className="px-3 py-2 whitespace-nowrap border-b border-gray-100 text-center">
                         <button
                           onClick={() => setComprobanteRow(row)}
                           disabled={!row.nickname}
