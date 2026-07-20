@@ -210,6 +210,13 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
       recargasVigente: anioVigente ? costoAnioAcc[anioVigente].recargas : 0,
       promedioHistorico: Math.round(costoGlobal),
       trmVigente,
+      // Costo por pantalla-mes año por año (misma base ponderada de arriba) —
+      // para el comparativo "costo de este año vs el anterior" en el frontend.
+      porAnio: aniosConCosto.map(anio => ({
+        anio,
+        costoPorPantalla: Math.round(costoPorAnio[anio]),
+        recargas: costoAnioAcc[anio].recargas,
+      })),
     },
     totales: {
       ingresos: Math.round(totalIngresos),
