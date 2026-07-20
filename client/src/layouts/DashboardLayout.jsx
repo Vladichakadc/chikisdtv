@@ -383,7 +383,7 @@ export default function DashboardLayout() {
             {showLabels && (
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-semibold text-slate-200">Administrador</p>
-                <p className="truncate text-[11px] text-slate-500">admin@chikisdtv.com</p>
+                <p className="truncate text-[11px] text-slate-500">admin@chikidstv.com</p>
               </div>
             )}
             <div className="group/rail relative">
@@ -418,9 +418,9 @@ export default function DashboardLayout() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[15px] font-bold leading-tight">
-              {currentPage?.label ?? <>Chikisd<span className="text-brand-primary">TV</span></>}
+              {currentPage?.label ?? <>Chikids<span className="text-brand-primary">TV</span></>}
             </p>
-            {currentPage && <p className="text-[10px] font-medium text-slate-500 leading-tight">ChikisdTV · Admin</p>}
+            {currentPage && <p className="text-[10px] font-medium text-slate-500 leading-tight">ChikidsTV · Admin</p>}
           </div>
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-primary to-brand-dark">
             <Tv size={16} className="text-white" />

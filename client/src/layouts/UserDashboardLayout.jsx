@@ -26,7 +26,7 @@ export default function UserDashboardLayout() {
         <div className="p-4 border-b border-slate-700 flex items-center justify-between">
           {open && (
             <div>
-              <div className="text-xl font-bold text-brand-primary">ChikisdTV</div>
+              <div className="text-xl font-bold text-brand-primary">ChikidsTV</div>
               <div className="text-xs text-slate-400">Mi Portal</div>
             </div>
           )}

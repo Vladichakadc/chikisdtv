@@ -31,7 +31,7 @@ async function exportIngresoPorClienteExcel(clientes, resumen) {
   // para no penalizar la carga inicial de la app (crítico en móviles).
   const { default: ExcelJS } = await import('exceljs')
   const workbook = new ExcelJS.Workbook()
-  workbook.creator = 'ChikisdTV'
+  workbook.creator = 'ChikidsTV'
   workbook.created = new Date()
 
   const sheet = workbook.addWorksheet('Ingreso por cliente')
@@ -41,7 +41,7 @@ async function exportIngresoPorClienteExcel(clientes, resumen) {
 
   sheet.mergeCells('A1:G1')
   const title = sheet.getCell('A1')
-  title.value = 'ChikisdTV · ARPU — Ingreso por cliente'
+  title.value = 'ChikidsTV · ARPU — Ingreso por cliente'
   title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } }
   title.alignment = { vertical: 'middle' }
   title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.accent } }

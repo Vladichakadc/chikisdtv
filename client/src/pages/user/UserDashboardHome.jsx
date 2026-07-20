@@ -38,7 +38,7 @@ export default function UserDashboardHome() {
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-brand-accent">Hola, {name}</h1>
-        <p className="text-gray-500">Bienvenido a tu portal ChikisdTV</p>
+        <p className="text-gray-500">Bienvenido a tu portal ChikidsTV</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

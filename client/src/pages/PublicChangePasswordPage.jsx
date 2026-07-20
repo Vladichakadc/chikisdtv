@@ -150,7 +150,7 @@ export default function PublicChangePasswordPage() {
                       onFocus={() => setFocusedField('email')}
                       onBlur={() => setFocusedField(null)}
                       required
-                      placeholder="admin@chikisdtv.com"
+                      placeholder="admin@chikidstv.com"
                       className="pl-10 relative z-0"
                       style={{
                         transition: 'all 0.3s ease',

@@ -88,7 +88,7 @@ export default function Login() {
                 <Tv size={40} className="floating" />
               </div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-accent to-blue-600 bg-clip-text text-transparent">
-                ChikisdTV
+                ChikidsTV
               </h1>
               <p className="text-gray-500 mt-2 text-sm font-medium tracking-wide">
                 PLATAFORMA DE GESTIÓN IPTV PROFESIONAL
@@ -114,7 +114,7 @@ export default function Login() {
                     onFocus={() => setFocusedField('email')}
                     onBlur={() => setFocusedField(null)}
                     required
-                    placeholder="admin@chikisdtv.com"
+                    placeholder="admin@chikidstv.com"
                     className="pl-10 relative z-0"
                     style={{
                       transition: 'all 0.3s ease',
@@ -194,7 +194,7 @@ export default function Login() {
             {/* Footer */}
             <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col items-center justify-center fade-in fade-in-4">
               <p className="text-center text-xs text-gray-400 font-medium tracking-wide">
-                ChikisdTV © {new Date().getFullYear()} • Todos los derechos reservados.
+                ChikidsTV © {new Date().getFullYear()} • Todos los derechos reservados.
               </p>
             </div>
           </div>

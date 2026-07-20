@@ -676,7 +676,7 @@ export default function DashboardHome() {
               Dashboard
             </h1>
             <p className="text-indigo-100/70 text-sm mt-2 max-w-xl">
-              Pulso diario de ChikisdTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-indigo-400 font-bold hover:text-white transition-colors">Análisis Financiero</button>
+              Pulso diario de ChikidsTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-indigo-400 font-bold hover:text-white transition-colors">Análisis Financiero</button>
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
