@@ -331,16 +331,39 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
     telefono = cliente?.phone || null;
   }
 
-  let pantallasCliente = 1;
+  // Detalle por pantalla del cliente: cada pantalla con su último pago y si
+  // está AL DÍA (fecha vigente, sin marca "debe" y con pago registrado). El
+  // comprobante consolida la suma cuando el cliente tiene 2+ pantallas al día.
+  let pantallasDetalle = [];
   if (customerId) {
-    const n = await Planificador.count({
+    const filas = await Planificador.findAll({
       where: {
         customerId,
         nickname: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }, { [Op.notLike]: '%libre%' }] },
       },
+      attributes: ['idPantalla', 'nickname', 'duracionReal', 'debe', 'montoDebe'],
+      order: [['nickname', 'ASC']],
     });
-    pantallasCliente = Math.max(1, n);
+    pantallasDetalle = await Promise.all(filas.map(async (f) => {
+      const ultimo = await Venta.findOne({
+        where: { nickname: f.nickname },
+        order: [['fecha', 'DESC'], ['createdAt', 'DESC']],
+        attributes: ['tipoPlan', 'precioVenta', 'fecha'],
+      });
+      const dias = calcDiasDB(f.duracionReal);
+      return {
+        idPantalla: f.idPantalla,
+        nickname: f.nickname,
+        finPlan: f.duracionReal,
+        dias,
+        debe: !!f.debe,
+        montoDebe: f.montoDebe,
+        alDia: dias != null && dias > 0 && !f.debe && !!ultimo,
+        pago: ultimo,
+      };
+    }));
   }
+  const pantallasCliente = Math.max(1, pantallasDetalle.length);
 
   const catalogo = await Plan.findAll({
     where: { activo: true },
@@ -348,7 +371,7 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
     order: [['numeroPantallas', 'ASC'], ['duracionDias', 'ASC']],
   });
 
-  res.json({ pago, telefono, pantallasCliente, catalogo });
+  res.json({ pago, telefono, pantallasCliente, catalogo, pantallasDetalle });
 }));
 
 // GET /planificador/export — descarga el Planificador completo como .xlsx
