@@ -506,12 +506,12 @@ export default function DashboardHome() {
         onClick: () => setShowProximasPanel(true),
       })
     }
-    if (stats.pendingPayments > 0) {
+    if (stats.clientesConDeuda > 0) {
       list.push({
         tone: 'warning', icon: Hourglass,
-        titulo: `${stats.pendingPayments} pago${stats.pendingPayments === 1 ? '' : 's'} pendiente${stats.pendingPayments === 1 ? '' : 's'} de conciliar`,
-        detalle: 'Dinero registrado que aún no está confirmado en el módulo de Pagos',
-        onClick: () => navigate('/admin/payments'),
+        titulo: `${stats.clientesConDeuda} cliente${stats.clientesConDeuda === 1 ? '' : 's'} con deuda pendiente`,
+        detalle: `${formatCurrency(stats.montoDeudaTotal)} marcados como "debe" en el Planificador`,
+        onClick: () => navigate('/admin/planificador'),
       })
     }
     const oc = bi?.ocupacion
@@ -768,12 +768,12 @@ export default function DashboardHome() {
         />
         <StatCard
           icon={Package} title="Planes" value={stats.totalPlans} color="bg-blue-500"
-          subtitle={`Catálogo vigente que respalda ${stats.activeSubscriptions} suscripciones activas hoy`}
+          subtitle={`Catálogo vigente que respalda ${pantallasActivasTotal.toLocaleString()} pantallas activas hoy`}
           onClick={() => setExplain({
             title: 'Planes', value: stats.totalPlans, icon: Package,
             queEs: 'Cuántos planes de venta (mensual, semestral, anual…) están disponibles hoy en el catálogo para ofrecer a los clientes.',
             comoSeCalcula: 'Se cuentan los planes marcados como **activos** en el catálogo. Los planes desactivados quedan por fuera aunque tengan historial.',
-            origen: `Módulo de **Planes**. Estos planes respaldan las ${stats.activeSubscriptions} suscripciones activas actuales.`,
+            origen: `Módulo de **Planes**. El Planificador registra ${pantallasActivasTotal.toLocaleString()} pantallas activas actuales.`,
             action: { label: 'Ver Planes', onClick: () => navigate('/admin/plans') },
           })}
         />
@@ -804,14 +804,14 @@ export default function DashboardHome() {
       {/* ─── KPIs operativos: cartera y vencimientos ─────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 dash-a2 mt-4">
         <StatCard
-          icon={Clock} title="Pagos Pendientes" value={stats.pendingPayments} color="bg-amber-500"
-          subtitle="A la espera de conciliación en el módulo de Pagos"
+          icon={Clock} title="Clientes con Deuda" value={stats.clientesConDeuda} color="bg-amber-500"
+          subtitle={`${formatCurrency(stats.montoDeudaTotal)} marcados como "debe" en el Planificador`}
           onClick={() => setExplain({
-            title: 'Pagos Pendientes', value: stats.pendingPayments, icon: Clock,
-            queEs: 'Pagos que fueron registrados pero aún no se han confirmado/conciliado — dinero que debería entrar pero todavía no está asegurado.',
-            comoSeCalcula: 'Se cuentan los registros de pago cuyo estado es **Pendiente**.',
-            origen: 'Módulo de **Pagos** (campo estado de cada pago).',
-            action: { label: 'Ver Pagos', onClick: () => navigate('/admin/payments') },
+            title: 'Clientes con Deuda', value: stats.clientesConDeuda, icon: Clock,
+            queEs: 'Cuentas del Planificador marcadas como "debe" — clientes que tienen un saldo pendiente por cobrar hoy.',
+            comoSeCalcula: 'Se cuentan las filas del Planificador con **debe = sí**, y se suma su campo **monto que debe**.',
+            origen: 'Módulo **Planificador** (campos debe / monto que debe de cada pantalla).',
+            action: { label: 'Ver Planificador', onClick: () => navigate('/admin/planificador') },
           })}
         />
         <StatCard

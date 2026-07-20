@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { Client, Plan, Subscription, Payment, Device, Baja, Venta, VentaEquipo, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
-const { todayStr, daysFromNow } = require('../../utils/dateUtils');
+const { Client, Plan, Device, Baja, Venta, VentaEquipo, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
 const { calcDias, alertaFromDias } = require('../../utils/planificadorAlerta');
 const asyncHandler = require('../../middleware/asyncHandler');
 
@@ -10,7 +9,6 @@ const asyncHandler = require('../../middleware/asyncHandler');
 router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   const totalClients = await Client.count({ where: { role: 'user', estatus: 'Activo' } });
   const totalPlans = await Plan.count({ where: { activo: true } });
-  const activeSubscriptions = await Subscription.count({ where: { estado: 'Activo' } });
   const totalDevices = await Device.count({ where: { activo: true } });
 
   // Fuente de verdad para ingresos = Venta (licencias) + VentaEquipo (hardware).
@@ -22,16 +20,17 @@ router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   ]);
   const totalIngresos = Math.round(ingLicencias + ingEquipos);
 
-  const pendingPayments = await Payment.count({ where: { estado: 'Pendiente' } });
-  const vencidosPayments = await Payment.count({ where: { estado: 'Vencido' } });
-
   const today = new Date();
-  const upcomingExpirations = await Subscription.count({
-    where: {
-      estado: 'Activo',
-      fechaVencimiento: { [Op.between]: [todayStr(), daysFromNow(7)] }
-    }
-  });
+
+  // Subscription y Payment son tablas congeladas (importadas una sola vez el
+  // 2026-06-06, nunca actualizadas desde entonces) — NO se usan para KPIs del
+  // Dashboard. La deuda/cartera vigente vive en Planificador.debe/montoDebe
+  // (misma fuente que usa /plans/performance para "conDeuda"/"montoDeuda").
+  const [clientesConDeuda, montoDeudaTotalRaw] = await Promise.all([
+    Planificador.count({ where: { debe: true } }),
+    Planificador.sum('montoDebe', { where: { debe: true } }),
+  ]);
+  const montoDeudaTotal = Math.round(montoDeudaTotalRaw || 0);
 
   // ─── Cruce con Clientes (TablaCliente): mezcla de canal y alcance geográfico
   const [clientesFinal, clientesRevendedor, paisesRows] = await Promise.all([
@@ -84,12 +83,10 @@ router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   res.json({
     totalClients,
     totalPlans,
-    activeSubscriptions,
     totalDevices,
     totalIngresos,
-    pendingPayments,
-    vencidosPayments,
-    upcomingExpirations,
+    clientesConDeuda,
+    montoDeudaTotal,
     // ── Cruces con otros módulos: dan contexto de negocio a las tarjetas ──
     clientesFinal,
     clientesRevendedor,
@@ -219,7 +216,10 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const mrrPorMesMap = {};
   const mrrPorTipoPlanMap = {};
   for (const v of ventas) {
-    if (v.tipoPago === 'Cortesia') continue;
+    // Cortesia (regalo, $0) y Cambio de Plan (registro administrativo, no es
+    // una transacción real) quedan fuera del MRR — misma exclusión que ya se
+    // aplica en el desglose por tipoPago y en /plans/performance.
+    if (v.tipoPago === 'Cortesia' || v.tipoPago === 'Cambio de Plan') continue;
     const key = monthKey(v.anio, v.mes);
     if (key.split('-')[1] === '00') continue;
     const divisor = MESES_POR_PLAN[v.tipoPlan] || 1;
@@ -286,10 +286,6 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const ticketPromedio = ventas.length > 0 ? Math.round(totalIngresos / ventas.length) : 0;
   const renovaciones = ventas.filter(v => v.tipoPago === 'Renovacion').length;
   const tasaRenovacionPct = ventas.length > 0 ? Number(((renovaciones / ventas.length) * 100).toFixed(1)) : 0;
-  const totalActivos = await Subscription.count({ where: { estado: 'Activo' } });
-  const totalCancelados = await Subscription.count({ where: { estado: 'Cancelado' } });
-  const churnPct = (totalActivos + totalCancelados) > 0 ? Number(((totalCancelados / (totalActivos + totalCancelados)) * 100).toFixed(1)) : 0;
-
   const ultimo = porAnio[porAnio.length - 1] || null;
   const penultimo = porAnio[porAnio.length - 2] || null;
 
@@ -426,6 +422,19 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const totalLibresCP    = Math.max(0, totalCapacidadCP - totalOcupadasCP);
   const pctOcupacionGlobal = totalCapacidadCP > 0 ? Math.round((totalOcupadasCP / totalCapacidadCP) * 100) : 0;
 
+  // ─── Tasa de cancelación (churn) REAL: bajas del año en curso vs. base
+  // instalada vigente del Planificador. Reemplaza el cálculo anterior, que
+  // salía de Subscription (119 registros importados una sola vez el
+  // 2026-06-06 y nunca más actualizados — desconectado de Bajas/Planificador).
+  // Misma fórmula ya validada en Análisis de Bajas, ahora en la fuente
+  // compartida para que Dashboard, Análisis Financiero y Análisis de Bajas
+  // muestren siempre el mismo número.
+  const anioActualChurn = new Date().getFullYear();
+  const bajasYTDChurn = bajasCountPorAnio[String(anioActualChurn)] || 0;
+  const churnPct = (totalOcupadasCP + bajasYTDChurn) > 0
+    ? Number(((bajasYTDChurn / (totalOcupadasCP + bajasYTDChurn)) * 100).toFixed(1))
+    : 0;
+
   // ─── LTV (Valor de Vida del Cliente) ─────────────────────────────────────
   // Sin CAC exacto, el LTV = ingreso histórico acumulado desde la primera
   // activación hasta la última transacción registrada (excluidas cortesías).
@@ -440,9 +449,13 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
         primeraActiv[v.customerId] = v.fecha;
     }
     if (v.tipoPago !== 'Cortesia') {
+      // Cambio de Plan sí cuenta como actividad del cliente (touchpoint real),
+      // pero no como ingreso — es un registro administrativo sin transacción.
       if (!ultimaActiv[v.customerId] || v.fecha > ultimaActiv[v.customerId])
         ultimaActiv[v.customerId] = v.fecha;
-      ingresosCli[v.customerId] = (ingresosCli[v.customerId] || 0) + (Number(v.precioVenta) || 0);
+      if (v.tipoPago !== 'Cambio de Plan') {
+        ingresosCli[v.customerId] = (ingresosCli[v.customerId] || 0) + (Number(v.precioVenta) || 0);
+      }
     }
   }
   const mesesEntreF = (f1, f2) => {
