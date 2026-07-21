@@ -219,7 +219,7 @@ export default function DashboardLayout() {
           {showLabels && (
             <div className="min-w-0 flex-1">
               <div className="text-lg font-extrabold leading-tight tracking-tight">
-                Chikisd<span className="text-brand-primary">TV</span>
+                Chikids<span className="text-brand-primary">TV</span>
               </div>
               <div className="text-[11px] font-medium tracking-wide text-slate-400">Panel Administrador</div>
             </div>
