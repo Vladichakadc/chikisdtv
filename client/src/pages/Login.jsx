@@ -87,8 +87,8 @@ export default function Login() {
               <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-brand-primary to-blue-600 rounded-2xl text-white mb-4 shadow-lg hover:shadow-xl transition-shadow">
                 <Tv size={40} className="floating" />
               </div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-accent to-blue-600 bg-clip-text text-transparent">
-                ChikidsTV
+              <h1 className="text-4xl font-bold text-brand-accent">
+                Chikids<span className="text-brand-primary">TV</span>
               </h1>
               <p className="text-gray-500 mt-2 text-sm font-medium tracking-wide">
                 PLATAFORMA DE GESTIÓN IPTV PROFESIONAL
