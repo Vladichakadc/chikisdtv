@@ -20,6 +20,19 @@ const MES_ABREV = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', '
 const SALDO_INICIAL_DEFAULT = 27
 const DIAS_ALERTA_CP = 30
 
+// Las fechas llegan como "YYYY-MM-DD" (sin hora). `new Date("YYYY-MM-DD")` las
+// interpreta como medianoche UTC — en una zona horaria detrás de UTC (Colombia,
+// UTC-5) eso cae en las 19:00 del día ANTERIOR en hora local, corriendo la
+// fecha (y a veces el mes) un día hacia atrás. Se parsean los componentes a
+// mano y se construyen en hora local para evitar el corrimiento.
+function parseDateOnly(str) {
+  if (!str) return null
+  const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return null
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return isNaN(d) ? null : d
+}
+
 const CSS = `
   @keyframes pr-fade-up { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
   @keyframes pr-orb-1   { 0%,100% { transform:translate(0,0) scale(1) } 50% { transform:translate(30px,-20px) scale(1.08) } }
@@ -35,8 +48,7 @@ const CSS = `
 function diasHasta(fecha) {
   if (!fecha) return null
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const d = new Date(fecha); if (isNaN(d)) return null
-  d.setHours(0, 0, 0, 0)
+  const d = parseDateOnly(fecha); if (!d) return null
   return Math.round((d - today) / 86400000)
 }
 
@@ -263,11 +275,23 @@ export default function ProyeccionRecargasPage() {
   }, [rows])
 
   // ── Proyección de recargas · 12 meses (usa el saldo interactivo) ────────
-  const { proyeccion, precioPack100 } = useMemo(() => {
-    const validos = rows.filter(r => r.creditos > 0 && r.costoCOP > 0)
+  const { proyeccion, precioPack100, trmVigente } = useMemo(() => {
+    // El proveedor cobra en USD — ese costo unitario es estable en el tiempo.
+    // Lo que cambia es la TRM. Proyectar con el promedio histórico de COP
+    // mezcla recargas de hace años (TRM ~4.700) con las de hoy (TRM ~3.630),
+    // sobreestimando el costo futuro. Se usa el costo unitario en USD
+    // (promedio, estable) × la TRM VIGENTE (la más reciente registrada, no
+    // el promedio histórico) para reflejar lo que costaría comprar hoy.
+    const validos = rows.filter(r => r.creditos > 0 && r.costoUSD > 0)
     const totalCr  = validos.reduce((s, r) => s + Number(r.creditos), 0)
-    const totalCOP = validos.reduce((s, r) => s + Number(r.costoCOP), 0)
-    const precioPack100 = totalCr > 0 ? (totalCOP / totalCr) * 100 : 0
+    const totalUSD = validos.reduce((s, r) => s + Number(r.costoUSD), 0)
+    const costoUnitarioUSD = totalCr > 0 ? totalUSD / totalCr : 0
+
+    const trmVigente = rows
+      .filter(r => Number(r.trm) > 0 && r.fecha)
+      .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0]?.trm || 0
+
+    const precioPack100 = costoUnitarioUSD > 0 && trmVigente > 0 ? costoUnitarioUSD * trmVigente * 100 : 0
 
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
     const meses = Array.from({ length: 12 }, (_, i) => {
@@ -281,9 +305,7 @@ export default function ProyeccionRecargasPage() {
 
     const grupos = Object.fromEntries(meses.map(m => [m.key, []]))
     ;(cpRows || []).forEach(cp => {
-      if (!cp.fechaFin) return
-      const fin = new Date(cp.fechaFin); if (isNaN(fin)) return
-      fin.setHours(0, 0, 0, 0)
+      const fin = parseDateOnly(cp.fechaFin); if (!fin) return
       const key = `${fin.getFullYear()}-${String(fin.getMonth() + 1).padStart(2, '0')}`
       if (grupos[key] !== undefined) grupos[key].push(cp)
     })
@@ -316,7 +338,7 @@ export default function ProyeccionRecargasPage() {
         labelPacks:   packs100 > 0 ? `${packs100}` : '',
       }
     })
-    return { proyeccion, precioPack100 }
+    return { proyeccion, precioPack100, trmVigente }
   }, [rows, cpRows, saldoInicial])
 
   const fmtC = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
@@ -424,9 +446,9 @@ export default function ProyeccionRecargasPage() {
               tag={{ tone: totalPacks > 5 ? 'warn' : 'good', text: `${totalPacks} compras en el período` }} />
             <BiCardCP icon={DollarSign}    variant={hayCost ? 'solid' : 'outline'} label="Costo estimado (12m)"
               value={hayCost ? fmtC(totalCOP) : '—'}
-              sub={hayCost ? `Ref.: ${fmtC(Math.round(precioPack100))} por pack de 100 Cr` : 'Sin datos de costo pantalla'}
+              sub={hayCost ? `Ref.: ${fmtC(Math.round(precioPack100))} por pack de 100 Cr (TRM vigente $${Math.round(trmVigente).toLocaleString('es-CO')})` : 'Sin datos de costo pantalla'}
               tag={hayCost
-                ? { tone: 'warn', text: `Promedio histórico: ${fmtC(Math.round(precioPack100 / 100))}/Cr` }
+                ? { tone: 'warn', text: `Costo hoy: ${fmtC(Math.round(precioPack100 / 100))}/Cr` }
                 : { tone: 'info', text: 'Registra recargas para estimar' }} />
           </div>
 
