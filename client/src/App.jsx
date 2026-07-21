@@ -18,6 +18,7 @@ const PlanificadorPage = lazy(() => import('./pages/admin/PlanificadorPage'))
 const BajasPage = lazy(() => import('./pages/admin/BajasPage'))
 const CostoPantallaPage = lazy(() => import('./pages/admin/CostoPantallaPage'))
 const AnalisisCostoPantallaPage = lazy(() => import('./pages/admin/AnalisisCostoPantallaPage'))
+const ProyeccionRecargasPage = lazy(() => import('./pages/admin/ProyeccionRecargasPage'))
 const CuentasPadrePage = lazy(() => import('./pages/admin/CuentasPadrePage'))
 const AnalisisRetencionPage = lazy(() => import('./pages/admin/AnalisisRetencionPage'))
 const AnalisisFinancieroPage = lazy(() => import('./pages/admin/AnalisisFinancieroPage'))
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="bajas" element={<BajasPage />} />
           <Route path="costo-pantalla" element={<CostoPantallaPage />} />
           <Route path="analisis-costo-pantalla" element={<AnalisisCostoPantallaPage />} />
+          <Route path="proyeccion-recargas" element={<ProyeccionRecargasPage />} />
           <Route path="cuentas-padre" element={<CuentasPadrePage />} />
           <Route path="retencion" element={<AnalisisRetencionPage />} />
           <Route path="analisis-financiero" element={<AnalisisFinancieroPage />} />

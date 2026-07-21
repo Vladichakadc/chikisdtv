@@ -67,6 +67,7 @@ const navSections = [
         icon: Monitor,
         subItems: [
           { to: '/admin/analisis-costo-pantalla', label: 'Análisis Económico', icon: Coins },
+          { to: '/admin/proyeccion-recargas', label: 'Proyección de Recargas', icon: CalendarClock },
         ],
       },
       {
