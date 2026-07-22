@@ -14,6 +14,7 @@ import {
   Trophy, TrendingUp, Percent, ChevronDown, ChevronUp,
   Sparkles, Info, Crown, Medal, Award,
 } from 'lucide-react'
+import { getRowVariant } from './rowHelpers'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -239,13 +240,16 @@ export function RankingAhorroMensual({ pantallas }) {
   const [expanded, setExpanded]     = useState(false)
   const [showDistrib, setShowDistrib] = useState(true)
 
-  /* Solo pantallas con cliente y % registrado */
+  /* Solo pantallas con cliente, % registrado y que sean socios activos */
   const ranked = useMemo(() => {
     if (!pantallas?.length) return []
     return pantallas
       .filter(p => {
         const nombre = (String(p.nombre ?? '') + String(p.apellido ?? '') + String(p.nickname ?? '')).trim()
-        return nombre && p.porcentaje != null && Number(p.porcentaje) > 0
+        if (!nombre || p.porcentaje == null || Number(p.porcentaje) <= 0) return false
+        
+        const variant = getRowVariant(p, 30)
+        return variant !== 'vencido' && variant !== 'libre'
       })
       .sort((a, b) => Number(b.porcentaje) - Number(a.porcentaje))
   }, [pantallas])
