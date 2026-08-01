@@ -1,4 +1,4 @@
-import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package } from 'lucide-react'
+import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
 import { STAT_TONES } from './StatCard'
@@ -87,7 +87,7 @@ export function screenToVentaPrefill(screen, catKey) {
 
 // Panel de detalle accionable: lista las pantallas/clientes de una categoría y permite
 // generar la venta correspondiente directamente desde Pagos, ya pre-cargada.
-export function CategoryPanel({ catKey, screens, onClose, onGenerate }) {
+export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit }) {
   const config = CATEGORY_CONFIG[catKey]
   if (!config) return null
   const t = STAT_TONES[config.tone] || STAT_TONES.orange
@@ -142,14 +142,28 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate }) {
                       <td className="px-4 py-2.5 text-xs text-gray-600">{p.cuenta || p.cuentaId || '—'}</td>
                       <td className="px-4 py-2.5">{config.badge(p)}</td>
                       <td className="px-4 py-2.5 text-right">
-                        <button
-                          onClick={() => onGenerate(p, catKey)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold shadow-sm transition-colors"
-                        >
-                          {catKey === 'libre'
-                            ? <><MonitorCheck size={13} /> Asignar Pantalla</>
-                            : <><Receipt size={13} /> Generar venta</>}
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* "libre" ya usa "Asignar Pantalla" para abrir Editar Pantalla; el resto
+                              de categorías (Vencidas, Próx. a vencer, Deben, Cortesías) gana un
+                              acceso directo al formulario sin pasar por la tabla principal. */}
+                          {catKey !== 'libre' && onEdit && (
+                            <button
+                              onClick={() => onEdit(p)}
+                              className="inline-flex items-center justify-center p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-brand-primary hover:border-brand-primary hover:bg-orange-50 transition-colors"
+                              title="Editar pantalla"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => onGenerate(p, catKey)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold shadow-sm transition-colors"
+                          >
+                            {catKey === 'libre'
+                              ? <><MonitorCheck size={13} /> Asignar Pantalla</>
+                              : <><Receipt size={13} /> Generar venta</>}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -163,7 +177,7 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate }) {
           <p className="text-xs text-gray-400">
             {catKey === 'libre'
               ? '"Asignar Pantalla" abre el formulario de edición de la pantalla para asignarle un nuevo titular.'
-              : '"Generar venta" abre el formulario en Pagos con los datos del cliente y la pantalla ya cargados.'}
+              : 'El lápiz abre Editar Pantalla directamente; "Generar venta" abre Pagos con los datos ya cargados.'}
           </p>
           <button onClick={onClose} className="shrink-0 px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors">
             Cerrar
