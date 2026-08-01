@@ -1,9 +1,19 @@
 // Helpers de cálculo y clasificación de filas del planificador (estado, días, orden de columnas)
 
+// Parsea "YYYY-MM-DD" como medianoche LOCAL. new Date('YYYY-MM-DD') interpreta
+// medianoche UTC, que en Bogotá (UTC-5) cae en el día anterior — eso hacía ver
+// todos los vencimientos adelantados 1 día.
+export function parseFechaLocal(fecha) {
+  const m = String(fecha).match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  const d = new Date(fecha)
+  return isNaN(d.getTime()) ? null : d
+}
+
 export function calcDias(fechaFin) {
   if (!fechaFin) return null
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const fin = new Date(fechaFin); if (isNaN(fin.getTime())) return null
+  const fin = parseFechaLocal(fechaFin); if (!fin) return null
   fin.setHours(0, 0, 0, 0)
   return Math.round((fin - today) / 86400000)
 }

@@ -189,8 +189,11 @@ export function PlanificadorTable({
                     ? (
                       <div className="flex flex-col items-center gap-0.5">
                         <Badge variant="error">Debe</Badge>
-                        {row.montoDebe != null && row.montoDebe !== '' && (
+                        {row.montoDebe > 0 && (
                           <span className="text-xs font-semibold text-red-600">{formatCurrency(row.montoDebe)}</span>
+                        )}
+                        {row.montoDebeUSD > 0 && (
+                          <span className="text-xs font-semibold text-emerald-700">US${Number(row.montoDebeUSD).toLocaleString('en-US')}</span>
                         )}
                       </div>
                     )

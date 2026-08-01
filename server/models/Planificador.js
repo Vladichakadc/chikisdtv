@@ -20,7 +20,8 @@ const Planificador = sequelize.define('Planificador', {
   alertaReal:   DataTypes.STRING,
   porcentaje:   DataTypes.FLOAT,
   debe:         { type: DataTypes.BOOLEAN, defaultValue: false },
-  montoDebe:    DataTypes.FLOAT,
+  montoDebe:    DataTypes.FLOAT,   // deuda en pesos colombianos (COP)
+  montoDebeUSD: DataTypes.FLOAT,   // deuda en dólares (USD) — cartera independiente
   tipoPlan:     DataTypes.STRING,
 }, {
   tableName: 'planificador',

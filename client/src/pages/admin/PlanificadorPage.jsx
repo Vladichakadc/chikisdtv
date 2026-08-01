@@ -593,8 +593,9 @@ export default function PlanificadorPage() {
     // ── Indicadores financieros y de negocio ──────────────────────────────
     const asignadas     = pantallas.length - libres
     const vencidas      = variantes.filter(v => v === 'vencido').length
-    const deudores      = pantallas.filter(p => p.debe).length
-    const montoCartera  = pantallas.reduce((s, p) => s + (p.debe ? (Number(p.montoDebe) || 0) : 0), 0)
+    const deudores        = pantallas.filter(p => p.debe).length
+    const montoCartera    = pantallas.reduce((s, p) => s + (p.debe ? (Number(p.montoDebe) || 0) : 0), 0)
+    const montoCarteraUSD = pantallas.reduce((s, p) => s + (p.debe ? (Number(p.montoDebeUSD) || 0) : 0), 0)
     const cortesias     = variantes.filter(v => v === 'cortesia').length
     
     const ocupacion     = pantallas.length ? Math.round((asignadas / pantallas.length) * 100) : 0
@@ -648,7 +649,7 @@ export default function PlanificadorPage() {
       rows,
       stats: {
         cuentas, activas, proximaVencer, libres, diasAlerta, total: pantallas.length,
-        vencidas, deudores, cortesias, montoCartera, ocupacion, asignadas,
+        vencidas, deudores, cortesias, montoCartera, montoCarteraUSD, ocupacion, asignadas,
       },
     }
   }, [data, search, filterStatus, sortConfig])
@@ -799,6 +800,7 @@ export default function PlanificadorPage() {
           allPantallas={data?.pantallas}
           onClose={() => setEditRow(null)}
           onSaved={() => { setEditRow(null); load() }}
+          onCreated={(nueva) => { setEditRow(nueva); load() }}
         />
       )}
 
@@ -919,14 +921,16 @@ export default function PlanificadorPage() {
       </div>
 
       {/* Indicadores financieros y de negocio */}
-      <div className="pl-a3 grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="pl-a3 grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
         <StatCard icon={XCircle}    label="Vencidas"            value={stats.vencidas}                    variant="outline" tone="red"     sub="Requieren acción inmediata"
           onClick={() => setActivePanel('vencido')} />
         <StatCard icon={Wallet}     label="Cuentas que deben"   value={stats.deudores}                    variant="outline" tone="amber"   sub="Pendientes de cobro"
           onClick={() => setActivePanel('debe')} />
         <StatCard icon={Gift}       label="Cortesías activas"   value={stats.cortesias}                   variant="outline" tone="pink"    sub="Sin generar ingreso"
           onClick={() => setActivePanel('cortesia')} />
-        <StatCard icon={DollarSign} label="Cartera por cobrar"  value={formatCurrency(stats.montoCartera)} variant="solid"   tone="orange"  sub="Dinero pendiente"
+        <StatCard icon={DollarSign} label="Cartera COP"         value={formatCurrency(stats.montoCartera)} variant="solid"   tone="orange"  sub="Deuda en pesos"
+          onClick={() => setActivePanel('debe')} />
+        <StatCard icon={DollarSign} label="Cartera USD"         value={`US$${Number(stats.montoCarteraUSD || 0).toLocaleString('en-US')}`} variant="solid" tone="emerald" sub="Deuda en dólares"
           onClick={() => setActivePanel('debe')} />
         <StatCard icon={Percent}    label="Ocupación"           value={`${stats.ocupacion}%`}              variant="light"   tone="cyan"    sub={`${stats.asignadas} de ${stats.total} pantallas`}
           onClick={() => setExplain({
@@ -1212,7 +1216,13 @@ export default function PlanificadorPage() {
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap border-b border-gray-100">
                         {row.debe
-                          ? <Badge variant="error">{row.montoDebe ? formatCurrency(row.montoDebe) : 'Debe'}</Badge>
+                          ? (
+                            <div className="flex flex-col items-start gap-0.5">
+                              {!row.montoDebe && !row.montoDebeUSD && <Badge variant="error">Debe</Badge>}
+                              {row.montoDebe > 0 && <Badge variant="error">{formatCurrency(row.montoDebe)}</Badge>}
+                              {row.montoDebeUSD > 0 && <Badge variant="error">US${Number(row.montoDebeUSD).toLocaleString('en-US')}</Badge>}
+                            </div>
+                          )
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td data-nocapture className="px-3 py-2 whitespace-nowrap border-b border-gray-100 text-center">

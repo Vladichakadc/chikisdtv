@@ -7,10 +7,20 @@
 
 const DIAS_ALERTA = 8;
 
+// Parsea una fecha DATEONLY ("YYYY-MM-DD") como medianoche LOCAL (America/Bogota,
+// fijada en server.js). new Date('YYYY-MM-DD') interpreta medianoche UTC, que en
+// Bogotá (UTC-5) cae en el día anterior y hacía ver los vencimientos adelantados 1 día.
+function parseFechaLocal(fecha) {
+  const m = String(fecha).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(fecha);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function calcDias(fecha) {
   if (!fecha) return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const d = new Date(fecha); if (isNaN(d.getTime())) return null;
+  const d = parseFechaLocal(fecha); if (!d) return null;
   d.setHours(0, 0, 0, 0);
   return Math.round((d - today) / 86400000);
 }
