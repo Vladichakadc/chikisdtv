@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import {
   X, UserPlus, Undo2, KeyRound, User, CalendarRange, Tv,
   Wallet, DollarSign, BadgePercent, Plus, Loader2, MonitorPlay,
-  Eye, EyeOff, PencilLine, List,
+  Eye, EyeOff, PencilLine, List, Pencil, Trash2,
 } from 'lucide-react'
 import api from '../../../config/api'
 import { useUi } from '../../../context/UiContext'
@@ -110,7 +110,7 @@ function Section({ icon: Icon, title, tone, aside, children }) {
 
 // ─── Modal de edición ────────────────────────────────────────────────────────
 
-export function EditModal({ row, allPantallas, onClose, onSaved, onCreated }) {
+export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSwitchPantalla, onDeleteSibling }) {
   const { showToast } = useUi()
 
   const [cuentasPadre, setCuentasPadre]   = useState([])
@@ -238,6 +238,28 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated }) {
 
   const [newScreenId, setNewScreenId] = useState('')
   useEffect(() => { setNewScreenId(nextPantallaId) }, [nextPantallaId])
+
+  // Pantallas hermanas: el resto de slots de la misma cuenta (mismo Usuario IPTV),
+  // excluyendo la que se está editando — permiten modificar o eliminar una
+  // "pantalla adicional" sin salir del modal.
+  const siblingScreens = useMemo(() => {
+    const cuentaId = (form.cuentaId || row.cuentaId || '').trim()
+    if (!cuentaId) return []
+    return (allPantallas || [])
+      .filter(p => p.cuentaId === cuentaId && p.idPantalla !== row.idPantalla)
+      .sort((a, b) => String(a.idPantalla).localeCompare(String(b.idPantalla), 'es', { numeric: true }))
+  }, [allPantallas, form.cuentaId, row.cuentaId, row.idPantalla])
+
+  const [deletingSiblingId, setDeletingSiblingId] = useState(null)
+  const handleDeleteSibling = async (sibling) => {
+    if (!onDeleteSibling) return
+    setDeletingSiblingId(sibling.idPantalla)
+    try {
+      await onDeleteSibling(sibling)
+    } finally {
+      setDeletingSiblingId(null)
+    }
+  }
 
   const handleCuentaChange = (cuentaId) => {
     setSelectedCuentaId(cuentaId)
@@ -404,37 +426,70 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated }) {
               </Field>
             </div>
 
-            {/* Pantalla adicional: nuevo slot con el mismo Usuario IPTV */}
+            {/* Pantallas de esta cuenta: gestiona los demás slots del mismo Usuario
+                IPTV — editarlos (sin salir del modal), eliminarlos, o crear uno nuevo. */}
             <div className="mt-4 rounded-xl border border-dashed border-violet-300 bg-violet-50/60 p-3">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="p-2 rounded-lg bg-violet-100 text-violet-600 shrink-0"><MonitorPlay size={16} /></div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-violet-700">Pantalla adicional</p>
-                    <p className="text-[11px] text-violet-500">
-                      Crea un nuevo slot en esta cuenta manteniendo el mismo Usuario IPTV
-                    </p>
-                  </div>
+              <div className="flex items-center gap-2.5 min-w-0 mb-2.5">
+                <div className="p-2 rounded-lg bg-violet-100 text-violet-600 shrink-0"><MonitorPlay size={16} /></div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-violet-700">Pantallas de esta cuenta</p>
+                  <p className="text-[11px] text-violet-500">Mismo Usuario IPTV — edita, elimina o agrega un nuevo slot</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={newScreenId}
-                    onChange={setNewScreenId}
-                    className="w-32 font-mono text-center border-violet-200 focus:ring-violet-400"
-                    placeholder={nextPantallaId || 'ID-1'}
-                    aria-label="ID de la nueva pantalla"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleCreateScreen}
-                    disabled={creating || !newScreenId.trim()}
-                    className="!bg-violet-600 hover:!bg-violet-700 whitespace-nowrap"
-                  >
-                    {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-                    {creating ? 'Creando…' : 'Crear pantalla'}
-                  </Button>
-                </div>
+              </div>
+
+              {siblingScreens.length > 0 && (
+                <ul className="mb-3 max-h-36 overflow-y-auto rounded-lg border border-violet-100 divide-y divide-violet-100 bg-white/80">
+                  {siblingScreens.map(s => {
+                    const cliente = [s.nombre, s.apellido].filter(Boolean).join(' ').trim() || s.nickname || 'Libre'
+                    return (
+                      <li key={s.idPantalla} className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+                        <div className="min-w-0 flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-violet-700 shrink-0">{s.idPantalla}</span>
+                          <span className="text-xs text-gray-500 truncate">{cliente}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => onSwitchPantalla?.(s)}
+                            className="p-1.5 rounded-md text-violet-600 hover:bg-violet-100 transition-colors"
+                            title={`Editar ${s.idPantalla}`}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSibling(s)}
+                            disabled={deletingSiblingId === s.idPantalla}
+                            className="p-1.5 rounded-md text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                            title={`Eliminar ${s.idPantalla}`}
+                          >
+                            {deletingSiblingId === s.idPantalla ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newScreenId}
+                  onChange={setNewScreenId}
+                  className="w-32 font-mono text-center border-violet-200 focus:ring-violet-400"
+                  placeholder={nextPantallaId || 'ID-1'}
+                  aria-label="ID de la nueva pantalla"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleCreateScreen}
+                  disabled={creating || !newScreenId.trim()}
+                  className="!bg-violet-600 hover:!bg-violet-700 whitespace-nowrap"
+                >
+                  {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                  {creating ? 'Creando…' : 'Crear pantalla'}
+                </Button>
               </div>
             </div>
           </Section>

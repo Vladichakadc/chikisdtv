@@ -793,14 +793,19 @@ export default function PlanificadorPage() {
         />
       )}
 
-      {/* Modal de edición */}
+      {/* Modal de edición — key por idPantalla: fuerza un remount limpio del
+          formulario al saltar entre pantallas hermanas (crear/editar), evitando
+          que queden campos de la pantalla anterior mezclados con la nueva. */}
       {editRow && (
         <EditModal
+          key={editRow.idPantalla}
           row={editRow}
           allPantallas={data?.pantallas}
           onClose={() => setEditRow(null)}
           onSaved={() => { setEditRow(null); load() }}
           onCreated={(nueva) => { setEditRow(nueva); load() }}
+          onSwitchPantalla={(sibling) => { snapshotBeforeChange(); setEditRow(sibling) }}
+          onDeleteSibling={handleDelete}
         />
       )}
 
@@ -811,6 +816,7 @@ export default function PlanificadorPage() {
           screens={categoryLists[activePanel] || []}
           onClose={() => setActivePanel(null)}
           onGenerate={handleGenerateVenta}
+          onEdit={(screen) => { setActivePanel(null); snapshotBeforeChange(); setEditRow(screen) }}
         />
       )}
 
