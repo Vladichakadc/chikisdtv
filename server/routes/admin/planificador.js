@@ -5,7 +5,7 @@ const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const { Planificador, CuentaPadre, Venta, Client, Plan } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
-const { importFromExcel, autoFixCuentaIdMismatches } = require('../../services/planificadorImportService');
+const { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan } = require('../../services/planificadorImportService');
 // La alerta se recalcula según la fecha vigente; "CORTESIA" es un valor manual que se respeta
 const { DIAS_ALERTA, calcDias: calcDiasDB, alertaFromDias } = require('../../utils/planificadorAlerta');
 
@@ -183,7 +183,13 @@ function buildPlanificadorWorkbook(pantallas) {
       fmtDateDMY(p.inicioReal), fmtDateDMY(p.duracionReal),
       p.diasVencimientoReal != null ? `${p.diasVencimientoReal}d` : '',
       p.estadoReal || '', p.alertaReal || '',
-      p.debe ? (p.montoDebe ? `Debe ($${Number(p.montoDebe).toLocaleString('es-CO')})` : 'Debe') : '',
+      p.debe
+        ? [
+            'Debe',
+            p.montoDebe    ? `$${Number(p.montoDebe).toLocaleString('es-CO')} COP` : '',
+            p.montoDebeUSD ? `US$${Number(p.montoDebeUSD).toLocaleString('en-US')}` : '',
+          ].filter(Boolean).join(' · ')
+        : '',
     ];
 
     values.forEach((val, i) => {
@@ -233,7 +239,10 @@ function buildPlanificadorWorkbook(pantallas) {
 router.get('/planificador', asyncHandler(async (_req, res) => {
   const count = await Planificador.count();
   if (count === 0) await importFromExcel(); // importFromExcel ya llama autofix internamente
-  else await autoFixCuentaIdMismatches();   // self-healing en cada carga sobre BD existente
+  else {
+    await autoFixCuentaIdMismatches();      // self-healing en cada carga sobre BD existente
+    await normalizeDuracionPlan();          // meses siempre enteros (el Excel traía días/30)
+  }
   const records = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
 
@@ -341,7 +350,7 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
         customerId,
         nickname: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }, { [Op.notLike]: '%libre%' }] },
       },
-      attributes: ['idPantalla', 'nickname', 'duracionReal', 'debe', 'montoDebe'],
+      attributes: ['idPantalla', 'nickname', 'duracionReal', 'debe', 'montoDebe', 'montoDebeUSD'],
       order: [['nickname', 'ASC']],
     });
     pantallasDetalle = await Promise.all(filas.map(async (f) => {
@@ -358,6 +367,7 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
         dias,
         debe: !!f.debe,
         montoDebe: f.montoDebe,
+        montoDebeUSD: f.montoDebeUSD,
         alDia: dias != null && dias > 0 && !f.debe && !!ultimo,
         pago: ultimo,
       };
@@ -454,6 +464,48 @@ router.get('/planificador/sync-preview', asyncHandler(async (_req, res) => {
   res.json({ diff, totalConCambios: diff.filter(d => d.status === 'actualizada').length });
 }));
 
+// POST /planificador — crea una pantalla adicional dentro de una cuenta padre
+// existente, manteniendo el mismo Usuario IPTV (bloque CUENTA compartido).
+// Usado por "Crear pantalla adicional" del modal Editar Pantalla: p. ej. si la
+// cuenta 087 tiene 087-1..087-3, el nuevo slot sugerido es 087-4.
+router.post('/planificador', asyncHandler(async (req, res) => {
+  const idPantalla = String(req.body.idPantalla || '').trim();
+  const cuentaId   = String(req.body.cuentaId   || '').trim();
+  if (!idPantalla) return res.status(400).json({ error: 'El ID de la nueva pantalla es obligatorio' });
+  if (!cuentaId)   return res.status(400).json({ error: 'La cuenta padre (cuentaId) es obligatoria' });
+
+  const conflict = await Planificador.findByPk(idPantalla);
+  if (conflict) return res.status(409).json({ error: `Ya existe una pantalla con el ID "${idPantalla}". Elige otro.` });
+
+  // El bloque CUENTA se hereda de una pantalla hermana o, en su defecto, de la CuentaPadre
+  const hermana = await Planificador.findOne({ where: { cuentaId } });
+  const cp      = await CuentaPadre.findOne({ where: { cuentaId } });
+  const base = hermana ? {
+    cuenta:       hermana.cuenta,
+    password:     hermana.password,
+    credito:      hermana.credito,
+    inicio:       hermana.inicio,
+    finalizacion: hermana.finalizacion,
+  } : cp ? {
+    cuenta:       cp.nombreUsuario || null,
+    password:     cp.contrasena    || null,
+    credito:      cp.credito       ?? null,
+    inicio:       cp.fechaInicio   || null,
+    finalizacion: cp.fechaFin      || null,
+  } : null;
+  if (!base) return res.status(404).json({ error: `No existe la cuenta padre "${cuentaId}" ni pantallas registradas en ella.` });
+
+  const record = await Planificador.create({
+    idPantalla,
+    cuentaId,
+    ...base,
+    nickname:  String(req.body.nickname || '').trim() || 'Libre',
+    pantallas: 1,
+    debe:      false,
+  });
+  res.status(201).json(enrichPantalla(record.toJSON()));
+}));
+
 // PUT /planificador/:idPantalla — actualiza un registro
 // Solo afecta a la pantalla editada (nunca a otras pantallas de la misma cuenta)
 router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
@@ -462,8 +514,9 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   if (!pantalla) return res.status(404).json({ error: 'Pantalla no encontrada' });
 
   const STRING_FIELDS = ['cuenta', 'password', 'nombre', 'apellido', 'customerId', 'nickname', 'alertaReal', 'tipoPlan'];
-  const FLOAT_FIELDS = ['credito', 'duracionPlan', 'porcentaje', 'montoDebe'];
-  const INT_FIELDS = ['pantallas'];
+  const FLOAT_FIELDS = ['credito', 'porcentaje', 'montoDebe', 'montoDebeUSD'];
+  // duracionPlan se guarda como meses enteros (el Excel de origen traía días/30 con decimales)
+  const INT_FIELDS = ['pantallas', 'duracionPlan'];
   const DATE_FIELDS = ['inicio', 'finalizacion', 'inicioReal', 'duracionReal'];
   const EDITABLE_FIELDS = [...STRING_FIELDS, ...FLOAT_FIELDS, ...INT_FIELDS, ...DATE_FIELDS, 'debe'];
 
@@ -473,11 +526,12 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
     const val = req.body[f];
     if (f === 'debe') update[f] = Boolean(val);
     else if (STRING_FIELDS.includes(f)) update[f] = (val ?? '').toString().trim() || null;
-    else if (FLOAT_FIELDS.includes(f) || INT_FIELDS.includes(f)) update[f] = val !== '' && val != null ? Number(val) : null;
+    else if (INT_FIELDS.includes(f)) update[f] = val !== '' && val != null ? Math.round(Number(val)) : null;
+    else if (FLOAT_FIELDS.includes(f)) update[f] = val !== '' && val != null ? Number(val) : null;
     else if (DATE_FIELDS.includes(f)) update[f] = (val || '').toString().trim() || null;
   }
-  // Si se desactiva "Debe", el monto adeudado no debe persistir
-  if (update.debe === false) update.montoDebe = null;
+  // Si se desactiva "Debe", los montos adeudados (COP y USD) no deben persistir
+  if (update.debe === false) { update.montoDebe = null; update.montoDebeUSD = null; }
 
   // Reasignar la pantalla a otra cuenta padre (cuentaId no admite null — es la clave de agrupación)
   if (req.body.cuentaId !== undefined && req.body.cuentaId && req.body.cuentaId !== pantalla.cuentaId) {
@@ -518,6 +572,7 @@ const PLANIFICADOR_FIELDS = [
   'idPantalla', 'cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion',
   'nombre', 'apellido', 'customerId', 'nickname', 'pantallas', 'duracionPlan',
   'inicioReal', 'duracionReal', 'alertaReal', 'porcentaje', 'tipoPlan',
+  'debe', 'montoDebe', 'montoDebeUSD',
 ];
 router.post('/planificador/restore', asyncHandler(async (req, res) => {
   const snapshot = req.body;

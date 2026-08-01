@@ -7,7 +7,7 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const sequelize = require('./config/database');
-const { Client, Plan, CostoPantalla } = require('./models');
+const { Client, Plan, CostoPantalla, Planificador } = require('./models');
 const { withRLS } = require('./middleware/rlsContext');
 
 const authRoutes = require('./routes/auth');
@@ -137,6 +137,8 @@ async function seedDevicesFromVentas() {
     // la tabla completa y puede dejar la BD a medias si el proceso muere.
     await ensureModelColumns(Client);
     await ensureModelColumns(CostoPantalla);
+    // planificador ganó montoDebeUSD (cartera en dólares) después de su creación
+    await ensureModelColumns(Planificador);
     // ventas_equipos también ganó columnas tarde (costo, serial, garantia):
     // ALTER dirigido e idempotente — debe correr ANTES de seedDevicesFromVentas,
     // que hace el primer SELECT del modelo y falla si falta alguna columna.

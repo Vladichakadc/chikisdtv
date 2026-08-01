@@ -1,5 +1,6 @@
 const path = require('path');
 const XLSX = require('xlsx');
+const sequelize = require('../config/database');
 const { Planificador, CuentaPadre } = require('../models');
 
 function excelToDate(n) {
@@ -53,6 +54,18 @@ async function autoFixCuentaIdMismatches() {
   return { fixed, unfixable };
 }
 
+// Normaliza duracionPlan a meses enteros. El Excel de origen la calcula como
+// días/30 (p. ej. 212/30 = 7,0667) y esos decimales se colaron a la BD en
+// imports antiguos. Idempotente: solo toca filas con decimales.
+async function normalizeDuracionPlan() {
+  const [, meta] = await sequelize.query(
+    "UPDATE planificador SET duracionPlan = ROUND(duracionPlan) WHERE duracionPlan IS NOT NULL AND duracionPlan <> ROUND(duracionPlan)"
+  );
+  const changed = meta?.changes ?? 0;
+  if (changed > 0) console.log(`[AUTOFIX] duracionPlan redondeada a meses enteros en ${changed} pantalla(s).`);
+  return changed;
+}
+
 // Importa/sincroniza el Planificador desde el archivo .xlsm de origen.
 // Compartido entre el router del Planificador y el de Bajas (que lo usa para
 // auto-poblar nicknames cuando la tabla está vacía).
@@ -83,7 +96,8 @@ async function importFromExcel() {
       customerId:   String(r[14] || '').trim(),
       nickname:     String(r[15] || '').trim(),
       pantallas:    r[16] !== '' ? Number(r[16]) : 1,
-      duracionPlan: r[17] !== '' ? Number(r[17]) : null,
+      // El Excel guarda la duración como días/30 (7,0667…) — se redondea a meses enteros
+      duracionPlan: r[17] !== '' ? Math.round(Number(r[17])) : null,
       inicioReal:   excelToDate(r[18]),
       duracionReal: excelToDate(r[19]),
       alertaReal:   String(r[23] || '').trim(),
@@ -103,8 +117,9 @@ async function importFromExcel() {
   // Autocorrección inmediata: si el Excel tiene el bug de cuentaId corrido,
   // lo sanamos en la BD antes de que cualquier cliente lea los datos.
   await autoFixCuentaIdMismatches();
+  await normalizeDuracionPlan();
 
   return records.length;
 }
 
-module.exports = { importFromExcel, autoFixCuentaIdMismatches, excelToDate };
+module.exports = { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan, excelToDate };

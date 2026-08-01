@@ -50,7 +50,13 @@ export const CATEGORY_CONFIG = {
   debe: {
     title: 'Cuentas que deben', icon: Wallet, tone: 'amber', tipoPago: 'Renovacion',
     extraLabel: 'Monto adeudado',
-    badge: (p) => <span className="font-semibold text-amber-700">{formatCurrency(p.montoDebe || 0)}</span>,
+    badge: (p) => (
+      <div className="flex flex-col items-start gap-0.5">
+        {!(p.montoDebe > 0) && !(p.montoDebeUSD > 0) && <span className="font-semibold text-amber-700">{formatCurrency(0)}</span>}
+        {p.montoDebe > 0 && <span className="font-semibold text-amber-700">{formatCurrency(p.montoDebe)}</span>}
+        {p.montoDebeUSD > 0 && <span className="font-semibold text-emerald-700">US${Number(p.montoDebeUSD).toLocaleString('en-US')}</span>}
+      </div>
+    ),
     emptyMsg: 'No hay cuentas con saldo pendiente — cartera de cobro al día.',
     hint: 'Gestiona el cobro y registra el pago como venta en cuanto el cliente regularice su saldo.',
   },
