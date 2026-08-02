@@ -290,7 +290,9 @@ export function narrarMrr(bi) {
   const { kpis, mrrPorTipoPlan, porMes } = bi
   if (!kpis?.mrrActual) return null
   const principal = mrrPorTipoPlan?.[0]
-  const mesAnual = porMes.filter(m => m.mrr > 0 && m.ingresos > 0)
+  // Excluye el mes en curso: con pocos días de datos, el ratio ingresos/MRR
+  // puede dispararse sin que eso refleje una concentración real en planes largos.
+  const mesAnual = porMes.filter(m => m.mrr > 0 && m.ingresos > 0 && !m.parcial)
     .reduce((worst, m) => {
       const ratio = m.ingresos / m.mrr
       return (!worst || ratio > worst.ratio) ? { label: m.label, ratio } : worst

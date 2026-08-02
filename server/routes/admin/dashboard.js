@@ -3,6 +3,7 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const { Client, Plan, Device, Baja, Venta, VentaEquipo, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
 const { calcDias, alertaFromDias } = require('../../utils/planificadorAlerta');
+const { getPeriodoActual, esMesParcial, esAnioParcial } = require('../../utils/dateUtils');
 const asyncHandler = require('../../middleware/asyncHandler');
 
 // ============ DASHBOARD STATS ============
@@ -120,6 +121,10 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     return res.json(dashboardBiCache.data);
   }
 
+  // Referencia única para marcar qué mes/año de las series de abajo está EN CURSO
+  // (parcial, incompleto) — ver utils/dateUtils.js para el porqué.
+  const periodo = getPeriodoActual();
+
   const ventas = await Venta.findAll({ attributes: ['anio', 'mes', 'precioVenta', 'tipoPago', 'estado', 'customerId', 'tipoPlan', 'fecha'] });
   const costos = await CostoPantalla.findAll({ attributes: ['anio', 'mes', 'costoCOP', 'impuesto4x100COP'] });
   // Atributos combinados: cubre tanto el agregado por año/mes (abajo) como el
@@ -178,6 +183,8 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
       numVentas: ventasCountPorAnio[anio] || 0,
       numActivaciones: activacionesCountPorAnio[anio] || 0,
       numBajas: bajasCountPorAnio[anio] || 0,
+      // Año en curso (incompleto) — no comparable contra años cerrados; ver dateUtils.js
+      parcial: esAnioParcial(anio, periodo),
     };
   });
 
@@ -205,6 +212,8 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
       margen: ingresos - costosVal,
       numVentas: ventasCountPorMes[key] || 0,
       numActivaciones: activacionesCountPorMes[key] || 0,
+      // Mes en curso (incompleto) — no comparable contra meses cerrados; ver dateUtils.js
+      parcial: esMesParcial(anio, mm, periodo),
     };
   });
 
@@ -235,8 +244,10 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     mrr: Math.round(mrrPorMesMap[m.key] || 0),
   }));
 
-  // KPIs de MRR: mes más reciente, anterior, crecimiento MoM, ARR
-  const mesesConMrr = porMesConMrr.filter(m => m.mrr > 0);
+  // KPIs de MRR: mes más reciente CERRADO, anterior, crecimiento MoM, ARR — el mes
+  // en curso (parcial) queda fuera: si ya tiene 1 venta el día 1, aparecería como
+  // "mrrActual" con una caída falsa frente a un mes anterior completo.
+  const mesesConMrr = porMesConMrr.filter(m => m.mrr > 0 && !m.parcial);
   const ultimoMesObj  = mesesConMrr[mesesConMrr.length - 1] || null;
   const penultimoMesObj = mesesConMrr[mesesConMrr.length - 2] || null;
   const mrrActual   = ultimoMesObj?.mrr || 0;
@@ -286,8 +297,12 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const ticketPromedio = ventas.length > 0 ? Math.round(totalIngresos / ventas.length) : 0;
   const renovaciones = ventas.filter(v => v.tipoPago === 'Renovacion').length;
   const tasaRenovacionPct = ventas.length > 0 ? Number(((renovaciones / ventas.length) * 100).toFixed(1)) : 0;
-  const ultimo = porAnio[porAnio.length - 1] || null;
-  const penultimo = porAnio[porAnio.length - 2] || null;
+  // Último año CERRADO (no el año en curso): las tarjetas de cabecera dicen
+  // "vs. año anterior (año cerrado)" y deben comparar dos años completos, nunca
+  // el año en curso (parcial) contra uno cerrado.
+  const aniosCerrados = porAnio.filter(a => !a.parcial);
+  const ultimo = aniosCerrados[aniosCerrados.length - 1] || null;
+  const penultimo = aniosCerrados[aniosCerrados.length - 2] || null;
 
   // ─── Rentabilidad: markup, cobertura y punto de equilibrio ────────────────
   // Margen (sobre ingresos) vs. Markup (sobre costos): dos lecturas distintas
@@ -508,7 +523,9 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   // Momentum de ventas: variación promedio mes a mes de ingresos en los
   // últimos meses con actividad registrada — sirve como "velocímetro" de
   // corto plazo, complementario al CAGR (que mide tendencia estructural).
-  const mesesConVentas = porMes.filter(m => m.numVentas > 0);
+  // Excluye el mes en curso (parcial): compararlo contra un mes cerrado
+  // completo siempre arroja una caída falsa, sobre todo los primeros días del mes.
+  const mesesConVentas = porMes.filter(m => m.numVentas > 0 && !m.parcial);
   const ultimosMeses = mesesConVentas.slice(-7);
   let sumaCrecMensual = 0;
   let conteoCrecMensual = 0;
@@ -522,19 +539,23 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   }
   const momentumVentasPct = conteoCrecMensual > 0 ? Number((sumaCrecMensual / conteoCrecMensual).toFixed(1)) : 0;
 
-  // ─── Comparativo YTD (año corrido: Ene–mesActual vs mismo período año anterior) ──
-  const todayLocal   = new Date();
-  const anioHoy      = todayLocal.getFullYear();
-  const mesHoy       = todayLocal.getMonth() + 1; // 1-based (Bogotá, por TZ env)
+  // ─── Comparativo YTD (año corrido: Ene–último mes CERRADO vs mismo período año
+  // anterior) ── Tope en `mesesCerrados`, NO en el mes en curso: comparar "Ene–Ago
+  // 2026" (1 día de agosto) contra "Ene–Ago 2025" (agosto completo) infla la caída
+  // artificialmente. Con el tope en el último mes cerrado, ambos lados sí son
+  // period-to-period comparables.
+  const anioHoy      = periodo.anioActual;
+  const mesesCerrados = periodo.mesesCerrados;
   const anioYTDAnt   = anioHoy - 1;
-  const ingYTD       = ventas.filter(v => Number(v.anio) === anioHoy    && mesNum(v.mes) <= mesHoy).reduce((s, v) => s + (Number(v.precioVenta) || 0), 0);
-  const cosYTD       = costos.filter(c => Number(c.anio) === anioHoy    && mesNum(c.mes) <= mesHoy).reduce((s, c) => s + Number(c.costoCOP || 0) + Number(c.impuesto4x100COP || 0), 0);
-  const ingYTDAnt    = ventas.filter(v => Number(v.anio) === anioYTDAnt && mesNum(v.mes) <= mesHoy).reduce((s, v) => s + (Number(v.precioVenta) || 0), 0);
-  const cosYTDAnt    = costos.filter(c => Number(c.anio) === anioYTDAnt && mesNum(c.mes) <= mesHoy).reduce((s, c) => s + Number(c.costoCOP || 0) + Number(c.impuesto4x100COP || 0), 0);
-  const comparativoYTD = (ingYTD > 0 || ingYTDAnt > 0) ? {
-    etiqueta:           `Ene–${MES_LABEL[mesHoy]}`,
+  const ingYTD       = ventas.filter(v => Number(v.anio) === anioHoy    && mesNum(v.mes) <= mesesCerrados && mesNum(v.mes) > 0).reduce((s, v) => s + (Number(v.precioVenta) || 0), 0);
+  const cosYTD       = costos.filter(c => Number(c.anio) === anioHoy    && mesNum(c.mes) <= mesesCerrados && mesNum(c.mes) > 0).reduce((s, c) => s + Number(c.costoCOP || 0) + Number(c.impuesto4x100COP || 0), 0);
+  const ingYTDAnt    = ventas.filter(v => Number(v.anio) === anioYTDAnt && mesNum(v.mes) <= mesesCerrados && mesNum(v.mes) > 0).reduce((s, v) => s + (Number(v.precioVenta) || 0), 0);
+  const cosYTDAnt    = costos.filter(c => Number(c.anio) === anioYTDAnt && mesNum(c.mes) <= mesesCerrados && mesNum(c.mes) > 0).reduce((s, c) => s + Number(c.costoCOP || 0) + Number(c.impuesto4x100COP || 0), 0);
+  const comparativoYTD = mesesCerrados > 0 && (ingYTD > 0 || ingYTDAnt > 0) ? {
+    etiqueta:           `Ene–${MES_LABEL[mesesCerrados]}`,
     anioActual:          anioHoy,
     anioAnterior:        anioYTDAnt,
+    mesesCerrados,
     ingresosActual:      Math.round(ingYTD),
     costosActual:        Math.round(cosYTD),
     ingresosAnterior:    Math.round(ingYTDAnt),
@@ -668,6 +689,7 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
 //  · TIR       = tasa interna de retorno de los flujos netos mensuales (bisección);
 //                solo es calculable si la serie tiene al menos un flujo negativo
 router.get('/dashboard-bi/finanzas', asyncHandler(async (_req, res) => {
+  const periodo = getPeriodoActual();
   const [ventas, equipos, costos] = await Promise.all([
     Venta.findAll({ attributes: ['anio', 'mes', 'precioVenta'], raw: true }),
     VentaEquipo.findAll({ attributes: ['anio', 'mes', 'precioVenta', 'costo'], raw: true }),
@@ -725,6 +747,8 @@ router.get('/dashboard-bi/finanzas', asyncHandler(async (_req, res) => {
       margenEbitdaPct: ingresos > 0 ? Number(((ebitda / ingresos) * 100).toFixed(1)) : null,
       flujoAcumulado: acumulado,
       trmPromedio: m.trmN > 0 ? Math.round(m.trmSum / m.trmN) : null,
+      // Mes en curso (incompleto) — no comparable contra meses cerrados; ver dateUtils.js
+      parcial: esMesParcial(anio, mm, periodo),
     };
   });
 
@@ -742,7 +766,7 @@ router.get('/dashboard-bi/finanzas', asyncHandler(async (_req, res) => {
     const crecimientoEbitdaPct = prevEbitda != null && prevEbitda !== 0
       ? Number((((a.ebitda - prevEbitda) / Math.abs(prevEbitda)) * 100).toFixed(1)) : null;
     prevEbitda = a.ebitda;
-    return { ...a, margenEbitdaPct, opexRatioPct, crecimientoEbitdaPct };
+    return { ...a, margenEbitdaPct, opexRatioPct, crecimientoEbitdaPct, parcial: esAnioParcial(a.anio, periodo) };
   });
 
   // ─── TIR de los flujos netos mensuales (bisección sobre VPN) ──────────────
@@ -775,11 +799,15 @@ router.get('/dashboard-bi/finanzas', asyncHandler(async (_req, res) => {
   const totOpex     = serieMensual.reduce((s, m) => s + m.opex, 0);
   const totCogs     = serieMensual.reduce((s, m) => s + m.cogsEquipos, 0);
   const totEbitda   = totIngresos - totOpex - totCogs;
-  const mesesConDatos = serieMensual.filter(m => m.ingresos > 0 || m.opex > 0);
+  // El mes en curso no cuenta como "mes con datos" para el promedio: diluiría
+  // ebitdaPromedioMensual con un mes que apenas empezó.
+  const mesesConDatos = serieMensual.filter(m => (m.ingresos > 0 || m.opex > 0) && !m.parcial);
   const roiSobreOpex  = totOpex > 0 ? Number((totEbitda / totOpex).toFixed(2)) : null;
 
-  // Últimos 12 meses (LTM) para lectura de corto plazo
-  const ltm = serieMensual.slice(-12);
+  // Últimos 12 meses CERRADOS (LTM) para lectura de corto plazo — si el mes en
+  // curso entrara aquí, "EBITDA últimos 12 meses" quedaría subestimado por incluir
+  // un mes de solo unos días como si fuera un mes completo más.
+  const ltm = serieMensual.filter(m => !m.parcial).slice(-12);
   const ltmIngresos = ltm.reduce((s, m) => s + m.ingresos, 0);
   const ltmOpex     = ltm.reduce((s, m) => s + m.opex, 0);
   const ltmEbitda   = ltm.reduce((s, m) => s + m.ebitda, 0);
@@ -811,6 +839,7 @@ router.get('/dashboard-bi/finanzas', asyncHandler(async (_req, res) => {
 
 // ============ ANÁLISIS FINANCIERO — EQUIPOS ============
 router.get('/dashboard-bi/finanzas-equipos', asyncHandler(async (_req, res) => {
+  const periodo = getPeriodoActual();
   const equipos = await VentaEquipo.findAll({
     attributes: ['anio', 'mes', 'precioVenta', 'costo', 'tipoFire', 'itemQuantity', 'tipoPago'],
     raw: true,
@@ -844,6 +873,8 @@ router.get('/dashboard-bi/finanzas-equipos', asyncHandler(async (_req, res) => {
       ingresos: ing, cogs, margen: ing - cogs,
       margenPct: ing > 0 ? Number((((ing - cogs) / ing) * 100).toFixed(1)) : null,
       unidades: Math.round(m.unidades),
+      // Mes en curso (incompleto) — no comparable contra meses cerrados; ver dateUtils.js
+      parcial: esMesParcial(anio, mm, periodo),
     };
   });
 

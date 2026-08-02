@@ -974,10 +974,11 @@ export default function AnalisisFinancieroPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  // Serie momentum
+  // Serie momentum — excluye el mes en curso (parcial): comparado contra un
+  // mes cerrado completo, siempre mostraría una caída falsa.
   const momentumSerie = useMemo(() => {
     if (!bi) return []
-    const meses = bi.porMes.filter(m => m.numVentas > 0)
+    const meses = bi.porMes.filter(m => m.numVentas > 0 && !m.parcial)
     const out = []
     for (let i = 1; i < meses.length; i++) {
       const prev = meses[i - 1].ingresos
@@ -993,8 +994,10 @@ export default function AnalisisFinancieroPage() {
     const totLic  = fin.serieMensual.reduce((s, m) => s + m.ingLicencias, 0)
     const totOpex = fin.serieMensual.reduce((s, m) => s + m.opex, 0)
     const ebitda  = totLic - totOpex
-    const mesesConDatos = fin.serieMensual.filter(m => m.ingLicencias > 0 || m.opex > 0)
-    const ltm12   = fin.serieMensual.slice(-12)
+    // El mes en curso no cuenta como "mes con datos" (deflaciona el promedio)
+    // ni entra en el LTM (subestimaría el EBITDA de los últimos 12 meses).
+    const mesesConDatos = fin.serieMensual.filter(m => (m.ingLicencias > 0 || m.opex > 0) && !m.parcial)
+    const ltm12   = fin.serieMensual.filter(m => !m.parcial).slice(-12)
     const ltmIng  = ltm12.reduce((s, m) => s + m.ingLicencias, 0)
     const ltmOpex = ltm12.reduce((s, m) => s + m.opex, 0)
     const ltmEbitda = ltmIng - ltmOpex

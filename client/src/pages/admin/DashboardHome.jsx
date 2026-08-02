@@ -182,17 +182,25 @@ function narrarIngresosCostosAnio(porAnio) {
   })
   const ultimo = porAnio[porAnio.length - 1]
   const penultimo = porAnio[porAnio.length - 2]
-  const pareceParcial = penultimo && ultimo.numVentas < penultimo.numVentas * 0.9
+  // El backend ya marca el año en curso (`parcial`) — se usa esa fuente de verdad
+  // en vez de inferirlo por volumen de ventas (heurística frágil: un año flojo
+  // real podía confundirse con uno parcial, o viceversa).
+  const pareceParcial = !!ultimo.parcial
   return `Leyendo barra por barra, año a año: ${relatos.join('; ')}.${pareceParcial
-    ? ` La barra de **${ultimo.anio}** se ve más baja porque el año está en curso (${ultimo.numVentas} ventas registradas frente a ${penultimo.numVentas} del ${penultimo.anio} ya cerrado) — no es una contracción real, es un corte parcial; para comparar de forma justa usa el comparativo "año corrido" (YTD) de arriba.`
+    ? ` La barra de **${ultimo.anio}** se ve más baja porque el año está en curso${penultimo ? ` (${ultimo.numVentas} ventas registradas frente a ${penultimo.numVentas} del ${penultimo.anio} ya cerrado)` : ''} — no es una contracción real, es un corte parcial; para comparar de forma justa usa el comparativo "año corrido" (YTD) de arriba.`
     : ` La línea morada (margen %) se mantiene en un rango alto y estable, lo que confirma que el crecimiento del negocio no ha sacrificado eficiencia de costos.`}`
 }
 
 function narrarEvolucionAnual(porAnio) {
   if (!porAnio?.length) return null
   const primero = porAnio[0]
-  const ultimo = porAnio[porAnio.length - 1]
-  if (primero === ultimo) return null
+  // El "hasta hoy" de esta lectura histórica debe ser el último año CERRADO:
+  // usar el año en curso (parcial) subestimaría el crecimiento desde el primer
+  // año registrado sin ninguna advertencia.
+  const enCurso = porAnio[porAnio.length - 1]?.parcial ? porAnio[porAnio.length - 1] : null
+  const cerrados = enCurso ? porAnio.slice(0, -1) : porAnio
+  const ultimo = cerrados[cerrados.length - 1]
+  if (!ultimo || primero === ultimo) return null
   const variacion = (ini, fin) => (ini > 0 ? ((fin - ini) / ini) * 100 : null)
   const crecIngresos = variacion(primero.ingresos, ultimo.ingresos)
   const crecCostos = variacion(primero.costos, ultimo.costos)
@@ -203,12 +211,17 @@ function narrarEvolucionAnual(porAnio) {
       ? ' La curva verde (ganancia) se separa cada vez más de la gris (costos): el negocio gana eficiencia a medida que crece — cada peso adicional de ingreso deja más ganancia que el anterior.'
       : ' La curva gris (costos) crece más rápido que la naranja (ingresos): vale la pena vigilar el costo unitario, porque está erosionando la ganancia a medida que el negocio escala.')
     : ''
-  return `Entre **${primero.anio}** y **${ultimo.anio}**: los ingresos pasaron de ${formatCurrency(primero.ingresos)} a ${formatCurrency(ultimo.ingresos)}${crecIngresos != null ? ` (${signo(crecIngresos)}${crecIngresos.toFixed(0)}%)` : ''}, los costos de ${formatCurrency(primero.costos)} a ${formatCurrency(ultimo.costos)}${crecCostos != null ? ` (${signo(crecCostos)}${crecCostos.toFixed(0)}%)` : ''}, y la ganancia (margen bruto en pesos) de ${formatCurrency(primero.margen)} a ${formatCurrency(ultimo.margen)}${crecMargen != null ? ` (${signo(crecMargen)}${crecMargen.toFixed(0)}%)` : ''}.${lecturaFinal}`
+  const notaEnCurso = enCurso ? ` (**${enCurso.anio}** sigue en curso y no se cuenta en esta lectura hasta que cierre.)` : ''
+  return `Entre **${primero.anio}** y **${ultimo.anio}**: los ingresos pasaron de ${formatCurrency(primero.ingresos)} a ${formatCurrency(ultimo.ingresos)}${crecIngresos != null ? ` (${signo(crecIngresos)}${crecIngresos.toFixed(0)}%)` : ''}, los costos de ${formatCurrency(primero.costos)} a ${formatCurrency(ultimo.costos)}${crecCostos != null ? ` (${signo(crecCostos)}${crecCostos.toFixed(0)}%)` : ''}, y la ganancia (margen bruto en pesos) de ${formatCurrency(primero.margen)} a ${formatCurrency(ultimo.margen)}${crecMargen != null ? ` (${signo(crecMargen)}${crecMargen.toFixed(0)}%)` : ''}.${lecturaFinal}${notaEnCurso}`
 }
 
 function narrarTendenciaMensual(porMes) {
   if (!porMes?.length) return null
-  const conVentas = porMes.filter(m => m.numVentas > 0)
+  // El mes en curso (parcial) queda fuera de picos/valles/promedios: comparado
+  // contra meses cerrados siempre "pierde" por incompleto, y arrastraría el
+  // promedio de los últimos 3 meses hacia abajo de forma artificial.
+  const mesEnCurso = porMes.find(m => m.parcial)
+  const conVentas = porMes.filter(m => m.numVentas > 0 && !m.parcial)
   if (conVentas.length < 2) return null
   const pico = conVentas.reduce((a, b) => (b.ingresos > a.ingresos ? b : a))
   const valle = conVentas.reduce((a, b) => (b.ingresos < a.ingresos ? b : a))
@@ -216,7 +229,8 @@ function narrarTendenciaMensual(porMes) {
   const ultimos3 = conVentas.slice(-3)
   const promUltimos3 = ultimos3.reduce((s, m) => s + m.ingresos, 0) / ultimos3.length
   const tendencia = promUltimos3 >= promedio ? 'por encima' : 'por debajo'
-  return `El mes de mayor ingreso histórico fue **${pico.label}** (${formatCurrency(pico.ingresos)}) y el más bajo **${valle.label}** (${formatCurrency(valle.ingresos)}) — esa diferencia es la huella de la **estacionalidad** (meses de mayor actividad de recargas y renovaciones). El promedio mensual histórico es ${formatCurrency(Math.round(promedio))}; los últimos tres meses con actividad promedian ${formatCurrency(Math.round(promUltimos3))}, **${tendencia}** del promedio histórico — una pista temprana de hacia dónde se dirige la tendencia de corto plazo, antes de que se refleje en el cierre anual.`
+  const notaEnCurso = mesEnCurso ? ` (**${mesEnCurso.label}** está en curso — no se cuenta hasta que cierre.)` : ''
+  return `El mes de mayor ingreso histórico fue **${pico.label}** (${formatCurrency(pico.ingresos)}) y el más bajo **${valle.label}** (${formatCurrency(valle.ingresos)}) — esa diferencia es la huella de la **estacionalidad** (meses de mayor actividad de recargas y renovaciones). El promedio mensual histórico es ${formatCurrency(Math.round(promedio))}; los últimos tres meses cerrados promedian ${formatCurrency(Math.round(promUltimos3))}, **${tendencia}** del promedio histórico — una pista temprana de hacia dónde se dirige la tendencia de corto plazo, antes de que se refleje en el cierre anual.${notaEnCurso}`
 }
 
 function narrarVentasLicenciaAnio(resumen, anio) {
@@ -321,10 +335,14 @@ function FinancialAnalysis({ bi }) {
   if (!bi) return null
   const { kpis, porAnio, comparativoYTD, tipoPago } = bi
   const ultimo = porAnio[porAnio.length - 1]
-  const penultimo = porAnio[porAnio.length - 2]
   const primero = porAnio[0]
 
-  const aniosCompletos = porAnio.slice(0, -1)
+  // `aniosCompletos` = años CERRADOS (excluye el año en curso vía el flag real
+  // del backend, no por posición) — `penultimo`, pese al nombre, pasa a ser
+  // "el último año YA CERRADO", que es lo que consumen las narrativas de abajo
+  // ("Crecimiento del último año cerrado", tijera de costos, etc.).
+  const aniosCompletos = porAnio.filter(a => !a.parcial)
+  const penultimo = aniosCompletos[aniosCompletos.length - 1] || null
   const cagr = aniosCompletos.length > 1
     ? (Math.pow(aniosCompletos[aniosCompletos.length - 1].ingresos / aniosCompletos[0].ingresos, 1 / (aniosCompletos.length - 1)) - 1) * 100
     : null
@@ -371,7 +389,7 @@ function FinancialAnalysis({ bi }) {
   items.push({
     tone: kpis.churnPct < 20 ? 'good' : kpis.churnPct < 35 ? 'neutral' : 'bad',
     title: 'Riesgo de cancelación (churn) y solidez de la base',
-    text: `La tasa de cancelación de suscripciones es de ${kpis.churnPct.toFixed(1)}% sobre el universo histórico activo+cancelado, y se registraron ${ultimo.numBajas} bajas en ${ultimo.anio} (${penultimo ? `frente a ${penultimo.numBajas} en ${penultimo.anio}` : ''}). ${kpis.churnPct > 30
+    text: `La tasa de cancelación de suscripciones es de ${kpis.churnPct.toFixed(1)}% sobre el universo histórico activo+cancelado, y se registraron ${ultimo.numBajas} bajas en ${ultimo.anio}${ultimo.parcial ? ' (año en curso, cifra parcial)' : ''} (${penultimo ? `frente a ${penultimo.numBajas} en ${penultimo.anio} ya cerrado` : ''}). ${kpis.churnPct > 30
       ? 'Este nivel de churn es **alto para un negocio de suscripción** — cada cliente que se cancela debe ser reemplazado por uno nuevo solo para mantener el ingreso plano, lo que castiga el crecimiento neto y eleva el costo efectivo de adquisición. Recomendación: instrumentar alertas tempranas de vencimiento (el Planificador ya identifica cuentas próximas a vencer) y campañas de retención proactivas antes del corte del servicio.'
       : 'Es un nivel de churn manejable, coherente con un negocio de contenidos digitales de bajo costo de cambio (switching cost). Aun así, cada punto de reducción de churn impacta directamente el margen, porque el costo de retener a un cliente existente es estructuralmente menor que el de activar uno nuevo.'}`,
   })
@@ -615,9 +633,12 @@ export default function DashboardHome() {
 
   const crecimientoMargenUltimo = useMemo(() => {
     if (!bi?.porAnio?.length) return null
-    const ultimo = bi.porAnio[bi.porAnio.length - 1]
-    const penultimo = bi.porAnio[bi.porAnio.length - 2]
-    if (!penultimo || penultimo.margen <= 0) return null
+    // Último año CERRADO vs. el anterior — nunca el año en curso (parcial),
+    // que siempre mostraría una caída falsa de margen frente a un año completo.
+    const cerrados = bi.porAnio.filter(a => !a.parcial)
+    const ultimo = cerrados[cerrados.length - 1]
+    const penultimo = cerrados[cerrados.length - 2]
+    if (!ultimo || !penultimo || penultimo.margen <= 0) return null
     return Number((((ultimo.margen - penultimo.margen) / penultimo.margen) * 100).toFixed(1))
   }, [bi])
 
@@ -668,21 +689,34 @@ export default function DashboardHome() {
 
   const resumenVentasLicencia = useMemo(() => {
     if (!bi || !ventasLicenciaPorMes.length) return null
-    const conDatos = ventasLicenciaPorMes.filter(m => m.numVentas > 0)
+    // El mes en curso (parcial) queda fuera de "mejor/peor mes" y del promedio
+    // mensual: comparado contra meses cerrados siempre "pierde" por incompleto.
+    const conDatos = ventasLicenciaPorMes.filter(m => m.numVentas > 0 && !m.parcial)
     const totalIngresos = ventasLicenciaPorMes.reduce((s, m) => s + m.ingresos, 0)
     const totalVentas = ventasLicenciaPorMes.reduce((s, m) => s + m.numVentas, 0)
     const ticketPromedio = totalVentas > 0 ? Math.round(totalIngresos / totalVentas) : 0
-    const promedioMensual = conDatos.length > 0 ? Math.round(totalIngresos / conDatos.length) : 0
+    const promedioMensual = conDatos.length > 0
+      ? Math.round(conDatos.reduce((s, m) => s + m.ingresos, 0) / conDatos.length) : 0
     const mejorMes = conDatos.length ? conDatos.reduce((a, b) => (b.ingresos > a.ingresos ? b : a)) : null
     const peorMes = conDatos.length ? conDatos.reduce((a, b) => (b.ingresos < a.ingresos ? b : a)) : null
 
+    // Comparativo interanual "mismo período": si el año seleccionado está en
+    // curso, tanto el año actual como el anterior se topan en el último mes
+    // cerrado — sin esto, "Ene-Ago parcial" quedaría comparado contra los 12
+    // meses completos del año anterior (un año entero vs. 7 meses y medio).
+    const mesEnCurso = ventasLicenciaPorMes.find(m => m.parcial)
+    const limiteMes = mesEnCurso ? mesEnCurso.mes - 1 : 12
+    const totalIngresosComparable = ventasLicenciaPorMes.filter(m => m.mes <= limiteMes).reduce((s, m) => s + m.ingresos, 0)
+    const totalVentasComparable = ventasLicenciaPorMes.filter(m => m.mes <= limiteMes).reduce((s, m) => s + m.numVentas, 0)
+
     const anterior = bi.porMes.filter(m => Number(m.anio) === anioVentasLicencia - 1)
-    const totalIngresosAnterior = anterior.reduce((s, m) => s + m.ingresos, 0)
-    const totalVentasAnterior = anterior.reduce((s, m) => s + m.numVentas, 0)
+    const anteriorComparable = anterior.filter(m => Number(m.key.split('-')[1]) <= limiteMes)
+    const totalIngresosAnterior = anteriorComparable.reduce((s, m) => s + m.ingresos, 0)
+    const totalVentasAnterior = anteriorComparable.reduce((s, m) => s + m.numVentas, 0)
     const crecimientoIngresosPct = totalIngresosAnterior > 0
-      ? Number((((totalIngresos - totalIngresosAnterior) / totalIngresosAnterior) * 100).toFixed(1)) : null
+      ? Number((((totalIngresosComparable - totalIngresosAnterior) / totalIngresosAnterior) * 100).toFixed(1)) : null
     const crecimientoVentasPct = totalVentasAnterior > 0
-      ? Number((((totalVentas - totalVentasAnterior) / totalVentasAnterior) * 100).toFixed(1)) : null
+      ? Number((((totalVentasComparable - totalVentasAnterior) / totalVentasAnterior) * 100).toFixed(1)) : null
 
     let mesDetalle = null
     if (mesVentasLicencia != null) {
@@ -975,12 +1009,12 @@ export default function DashboardHome() {
             <BiCard
               icon={Percent} variant="outline" label="Margen bruto"
               value={`${k.margenPctTotal.toFixed(1)}%`}
-              sub={`${k.margenPctUltimo?.toFixed(1)}% en ${k.anioActual}`}
+              sub={`${k.margenPctUltimo?.toFixed(1)}% en ${k.anioActual} (cerrado)`}
               onClick={() => setExplain({
                 title: 'Margen bruto', value: `${k.margenPctTotal.toFixed(1)}%`, icon: Percent,
                 queEs: 'De cada $100 que entran por ventas, cuántos quedan como ganancia después de pagar las recargas. Es el termómetro de eficiencia del negocio.',
                 comoSeCalcula: '**(Ganancia ÷ Ingresos) × 100**. Por ejemplo: si entran $100 y las recargas costaron $30, el margen bruto es 70%.',
-                origen: `Derivado de Pagos y Costo Pantalla. El margen del año en curso (${k.anioActual}) va en ${k.margenPctUltimo?.toFixed(1)}%.`,
+                origen: `Derivado de Pagos y Costo Pantalla. El margen del último año cerrado (${k.anioActual}) fue ${k.margenPctUltimo?.toFixed(1)}%; el año en curso todavía no cierra y por eso no se usa para este comparativo.`,
                 action: { label: 'Ver Análisis Financiero', onClick: () => navigate('/admin/analisis-financiero') },
               })}
             />
@@ -1357,8 +1391,12 @@ export default function DashboardHome() {
                   </thead>
                   <tbody>
                     {(() => {
-                      const mejorAnio = bi.porAnio.reduce((best, r) => (!best || r.ingresos > best.ingresos ? r : best), null)
-                      const anioEnCurso = bi.comparativoYTD?.anioActual
+                      // El año en curso (parcial) nunca puede ganar "Mejor año histórico"
+                      // — compite en desventaja estructural contra años completos.
+                      const mejorAnio = bi.porAnio
+                        .filter(r => !r.parcial)
+                        .reduce((best, r) => (!best || r.ingresos > best.ingresos ? r : best), null)
+                      const anioEnCurso = bi.porAnio.find(r => r.parcial)?.anio
                       return bi.porAnio.map((r, i) => (
                         <tr key={r.anio} className={`border-b border-orange-50 ${i % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}`}>
                           <td className="px-4 py-2.5 font-bold text-orange-700">

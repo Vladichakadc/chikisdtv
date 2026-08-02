@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Plan, Venta, Planificador, CostoPantalla } = require('../../models');
+const { getPeriodoActual } = require('../../utils/dateUtils');
 const asyncHandler = require('../../middleware/asyncHandler');
 
 // ============ PLANS CRUD ============
@@ -79,6 +80,12 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
   const anioHoy = hoy.getFullYear();
   const mesHoy = hoy.getMonth() + 1;
   const hoyStr = `${anioHoy}-${String(mesHoy).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+  // Tope para el comparativo YTD por plan: el último mes CERRADO, no el mes en
+  // curso — comparar "Ene-mesHoy" de este año (parcial) contra el mismo rango del
+  // año pasado (completo) infla artificialmente la caída de cada plan. `hoyStr`/
+  // `mesHoy` arriba SÍ siguen usándose tal cual para "¿esta pantalla sigue vigente
+  // hoy?" (punto en el tiempo, no promedio de período) — eso no tiene el sesgo.
+  const { mesesCerrados } = getPeriodoActual();
 
   // Última venta con plan por pantalla → plan vigente de la base instalada
   const ultimaPorPantalla = {};
@@ -120,8 +127,8 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
     else if (v.tipoPago === 'Activacion Pantalla') p.activaciones += 1;
     const anio = Number(v.anio);
     const mm = mesNum(v.mes);
-    if (anio === anioHoy && mm > 0 && mm <= mesHoy) { p.ingresosYTD += monto; p.ventasYTD += 1; }
-    if (anio === anioHoy - 1 && mm > 0 && mm <= mesHoy) p.ingresosYTDAnterior += monto;
+    if (anio === anioHoy && mm > 0 && mm <= mesesCerrados) { p.ingresosYTD += monto; p.ventasYTD += 1; }
+    if (anio === anioHoy - 1 && mm > 0 && mm <= mesesCerrados) p.ingresosYTDAnterior += monto;
   }
 
   // ── Planificador: base instalada vigente/vencida y deuda por plan ──

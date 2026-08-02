@@ -161,8 +161,18 @@ export default function AnalisisBajasPage() {
     const devueltos = src.filter(b => b.devolucion === 'SI').length
     const cortesias = src.filter(b => b.cortesia === 'SI').length
     const anioActual = new Date().getFullYear()
-    const bajasYTD = src.filter(b => Number(b.anio) === anioActual).length
-    const bajasYTDPrev = src.filter(b => Number(b.anio) === anioActual - 1).length
+    // Mismo período en ambos años: sin esto, "bajas {anioActual}" (parcial, solo
+    // los meses ya transcurridos) quedaba comparado contra TODO el año anterior
+    // (12 meses completos) — el mismatch más severo encontrado en el Dashboard/
+    // Análisis. mesesCerrados 0-based = cantidad de meses ya cerrados este año
+    // (getMonth()=7 en agosto ⇒ Ene-Jul, índices 0-6, son los 7 meses cerrados).
+    const mesesCerrados = new Date().getMonth()
+    const enRangoCerrado = (b) => {
+      const idx = MESES.indexOf(b.mes)
+      return idx >= 0 && idx < mesesCerrados
+    }
+    const bajasYTD = src.filter(b => Number(b.anio) === anioActual && enRangoCerrado(b)).length
+    const bajasYTDPrev = src.filter(b => Number(b.anio) === anioActual - 1 && enRangoCerrado(b)).length
 
     // Velocidad de churn (últimos 3 meses)
     const now = new Date()

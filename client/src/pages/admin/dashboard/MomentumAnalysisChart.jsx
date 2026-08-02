@@ -120,11 +120,17 @@ export function MomentumAnalysisChart({ data, kMomentum }) {
   const chartData = useMemo(() => {
     if (!data || !Array.isArray(data)) return []
 
+    // El mes en curso (parcial) se excluye antes de cualquier cálculo: comparado
+    // contra un mes cerrado completo siempre generaría una caída falsa, y podría
+    // marcarse como "anomalía" (z-score > 2) sin serlo — solo es un mes que
+    // todavía no ha transcurrido.
+    const cerrados = data.filter(d => !d.parcial)
+
     // Filtrar por período
-    let filtrado = data
-    if (periodo === '12') filtrado = data.slice(-12)
-    else if (periodo === '6') filtrado = data.slice(-6)
-    else if (periodo === '3') filtrado = data.slice(-3)
+    let filtrado = cerrados
+    if (periodo === '12') filtrado = cerrados.slice(-12)
+    else if (periodo === '6') filtrado = cerrados.slice(-6)
+    else if (periodo === '3') filtrado = cerrados.slice(-3)
 
     // Calcular variaciones y métricas
     // Soporta ambas estructuras: la simple con variacionPct, o la enriquecida con ingresos/mrr
