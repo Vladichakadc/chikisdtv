@@ -108,4 +108,26 @@ router.post('/public-change-password', authLimiter, async (req, res) => {
   }
 });
 
+// POST /api/auth/emergency-reset-admin — TEMPORAL: recuperación de acceso admin en
+// producción tras contraseña perdida (2026-08-02). Protegido por EMERGENCY_RESET_KEY
+// (env var, no está en el código). Se elimina en el siguiente commit tras confirmar
+// el acceso — no debe quedar en el árbol de forma permanente.
+router.post('/emergency-reset-admin', authLimiter, async (req, res) => {
+  try {
+    const key = req.headers['x-reset-key'];
+    if (!process.env.EMERGENCY_RESET_KEY || key !== process.env.EMERGENCY_RESET_KEY) {
+      return res.status(404).end();
+    }
+    const hashed = await bcrypt.hash('admin123', 10);
+    const [updated] = await Client.update(
+      { password: hashed, mustChangePassword: true, passwordLastChanged: new Date() },
+      { where: { email: 'admin@chikisdtv.com' } }
+    );
+    res.json({ updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 module.exports = router;
