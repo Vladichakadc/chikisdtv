@@ -17,7 +17,12 @@ function verifyToken(req, res, next) {
     
     next();
   } catch {
-    return res.status(403).json({ error: 'Token inválido o expirado' });
+    // 401 (no 403): un token inválido/vencido es una falla de AUTENTICACIÓN
+    // ("¿quién eres?"), no de autorización ("no tienes permiso"). El interceptor
+    // del frontend (client/src/config/api.js) solo reacciona a 401 para cerrar
+    // sesión — con 403 esto quedaba "roto en silencio" 8h después del login
+    // (el usuario veía errores genéricos en cada acción, sin volver a /login).
+    return res.status(401).json({ error: 'Token inválido o expirado' });
   }
 }
 
