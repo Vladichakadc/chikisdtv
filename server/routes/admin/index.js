@@ -20,5 +20,6 @@ router.use(require('./cuentasPadre'));
 router.use(require('./bajas'));
 router.use(require('./costoPantalla'));
 router.use(require('./backup'));
+router.use(require('./settings'));
 
 module.exports = router;

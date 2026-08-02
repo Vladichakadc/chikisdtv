@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   CalendarClock, Zap, Package, DollarSign, X, Sparkles, Lightbulb, Pencil, TrendingUp,
+  Save, Loader2, CalendarDays,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -8,6 +9,7 @@ import {
 } from 'recharts'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
+import { useUi } from '../../context/UiContext'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 
@@ -19,6 +21,7 @@ const MES_ABREV = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', '
 
 const SALDO_INICIAL_DEFAULT = 27
 const DIAS_ALERTA_CP = 30
+const SALDO_SETTING_KEY = 'saldoCreditosCuentasPadre'
 
 // Las fechas llegan como "YYYY-MM-DD" (sin hora). `new Date("YYYY-MM-DD")` las
 // interpreta como medianoche UTC — en una zona horaria detrás de UTC (Colombia,
@@ -225,7 +228,7 @@ function ProyeccionTooltip({ active, payload, label, hayCost, fmtC }) {
 function narrarProyeccion(proyeccion, precioPack100, saldoInicial) {
   if (!proyeccion?.length) return null
   const total = proyeccion.reduce((s, m) => s + m.cuentas, 0)
-  if (total === 0) return 'Ninguna cuenta padre tiene fecha de vencimiento en los próximos 12 meses.'
+  if (total === 0) return null // ver el banner dedicado para el caso "año sin vencimientos"
   const mesPico = proyeccion.reduce((best, m) => m.cuentas > best.cuentas ? m : best, proyeccion[0])
   const totalCreditos = proyeccion.reduce((s, m) => s + m.creditos, 0)
   const totalPacks = proyeccion.reduce((s, m) => s + m.packs100, 0)
@@ -242,16 +245,45 @@ function narrarProyeccion(proyeccion, precioPack100, saldoInicial) {
 }
 
 export default function ProyeccionRecargasPage() {
+  const { showToast } = useUi()
   const { data: rows, loading } = useApiResource('/admin/payments/costo-pantalla')
   const [cpRows, setCpRows] = useState([])
   const [cpMesModal, setCpMesModal] = useState(null)
   const [saldoInicial, setSaldoInicial] = useState(SALDO_INICIAL_DEFAULT)
+  // Último valor confirmado en el backend — sirve para saber si hay cambios sin guardar
+  const [saldoGuardado, setSaldoGuardado] = useState(null)
+  const [guardandoSaldo, setGuardandoSaldo] = useState(false)
+  // Filtro de año: la proyección es una ventana rodante de 12 meses desde hoy
+  // (normalmente cruza dos años calendario) — por defecto se muestra el año actual.
+  const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear())
 
   useEffect(() => {
     api.get('/admin/cuentas-padre')
       .then(r => setCpRows(r.data || []))
       .catch(() => {})
+    api.get(`/admin/settings/${SALDO_SETTING_KEY}`)
+      .then(r => {
+        const val = r.data?.value != null ? Number(r.data.value) : SALDO_INICIAL_DEFAULT
+        setSaldoInicial(val)
+        setSaldoGuardado(val)
+      })
+      .catch(() => setSaldoGuardado(SALDO_INICIAL_DEFAULT))
   }, [])
+
+  const saldoSinGuardar = saldoGuardado != null && saldoInicial !== saldoGuardado
+
+  const handleGuardarSaldo = async () => {
+    setGuardandoSaldo(true)
+    try {
+      await api.put(`/admin/settings/${SALDO_SETTING_KEY}`, { value: saldoInicial })
+      setSaldoGuardado(saldoInicial)
+      showToast(`Saldo actual de créditos guardado: ${saldoInicial} Cr`, 'success')
+    } catch (e) {
+      showToast(e.response?.data?.error || e.message, 'error')
+    } finally {
+      setGuardandoSaldo(false)
+    }
+  }
 
   // ── Evolución mensual del costo (con 4x1000) y TRM ──────────────────────
   const serieMensualCosto = useMemo(() => {
@@ -341,14 +373,40 @@ export default function ProyeccionRecargasPage() {
     return { proyeccion, precioPack100, trmVigente }
   }, [rows, cpRows, saldoInicial])
 
+  // ── Filtro dinámico por año ──────────────────────────────────────────────
+  // La simulación de saldo (arriba) SIEMPRE corre sobre los 12 meses completos
+  // en secuencia — el arrastre de saldo entre meses no puede recalcularse desde
+  // cero para un año recortado. El filtro solo decide qué parte de esa
+  // simulación ya calculada se muestra en las tarjetas, el gráfico y la tabla.
+  const aniosDisponibles = useMemo(() => (
+    [...new Set(proyeccion.map(m => Number(m.key.split('-')[0])))].sort((a, b) => a - b)
+  ), [proyeccion])
+
+  useEffect(() => {
+    if (aniosDisponibles.length && !aniosDisponibles.includes(filtroAnio)) {
+      setFiltroAnio(aniosDisponibles.includes(new Date().getFullYear())
+        ? new Date().getFullYear()
+        : aniosDisponibles[0])
+    }
+  }, [aniosDisponibles, filtroAnio])
+
+  const proyeccionFiltrada = useMemo(() => (
+    proyeccion.filter(m => Number(m.key.split('-')[0]) === filtroAnio)
+  ), [proyeccion, filtroAnio])
+
   const fmtC = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
-  const totalCuentas  = proyeccion.reduce((s, m) => s + m.cuentas,  0)
-  const totalCreditos = proyeccion.reduce((s, m) => s + m.creditos, 0)
-  const totalPacks    = proyeccion.reduce((s, m) => s + m.packs100, 0)
-  const totalCOP      = proyeccion.reduce((s, m) => s + m.costoCOP, 0)
-  const saldoFinal    = proyeccion[proyeccion.length - 1]?.saldoDespues ?? saldoInicial
+  // Punto de partida real del saldo AL ENTRAR al año filtrado (arrastrado desde
+  // los meses previos de la simulación) — no siempre es igual a `saldoInicial`,
+  // que es el punto de partida de TODA la ventana de 12 meses.
+  const saldoInicioFiltro = proyeccionFiltrada[0]?.saldoAntes ?? saldoInicial
+  const totalCuentas  = proyeccionFiltrada.reduce((s, m) => s + m.cuentas,  0)
+  const totalCreditos = proyeccionFiltrada.reduce((s, m) => s + m.creditos, 0)
+  const totalPacks    = proyeccionFiltrada.reduce((s, m) => s + m.packs100, 0)
+  const totalCOP      = proyeccionFiltrada.reduce((s, m) => s + m.costoCOP, 0)
+  const saldoFinal    = proyeccionFiltrada[proyeccionFiltrada.length - 1]?.saldoDespues ?? saldoInicioFiltro
   const hayCost = precioPack100 > 0
   const haySaldo = proyeccion.some(m => m.cuentas > 0)
+  const haySaldoFiltrado = proyeccionFiltrada.some(m => m.cuentas > 0)
 
   return (
     <div>
@@ -421,30 +479,64 @@ export default function ProyeccionRecargasPage() {
               </div>
             </div>
 
-            {/* Campo interactivo: saldo actual de créditos — alimenta toda la proyección de abajo */}
-            <label className="flex items-center gap-2.5 bg-white border-2 border-indigo-200 rounded-2xl pl-4 pr-2 py-2 shadow-sm">
-              <Pencil size={14} className="text-indigo-400 flex-shrink-0" />
-              <span className="text-sm font-semibold text-gray-500 whitespace-nowrap">Saldo actual de créditos</span>
-              <input
-                type="number" min="0" value={saldoInicial}
-                onChange={(e) => setSaldoInicial(Math.max(0, Math.round(Number(e.target.value)) || 0))}
-                className="w-20 text-right font-extrabold text-indigo-700 text-lg bg-indigo-50 rounded-xl px-2 py-1 outline-none focus:ring-2 focus:ring-indigo-400"
-              />
-              <span className="text-sm font-bold text-indigo-500 pr-1">Cr</span>
-            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filtro dinámico por año: la ventana de 12 meses suele cruzar dos
+                  años calendario — por defecto se muestra el año actual */}
+              {aniosDisponibles.length > 1 && (
+                <div className="flex items-center gap-1 bg-white border-2 border-indigo-200 rounded-2xl p-1 shadow-sm">
+                  <CalendarDays size={14} className="text-indigo-400 flex-shrink-0 ml-1.5" />
+                  {aniosDisponibles.map(anio => (
+                    <button
+                      key={anio}
+                      onClick={() => setFiltroAnio(anio)}
+                      className={`px-3 py-1 rounded-xl text-sm font-bold transition-colors ${
+                        filtroAnio === anio ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:bg-indigo-50'
+                      }`}
+                    >
+                      {anio}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Campo interactivo: saldo actual de créditos — alimenta toda la proyección de abajo */}
+              <label className="flex items-center gap-2.5 bg-white border-2 border-indigo-200 rounded-2xl pl-4 pr-2 py-2 shadow-sm">
+                <Pencil size={14} className="text-indigo-400 flex-shrink-0" />
+                <span className="text-sm font-semibold text-gray-500 whitespace-nowrap">Saldo actual de créditos</span>
+                <input
+                  type="number" min="0" value={saldoInicial}
+                  onChange={(e) => setSaldoInicial(Math.max(0, Math.round(Number(e.target.value)) || 0))}
+                  className="w-20 text-right font-extrabold text-indigo-700 text-lg bg-indigo-50 rounded-xl px-2 py-1 outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <span className="text-sm font-bold text-indigo-500 pr-1">Cr</span>
+                <button
+                  onClick={handleGuardarSaldo}
+                  disabled={guardandoSaldo || !saldoSinGuardar}
+                  title={saldoSinGuardar ? 'Guardar el nuevo saldo' : 'Sin cambios por guardar'}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-colors ${
+                    saldoSinGuardar
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {guardandoSaldo ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Guardar
+                </button>
+              </label>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-            <BiCardCP icon={CalendarClock} variant="solid"   label="CPs a renovar (12m)" value={totalCuentas}
-              sub="cuentas padre con vencimiento en el período"
+            <BiCardCP icon={CalendarClock} variant="solid"   label={`CPs a renovar (${filtroAnio})`} value={totalCuentas}
+              sub="cuentas padre con vencimiento en el año seleccionado"
               tag={{ tone: totalCuentas > 20 ? 'warn' : 'info', text: `${totalCuentas} renovaciones proyectadas` }} />
             <BiCardCP icon={Zap}           variant="light"   label="Créditos necesarios" value={totalCreditos}
-              sub={`${totalCuentas} cuentas × 6 Cr · Saldo inicial: ${saldoInicial} Cr`}
+              sub={`${totalCuentas} cuentas × 6 Cr · Saldo al iniciar ${filtroAnio}: ${saldoInicioFiltro} Cr`}
               tag={{ tone: 'info', text: '6 créditos = 6 meses por cuenta' }} />
             <BiCardCP icon={Package}       variant="outline" label="Packs de 100 Cr"      value={totalPacks}
-              sub={`Con saldo acumulado · Saldo final: ${saldoFinal} Cr sobrantes`}
+              sub={`Con saldo acumulado · Saldo final ${filtroAnio}: ${saldoFinal} Cr sobrantes`}
               tag={{ tone: totalPacks > 5 ? 'warn' : 'good', text: `${totalPacks} compras en el período` }} />
-            <BiCardCP icon={DollarSign}    variant={hayCost ? 'solid' : 'outline'} label="Costo estimado (12m)"
+            <BiCardCP icon={DollarSign}    variant={hayCost ? 'solid' : 'outline'} label={`Costo estimado (${filtroAnio})`}
               value={hayCost ? fmtC(totalCOP) : '—'}
               sub={hayCost ? `Ref.: ${fmtC(Math.round(precioPack100))} por pack de 100 Cr (TRM vigente $${Math.round(trmVigente).toLocaleString('es-CO')})` : 'Sin datos de costo pantalla'}
               tag={hayCost
@@ -452,9 +544,15 @@ export default function ProyeccionRecargasPage() {
                 : { tone: 'info', text: 'Registra recargas para estimar' }} />
           </div>
 
+          {!haySaldoFiltrado && (
+            <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+              Ninguna cuenta padre vence en <strong>{filtroAnio}</strong> dentro de esta ventana de 12 meses — prueba con el otro año disponible arriba.
+            </div>
+          )}
+
           <Card className="border-indigo-100 mb-4">
             <CardHeader className="border-indigo-50">
-              <CardTitle>Recargas proyectadas mes a mes</CardTitle>
+              <CardTitle>Recargas proyectadas mes a mes · {filtroAnio}</CardTitle>
               <p className="text-sm text-gray-400 mt-0.5">
                 <span className="inline-flex items-center gap-1 mr-2">
                   <span className="inline-block w-3 h-3 rounded-sm bg-indigo-500" /> Cubierto con saldo
@@ -470,7 +568,7 @@ export default function ProyeccionRecargasPage() {
             </CardHeader>
             <CardBody>
               <ResponsiveContainer width="100%" height={340}>
-                <ComposedChart data={proyeccion} margin={{ top: 20, right: hayCost ? 64 : 16, left: 0, bottom: 0 }}>
+                <ComposedChart data={proyeccionFiltrada} margin={{ top: 20, right: hayCost ? 64 : 16, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="saldoGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
@@ -494,12 +592,12 @@ export default function ProyeccionRecargasPage() {
                   )}
                   <Tooltip content={<ProyeccionTooltip hayCost={hayCost} fmtC={fmtC} />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" />
-                  <ReferenceLine yAxisId="left" y={saldoInicial}
+                  <ReferenceLine yAxisId="left" y={saldoInicioFiltro}
                     stroke="#10b981" strokeDasharray="5 3" strokeWidth={1.5}
-                    label={{ value: `Saldo inicial ${saldoInicial} Cr`, position: 'insideTopRight', fontSize: 9, fill: '#059669', dy: -4 }}
+                    label={{ value: `Saldo al iniciar ${filtroAnio}: ${saldoInicioFiltro} Cr`, position: 'insideTopRight', fontSize: 9, fill: '#059669', dy: -4 }}
                   />
                   <Bar yAxisId="left" dataKey="cuentas" name="CPs que vencen" radius={[5, 5, 0, 0]} maxBarSize={44}>
-                    {proyeccion.map((m, i) => (
+                    {proyeccionFiltrada.map((m, i) => (
                       <Cell key={i} fill={m.cuentas === 0 ? '#e0e7ff' : m.packs100 > 0 ? '#f97316' : '#6366f1'} />
                     ))}
                     <LabelList dataKey="labelCuentas" position="top"
@@ -520,16 +618,16 @@ export default function ProyeccionRecargasPage() {
                   )}
                 </ComposedChart>
               </ResponsiveContainer>
-              <ChartInsightCP text={narrarProyeccion(proyeccion, precioPack100, saldoInicial)} />
+              <ChartInsightCP text={narrarProyeccion(proyeccionFiltrada, precioPack100, saldoInicioFiltro)} />
             </CardBody>
           </Card>
 
           {/* ── Detalle mensual de recargas ── */}
           <Card className="border-indigo-100 overflow-hidden mb-6">
             <CardHeader className="border-indigo-50">
-              <CardTitle>Detalle mensual de recargas</CardTitle>
+              <CardTitle>Detalle mensual de recargas · {filtroAnio}</CardTitle>
               <div className="flex items-center flex-wrap gap-2 mt-1">
-                <p className="text-xs text-gray-400">Saldo inicial: <strong className="text-indigo-600">{saldoInicial} Cr</strong> · Los créditos no usados pasan al siguiente mes</p>
+                <p className="text-xs text-gray-400">Saldo al iniciar {filtroAnio}: <strong className="text-indigo-600">{saldoInicioFiltro} Cr</strong> · Los créditos no usados pasan al siguiente mes</p>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">Verde = cubierto con saldo</span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700">Naranja = requiere compra de pack</span>
               </div>
@@ -544,7 +642,7 @@ export default function ProyeccionRecargasPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {proyeccion.map((m, i) => (
+                  {proyeccionFiltrada.map((m, i) => (
                     <tr key={m.key}
                       className={`border-b border-gray-50 transition-colors ${
                         m.cuentas === 0  ? 'opacity-40' :
@@ -554,7 +652,7 @@ export default function ProyeccionRecargasPage() {
                       }`}
                     >
                       <td className="px-4 py-2.5 font-semibold text-brand-accent whitespace-nowrap">
-                        {i === 0 && <span className="mr-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">HOY</span>}
+                        {m.key === proyeccion[0]?.key && <span className="mr-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">HOY</span>}
                         {m.mesLabel}
                       </td>
                       <td className="px-4 py-2.5 text-center font-bold">
@@ -597,9 +695,11 @@ export default function ProyeccionRecargasPage() {
                     </tr>
                   ))}
                   <tr className="bg-indigo-50 border-t-2 border-indigo-200 font-bold">
-                    <td className="px-4 py-3 text-indigo-800">Total 12 meses</td>
+                    <td className="px-4 py-3 text-indigo-800">Total {filtroAnio}</td>
                     <td className="px-4 py-3 text-center text-indigo-800">{totalCuentas}</td>
-                    <td className="px-4 py-3 text-center text-indigo-500 text-sm">100%</td>
+                    <td className="px-4 py-3 text-center text-indigo-500 text-sm">
+                      {proyeccionFiltrada.reduce((s, m) => s + m.pct, 0)}%
+                    </td>
                     <td className="px-4 py-3 text-center text-indigo-800">{totalCreditos}</td>
                     <td className="px-4 py-3 text-center">
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-500 text-white text-xs font-bold"><Package size={11} />{totalPacks}</span>

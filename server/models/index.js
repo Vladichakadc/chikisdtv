@@ -11,6 +11,7 @@ const VentaEquipo = require('./VentaEquipo');
 const CuentaPadre = require('./CuentaPadre');
 const CostoPantalla = require('./CostoPantalla');
 const InventarioEquipo = require('./InventarioEquipo');
+const Setting = require('./Setting');
 
 // Client associations
 Client.hasMany(Subscription, { foreignKey: 'clientId', as: 'subscriptions' });
@@ -54,7 +55,7 @@ VentaEquipo.hasOne(InventarioEquipo, { foreignKey: 'serie', sourceKey: 'serial',
 
 const { getRLSContext } = require('../middleware/rlsContext');
 
-const models = { Client, Plan, Subscription, Payment, Device, Planificador, Baja, TablaCliente, Venta, VentaEquipo, CuentaPadre, CostoPantalla, InventarioEquipo };
+const models = { Client, Plan, Subscription, Payment, Device, Planificador, Baja, TablaCliente, Venta, VentaEquipo, CuentaPadre, CostoPantalla, InventarioEquipo, Setting };
 
 // Activar Row Level Security (RLS) a nivel de Aplicación
 function applyRLS(options, modelName) {
