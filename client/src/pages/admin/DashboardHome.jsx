@@ -454,18 +454,22 @@ export default function DashboardHome() {
   const [showArpuPanel, setShowArpuPanel] = useState(false)
   const [explain, setExplain] = useState(null)
 
-  const load = () => Promise.all([
-    api.get('/admin/dashboard-stats').then((r) => setStats(r.data)),
-    api.get('/admin/dashboard-bi').then((r) => setBi(r.data)),
-    api.get('/admin/planificador').then((r) => setPlanificador(r.data)),
+  // `silent`: en las recargas de fondo (auto-refresh cada 60s y al recuperar el
+  // foco de la pestaña) no queremos que un token vencido/ausente en ese instante
+  // dispare el cierre de sesión — eso cerraba de golpe cualquier modal abierto
+  // mientras el usuario estaba en otra pestaña. Ver client/src/config/api.js.
+  const load = ({ silent = false } = {}) => Promise.all([
+    api.get('/admin/dashboard-stats', { silent }).then((r) => setStats(r.data)),
+    api.get('/admin/dashboard-bi', { silent }).then((r) => setBi(r.data)),
+    api.get('/admin/planificador', { silent }).then((r) => setPlanificador(r.data)),
   ])
 
   useEffect(() => {
-    load().finally(() => setLoading(false))
+    load().catch(() => {}).finally(() => setLoading(false))
 
-    const onFocus = () => load()
+    const onFocus = () => load({ silent: true }).catch(() => {})
     window.addEventListener('focus', onFocus)
-    const interval = setInterval(load, 60000)
+    const interval = setInterval(() => load({ silent: true }).catch(() => {}), 60000)
 
     return () => {
       window.removeEventListener('focus', onFocus)

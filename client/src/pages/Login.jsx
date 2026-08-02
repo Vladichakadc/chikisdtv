@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Tv, Loader2, Lock, Mail, Eye, EyeOff } from 'lucide-react'
 import api from '../config/api'
@@ -44,11 +44,24 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [focusedField, setFocusedField] = useState(null)
+  const [sessionNotice, setSessionNotice] = useState('')
   const navigate = useNavigate()
+
+  // Si el interceptor de api.js redirigió aquí por un 401 (sesión expirada o
+  // token inválido), muestra el motivo en vez de dejar al usuario "aparecer"
+  // en el login sin contexto — ver client/src/config/api.js.
+  useEffect(() => {
+    const msg = sessionStorage.getItem('sessionExpiredMessage')
+    if (msg) {
+      setSessionNotice(msg)
+      sessionStorage.removeItem('sessionExpiredMessage')
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setSessionNotice('')
     setLoading(true)
     try {
       const { data } = await api.post('/auth/login', { email, password })
@@ -152,6 +165,14 @@ export default function Login() {
                   </button>
                 </div>
               </div>
+
+              {/* Aviso de sesión expirada (redirect de api.js) — tono informativo, no de error */}
+              {sessionNotice && !error && (
+                <div className="error-pulse bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 text-amber-700 text-sm p-4 rounded-lg flex items-start gap-3">
+                  <span className="text-lg">⏱️</span>
+                  <p className="font-medium">{sessionNotice}</p>
+                </div>
+              )}
 
               {/* Error State */}
               {error && (
