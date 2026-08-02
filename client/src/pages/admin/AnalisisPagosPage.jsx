@@ -314,12 +314,15 @@ export default function AnalisisPagosPage() {
   const trendStats = useMemo(() => {
     const hoy = new Date()
     const anioHoy = hoy.getFullYear()
-    const mesHoy = hoy.getMonth() + 1
+    // Tope en el último mes CERRADO (no en mesHoy): `mm > mesHoy` solo excluía
+    // los meses futuros, pero dejaba pasar el mes en curso — comparado contra
+    // el mismo mes ya cerrado del año anterior, siempre perdía por incompleto.
+    const mesesCerrados = hoy.getMonth() // 0-based = cantidad de meses ya cerrados
     let ytd = 0, ytdAnt = 0, ventasYtd = 0, ventasYtdAnt = 0
     for (const r of rows.filter(esIngresoReal)) {
       const anio = Number(r.anio)
       const mm = MES_NUM[normMes(r.mes)] || 0
-      if (!anio || !mm || mm > mesHoy) continue
+      if (!anio || !mm || mm > mesesCerrados) continue
       const monto = Number(r.precioVenta) || 0
       if (anio === anioHoy) { ytd += monto; ventasYtd += 1 }
       else if (anio === anioHoy - 1) { ytdAnt += monto; ventasYtdAnt += 1 }
