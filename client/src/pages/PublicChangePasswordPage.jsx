@@ -70,8 +70,8 @@ export default function PublicChangePasswordPage() {
     e.preventDefault()
     setError('')
     
-    if (newPassword.length < 6) {
-      return setError('La nueva contraseña debe tener al menos 6 caracteres')
+    if (newPassword.length < 8) {
+      return setError('La nueva contraseña debe tener al menos 8 caracteres')
     }
     if (newPassword !== confirmPassword) {
       return setError('Las contraseñas nuevas no coinciden')
@@ -120,9 +120,15 @@ export default function PublicChangePasswordPage() {
                 Cambiar Contraseña
               </h1>
               <p className="text-sm text-slate-500">
-                Ingresa tus datos para actualizar tu acceso
+                Necesitas tu contraseña actual para definir una nueva
               </p>
             </div>
+
+            {!success && (
+              <div className="fade-in fade-in-2 mb-6 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 text-xs text-slate-500 leading-relaxed">
+                <span className="font-semibold text-slate-600">¿No recuerdas tu contraseña actual?</span> Este formulario no la recupera. Pide a un administrador del sistema que te la restablezca manualmente — no hay recuperación automática por correo en esta herramienta.
+              </div>
+            )}
 
             {success ? (
               <div className="fade-in text-center py-8">
@@ -201,7 +207,7 @@ export default function PublicChangePasswordPage() {
                       onFocus={() => setFocusedField('newPassword')}
                       onBlur={() => setFocusedField(null)}
                       required
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder="Mínimo 8 caracteres"
                       className="pl-10 pr-10 relative z-0"
                       style={{
                         transition: 'all 0.3s ease',
@@ -231,7 +237,7 @@ export default function PublicChangePasswordPage() {
                       onFocus={() => setFocusedField('confirmPassword')}
                       onBlur={() => setFocusedField(null)}
                       required
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder="Mínimo 8 caracteres"
                       className="pl-10 pr-10 relative z-0"
                       style={{
                         transition: 'all 0.3s ease',
