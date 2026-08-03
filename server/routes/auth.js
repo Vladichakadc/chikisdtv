@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Client } = require('../models');
+const { verifyToken } = require('../middleware/authMiddleware');
 
 const JWT_SECRET = require('../config/jwt');
 const rateLimit = require('express-rate-limit');
@@ -57,6 +58,16 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 });
 
+// GET /api/auth/me — datos mínimos del usuario autenticado (usado por el
+// banner de expiración de contraseña en ChangePasswordPage).
+router.get('/me', verifyToken, async (req, res) => {
+  const client = await Client.findByPk(req.user.id, {
+    attributes: ['role', 'passwordLastChanged'],
+  });
+  if (!client) return res.status(404).json({ error: 'Usuario no encontrado' });
+  res.json({ role: client.role, passwordLastChanged: client.passwordLastChanged });
+});
+
 // POST /api/auth/change-password
 router.post('/change-password', async (req, res) => {
   try {
@@ -68,7 +79,7 @@ router.post('/change-password', async (req, res) => {
     const decoded = jwt2.verify(token, JWT_SECRET);
 
     const { newPassword } = req.body;
-    if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    if (!newPassword || newPassword.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
 
     const hashed = await bcrypt.hash(newPassword, 10);
     await Client.update({ password: hashed, mustChangePassword: false, passwordLastChanged: new Date() }, { where: { id: decoded.id } });
@@ -94,8 +105,8 @@ router.post('/public-change-password', authLimiter, async (req, res) => {
     const valid = await bcrypt.compare(currentPassword, client.password);
     if (!valid) return res.status(401).json({ error: 'Credenciales incorrectas' });
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
     }
 
     const hashed = await bcrypt.hash(newPassword, 10);

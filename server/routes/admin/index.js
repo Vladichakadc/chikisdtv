@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken, requireRole } = require('../../middleware/authMiddleware');
+const { verifyToken, requireRole, requireFreshPassword } = require('../../middleware/authMiddleware');
 
-// Todas las rutas de administración requieren rol admin
+// Todas las rutas de administración requieren rol admin y contraseña vigente.
+// El frontend ya está preparado para el 403 { mustChangePassword: true } que
+// dispara requireFreshPassword — ver client/src/config/api.js.
 router.use(verifyToken);
 router.use(requireRole('admin'));
+router.use(requireFreshPassword);
 
 router.use(require('./dashboard'));
 router.use(require('./clients'));

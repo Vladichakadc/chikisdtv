@@ -9,6 +9,7 @@ import {
   CheckCircle2, XCircle, AlertTriangle, ArrowRight, Lock,
 } from 'lucide-react'
 import api from '../config/api'
+import { evaluatePasswordStrength } from '../utils/passwordStrength'
 
 /* ── Huashu CSS tokens + animaciones ────────────────────────────────────── */
 const CSS = `
@@ -207,27 +208,6 @@ const CSS = `
   }
 `
 
-/* ── Evaluador de fortaleza (5 niveles) ─────────────────────────────────── */
-const LEVELS = [
-  { label:'',           color:'#44445a' },
-  { label:'Muy débil',  color:'#ef4444' },
-  { label:'Débil',      color:'#f97316' },
-  { label:'Regular',    color:'#f59e0b' },
-  { label:'Buena',      color:'#10b981' },
-  { label:'Fuerte 🔒',  color:'#06b6d4' },
-]
-function evalPassword(pass) {
-  if (!pass) return { score:0, label:'', color:'#44445a', reqs:[] }
-  const reqs = [
-    { label:'Mín. 8 caracteres', ok: pass.length >= 8 },
-    { label:'Mayúscula (A–Z)',    ok: /[A-Z]/.test(pass) },
-    { label:'Número (0–9)',       ok: /[0-9]/.test(pass) },
-    { label:'Símbolo (!@#…)',     ok: /[^A-Za-z0-9]/.test(pass) },
-  ]
-  const score = Math.min(5, (pass.length >= 6 ? 1 : 0) + reqs.filter(r => r.ok).length)
-  return { score, ...LEVELS[score], reqs }
-}
-
 /* ── Componente principal ───────────────────────────────────────────────── */
 export default function ChangePasswordPage() {
   const [newPassword, setNewPassword]     = useState('')
@@ -241,7 +221,7 @@ export default function ChangePasswordPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    api.get('/user/me').then(({ data }) => {
+    api.get('/auth/me').then(({ data }) => {
       if (data.role === 'admin' && data.passwordLastChanged) {
         const days = (new Date() - new Date(data.passwordLastChanged)) / 86400000
         setDaysRemaining(Math.max(0, 90 - Math.floor(days)))
@@ -249,14 +229,14 @@ export default function ChangePasswordPage() {
     }).catch(() => {})
   }, [])
 
-  const { score, label, color, reqs } = evalPassword(newPassword)
+  const { score, label, color, reqs } = evaluatePasswordStrength(newPassword)
   const matchOk  = confirm.length > 0 && newPassword === confirm
   const matchErr = confirm.length > 0 && newPassword !== confirm
 
   const submit = async (e) => {
     e.preventDefault()
     if (newPassword !== confirm) return setError('Las contraseñas no coinciden')
-    if (newPassword.length < 6)  return setError('Mínimo 6 caracteres')
+    if (newPassword.length < 8)  return setError('Mínimo 8 caracteres')
     setError(''); setLoading(true)
     try {
       await api.post('/auth/change-password', { newPassword })
@@ -337,7 +317,7 @@ export default function ChangePasswordPage() {
                 {newPassword && (
                   <>
                     <div className="sec-bar-wrap">
-                      {[1,2,3,4,5].map(i => (
+                      {[1,2,3,4].map(i => (
                         <div key={i} className="sec-bar-seg"
                           style={{ background: i <= score ? color : 'rgba(255,255,255,0.07)' }} />
                       ))}
