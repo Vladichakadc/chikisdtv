@@ -208,8 +208,11 @@ export default function Login() {
             {/* Change Password Link */}
             <div className="mt-6 text-center fade-in fade-in-4">
               <Link to="/public-change-password" className="text-sm text-brand-primary hover:text-orange-500 font-medium transition-colors">
-                ¿Deseas cambiar tu contraseña?
+                ¿Sabes tu contraseña actual y quieres cambiarla?
               </Link>
+              <p className="text-xs text-gray-400 mt-1.5">
+                ¿La olvidaste? Pide a un administrador que te la restablezca.
+              </p>
             </div>
 
             {/* Footer */}

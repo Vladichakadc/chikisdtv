@@ -627,11 +627,20 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
   // Snapshot previo: una fila representativa por cuentaId (todas las pantallas de
   // la misma cuenta comparten los mismos campos de cuenta/password/credito/inicio/fin)
   const allBefore = await Planificador.findAll({
-    attributes: ['cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion'],
+    attributes: ['cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion', 'pantallas'],
     raw: true,
   });
   const beforeMap = {};
   allBefore.forEach(r => { if (!beforeMap[r.cuentaId]) beforeMap[r.cuentaId] = r; });
+
+  // Suma real de pantallas por cuentaId (una fila/slot puede representar más de
+  // una pantalla — ver comentario equivalente en routes/admin/dashboard.js).
+  // affectedCount de Model.update() cuenta FILAS, no pantallas, así que no sirve
+  // para reportar "pantallas sincronizadas" consistente con el resto del dashboard.
+  const pantallasPorCuenta = {};
+  allBefore.forEach(r => {
+    pantallasPorCuenta[r.cuentaId] = (pantallasPorCuenta[r.cuentaId] || 0) + (Number(r.pantallas) || 0);
+  });
 
   let updatedScreens = 0;
   let updatedGroups  = 0;
@@ -658,7 +667,8 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
       continue;
     }
 
-    updatedScreens += affectedCount;
+    const pantallasCuenta = pantallasPorCuenta[cuentaId] || 0;
+    updatedScreens += pantallasCuenta;
     updatedGroups++;
 
     const before = beforeMap[cuentaId];
@@ -677,7 +687,7 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
       estado: estadoCuenta,
       diasAlFin,
       status: cambios.length > 0 ? 'actualizada' : 'sin_cambio',
-      pantallasAfectadas: affectedCount,
+      pantallasAfectadas: pantallasCuenta,
       cambios,
     });
   }
