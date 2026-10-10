@@ -66,6 +66,44 @@ async function normalizeDuracionPlan() {
   return changed;
 }
 
+// Cada cuenta padre soporta 3 pantallas (ver CostoPantallaPage: "cada crédito
+// habilita una cuenta que suele soportar 3 pantallas").
+const PANTALLAS_POR_CUENTA = 3;
+
+// Crea pantallas libres (`${cuentaId}-1..3`) para cada CuentaPadre que aún no
+// tiene filas en el Planificador — sin esto, una cuenta cargada en Cuentas
+// Padre después del import de Excel nunca aparece (el sync solo hace UPDATE).
+// Devuelve los cuentaId creados.
+async function ensurePantallasCuentasPadre() {
+  const [cuentas, existentes] = await Promise.all([
+    CuentaPadre.findAll({ raw: true }),
+    Planificador.findAll({ attributes: ['cuentaId'], group: ['cuentaId'], raw: true }),
+  ]);
+  const conPantallas = new Set(existentes.map(r => String(r.cuentaId).trim()));
+  const faltantes = cuentas.filter(cp => !conPantallas.has(String(cp.cuentaId).trim()));
+  if (faltantes.length === 0) return [];
+
+  const records = faltantes.flatMap(cp => {
+    const cuentaId = String(cp.cuentaId).trim();
+    return Array.from({ length: PANTALLAS_POR_CUENTA }, (_, i) => ({
+      idPantalla:   `${cuentaId}-${i + 1}`,
+      cuentaId,
+      cuenta:       cp.nombreUsuario || null,
+      password:     cp.contrasena    || null,
+      credito:      cp.credito       ?? null,
+      inicio:       cp.fechaInicio   || null,
+      finalizacion: cp.fechaFin      || null,
+      nickname:     'Libre',
+      pantallas:    1,
+    }));
+  });
+  // ignoreDuplicates: si un idPantalla ya existe bajo otro cuentaId no se pisa
+  await Planificador.bulkCreate(records, { ignoreDuplicates: true });
+  const ids = faltantes.map(cp => String(cp.cuentaId).trim());
+  console.log(`[PLANIFICADOR] Pantallas libres creadas para cuenta(s) padre nuevas: ${ids.join(', ')}`);
+  return ids;
+}
+
 // Importa/sincroniza el Planificador desde el archivo .xlsm de origen.
 // Compartido entre el router del Planificador y el de Bajas (que lo usa para
 // auto-poblar nicknames cuando la tabla está vacía).
@@ -122,4 +160,4 @@ async function importFromExcel() {
   return records.length;
 }
 
-module.exports = { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan, excelToDate };
+module.exports = { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan, ensurePantallasCuentasPadre, excelToDate };
