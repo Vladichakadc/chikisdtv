@@ -5,7 +5,7 @@ const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const { Planificador, CuentaPadre, Venta, Client, Plan } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
-const { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan } = require('../../services/planificadorImportService');
+const { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan, ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
 // La alerta se recalcula según la fecha vigente; "CORTESIA" es un valor manual que se respeta
 const { DIAS_ALERTA, calcDias: calcDiasDB, alertaFromDias } = require('../../utils/planificadorAlerta');
 
@@ -243,6 +243,7 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
     await autoFixCuentaIdMismatches();      // self-healing en cada carga sobre BD existente
     await normalizeDuracionPlan();          // meses siempre enteros (el Excel traía días/30)
   }
+  await ensurePantallasCuentasPadre();      // cuentas padre nuevas → pantallas libres
   const records = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
 
@@ -624,6 +625,10 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
   const cuentaMap = {};
   cuentas.forEach(c => { cuentaMap[String(c.cuentaId).trim()] = c; });
 
+  // Cuentas padre sin pantallas en el Planificador → se crean libres antes del
+  // snapshot, así el diff las reporta como 'creada' (y "Deshacer" las elimina).
+  const creadas = new Set(await ensurePantallasCuentasPadre());
+
   // Snapshot previo: una fila representativa por cuentaId (todas las pantallas de
   // la misma cuenta comparten los mismos campos de cuenta/password/credito/inicio/fin)
   const allBefore = await Planificador.findAll({
@@ -676,7 +681,7 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
       cuenta: cp.nombreUsuario || null,
       estado: estadoCuenta,
       diasAlFin,
-      status: cambios.length > 0 ? 'actualizada' : 'sin_cambio',
+      status: creadas.has(cuentaId) ? 'creada' : cambios.length > 0 ? 'actualizada' : 'sin_cambio',
       pantallasAfectadas: affectedCount,
       cambios,
     });
@@ -690,6 +695,7 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
   const sinCambioN  = diff.filter(d => d.status === 'sin_cambio').length;
 
   const parts = [`${updatedGroups} cuenta(s) · ${updatedScreens} pantalla(s) actualizadas`];
+  if (creadas.size > 0) parts.push(`${creadas.size} cuenta(s) nueva(s) agregada(s)`);
   if (conCambios > 0)  parts.push(`${conCambios} con cambios`);
   if (sinCambioN > 0)  parts.push(`${sinCambioN} sin cambio`);
   if (skipped > 0)     parts.push(`${skipped} sin pantallas`);
@@ -702,6 +708,7 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
     conCambios,
     sinCambio: sinCambioN,
     sinPantallas: skipped,
+    creadas: creadas.size,
     diff,
     diasAlerta: DIAS_ALERTA,
     pantallas,

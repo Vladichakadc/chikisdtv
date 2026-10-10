@@ -175,12 +175,13 @@ function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
   const actualizadas  = diff.filter(d => d.status === 'actualizada')
   const sinCambio     = diff.filter(d => d.status === 'sin_cambio')
   const sinPantallas  = diff.filter(d => d.status === 'sin_pantallas')
+  const creadas       = diff.filter(d => d.status === 'creada')
   const vencidas      = diff.filter(d => d.diasAlFin != null && d.diasAlFin <= 0)
   const porVencer     = diff.filter(d => d.diasAlFin != null && d.diasAlFin > 0 && d.diasAlFin <= 7)
 
   const visible = soloConCambios
-    ? actualizadas
-    : [...actualizadas, ...sinCambio]
+    ? [...creadas, ...actualizadas]
+    : [...creadas, ...actualizadas, ...sinCambio]
 
   return (
     <div className="pl-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4" onClick={onClose}>
@@ -211,6 +212,12 @@ function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
             <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 text-sm font-semibold">
               <Clock size={13} />
               {porVencer.length} por vencer
+            </span>
+          )}
+          {creadas.length > 0 && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 text-green-700 text-sm font-semibold">
+              <Monitor size={13} />
+              {creadas.length} nueva{creadas.length > 1 ? 's' : ''}
             </span>
           )}
           {actualizadas.length > 0 && (
@@ -294,6 +301,10 @@ function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
                     {item.status === 'actualizada' ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold">
                         <Pencil size={10} /> Actualizada
+                      </span>
+                    ) : item.status === 'creada' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                        <Monitor size={10} /> Nueva
                       </span>
                     ) : item.status === 'sin_pantallas' ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">
