@@ -19,6 +19,11 @@ const { ensureModelColumns, dropStaleBackupTables } = require('./utils/ensureMod
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Railway (y cualquier PaaS) pone un proxy delante: confiar en el primer salto
+// para que req.ip sea la IP real del cliente y express-rate-limit no mezcle a
+// todos los usuarios bajo la IP del proxy (error ERR_ERL_UNEXPECTED_X_FORWARDED_FOR).
+app.set('trust proxy', 1);
+
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -75,6 +80,31 @@ async function seedAdminAndPlans() {
     ]);
     console.log('[SEED] Planes iniciales creados');
   }
+}
+
+// Reseteo de emergencia de la contraseña admin, controlado por variables de
+// entorno. Uso: definir ADMIN_RESET_PASSWORD (y opcionalmente ADMIN_RESET_EMAIL)
+// en Railway, redeployar, ingresar, y luego VACIAR las variables. Sin
+// ADMIN_RESET_EMAIL se resetean todas las cuentas con role='admin'.
+async function emergencyAdminPasswordReset() {
+  const newPassword = (process.env.ADMIN_RESET_PASSWORD || '').trim();
+  if (!newPassword) return;
+  if (newPassword.length < 6) {
+    console.warn('[RESET] ADMIN_RESET_PASSWORD ignorada: debe tener al menos 6 caracteres');
+    return;
+  }
+  const email = (process.env.ADMIN_RESET_EMAIL || '').trim();
+  const where = email ? { email, role: 'admin' } : { role: 'admin' };
+  const admins = await Client.findAll({ where });
+  if (admins.length === 0) {
+    console.warn(`[RESET] No se encontró ninguna cuenta admin${email ? ` con email ${email}` : ''}`);
+    return;
+  }
+  const hashed = await bcrypt.hash(newPassword, 10);
+  for (const a of admins) {
+    await a.update({ password: hashed, mustChangePassword: false, passwordLastChanged: new Date(), estatus: 'Activo' });
+  }
+  console.warn(`[RESET] Contraseña admin reseteada para: ${admins.map(a => a.email).join(', ')} — vacía ADMIN_RESET_PASSWORD en Railway`);
 }
 
 async function seedDevicesFromVentas() {
@@ -145,6 +175,7 @@ async function seedDevicesFromVentas() {
     await ensureVentasEquiposSchema();
     console.log('[DB] Tablas sincronizadas');
     await seedAdminAndPlans();
+    await emergencyAdminPasswordReset();
     await seedDevicesFromVentas();
     // Self-healing: corrige desalineamientos cuentaId/idPantalla en cada arranque,
     // garantizando que producción quede sana sin necesidad de scripts manuales.
