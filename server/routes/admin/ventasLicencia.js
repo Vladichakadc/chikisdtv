@@ -4,6 +4,7 @@ const path = require('path');
 const XLSX = require('xlsx');
 const { Venta, Client, Device } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
 
 function excelSerial(n) {
   if (typeof n !== 'number') return n || null;
@@ -20,7 +21,7 @@ function normalizeTipoPago(v) {
 
 async function importVentas() {
   const filePath = path.join(__dirname, '../../../Tablas/1-orders_table_Ventas_LicenciaIPVT2024.xlsx');
-  const wb = XLSX.readFile(filePath);
+  const wb = leerExcelOrigen(filePath);
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
   const records = raw.slice(1)
@@ -139,14 +140,14 @@ router.post('/payments/ventas-licencia/import', asyncHandler(async (_req, res) =
 
 router.get('/payments/ventas-licencia', asyncHandler(async (_req, res) => {
   const count = await Venta.count();
-  if (count === 0) await importVentas();
+  if (count === 0) await autoImportarSiDisponible(importVentas);
   const rows = await Venta.findAll({ order: [['fecha', 'DESC']] });
   res.json(rows);
 }));
 
 router.get('/payments/ventas-dispositivos', asyncHandler(async (_req, res) => {
   const count = await Venta.count();
-  if (count === 0) await importVentas();
+  if (count === 0) await autoImportarSiDisponible(importVentas);
   
   const { Op } = require('sequelize');
   const rows = await Venta.findAll({

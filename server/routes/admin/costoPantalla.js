@@ -4,12 +4,13 @@ const path = require('path');
 const XLSX = require('xlsx');
 const { CostoPantalla } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
 
 // ============ COSTO PANTALLA (DB + Excel import) ============
 
 async function importCostoPantalla() {
   const filePath = path.join(__dirname, '../../../Tablas/Tabla_Costo_Pantalla.xlsx');
-  const wb = XLSX.readFile(filePath);
+  const wb = leerExcelOrigen(filePath);
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
   const headers = raw[0].map(h => (h || '').toString().trim());
@@ -68,7 +69,7 @@ async function importCostoPantalla() {
 
 router.get('/payments/costo-pantalla', asyncHandler(async (_req, res) => {
   const count = await CostoPantalla.count();
-  if (count === 0) await importCostoPantalla();
+  if (count === 0) await autoImportarSiDisponible(importCostoPantalla);
   const rows = await CostoPantalla.findAll({ order: [['id', 'DESC']] });
   res.json(rows);
 }));

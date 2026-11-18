@@ -5,6 +5,7 @@ const XLSX = require('xlsx');
 const { Op } = require('sequelize');
 const { InventarioEquipo, VentaEquipo, CostoPantalla } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
 
 function excelSerial(n) {
   if (typeof n !== 'number') return n || null;
@@ -21,7 +22,7 @@ const str = (v) => {
 // inventario_equipos: el Excel es la fuente de verdad de este lote de compra.
 async function importInventario() {
   const filePath = path.join(__dirname, '../../../Tablas/order_inventario2026.xlsx');
-  const wb = XLSX.readFile(filePath);
+  const wb = leerExcelOrigen(filePath);
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
   const records = raw.slice(1)
@@ -57,7 +58,7 @@ async function importInventario() {
 // (serie ↔ VentaEquipo.serial); auto-importa desde el Excel si la tabla está vacía.
 router.get('/inventario-equipos', asyncHandler(async (_req, res) => {
   const count = await InventarioEquipo.count();
-  if (count === 0) await importInventario();
+  if (count === 0) await autoImportarSiDisponible(importInventario);
   const items = await InventarioEquipo.findAll({
     include: [{
       model: VentaEquipo,
