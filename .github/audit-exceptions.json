@@ -1,0 +1,8 @@
+[
+  {
+    "ghsa": "GHSA-fc5q-39xc-vjpf",
+    "paquete": "picomatch",
+    "motivo": "ReDoS publicado el 2026-11 que afecta a todas las versiones (<=4.0.7, la última); no hay versión corregida. Solo entra por herramientas de build y desarrollo (vite, tailwindcss, nodemon) y por node-gyp al instalar sqlite3; ninguna ruta de la app pasa patrones glob del usuario a picomatch.",
+    "caduca": "2026-12-18"
+  }
+]
