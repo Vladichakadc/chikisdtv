@@ -23,6 +23,9 @@ const Planificador = sequelize.define('Planificador', {
   montoDebe:    DataTypes.FLOAT,   // deuda en pesos colombianos (COP)
   montoDebeUSD: DataTypes.FLOAT,   // deuda en dólares (USD) — cartera independiente
   tipoPlan:     DataTypes.STRING,
+  // Cortesía (no se cobra): dato propio. Antes iba como texto "CORTESIA"
+  // dentro de alertaReal, mezclado con un valor que el sistema recalcula.
+  cortesia:     { type: DataTypes.BOOLEAN, defaultValue: false },
 }, {
   tableName: 'planificador',
   timestamps: true,

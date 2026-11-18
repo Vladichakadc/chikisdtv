@@ -12,7 +12,7 @@ const { withRLS } = require('./middleware/rlsContext');
 
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
-const { autoFixCuentaIdMismatches } = require('./services/planificadorImportService');
+const { autoFixCuentaIdMismatches, normalizeDuracionPlan, ensurePantallasCuentasPadre } = require('./services/planificadorImportService');
 const { ensureVentasEquiposSchema } = require('./utils/ensureVentasEquiposSchema');
 const { ensureModelColumns, dropStaleBackupTables } = require('./utils/ensureModelColumns');
 const { ensureIndexes } = require('./utils/ensureIndexes');
@@ -170,6 +170,9 @@ async function seedDevicesFromVentas() {
     await ensureModelColumns(CostoPantalla);
     // planificador ganó montoDebeUSD (cartera en dólares) después de su creación
     await ensureModelColumns(Planificador);
+    // Cortesía pasó de texto en alertaReal a columna propia: migración idempotente
+    await sequelize.query("UPDATE planificador SET cortesia = 1 WHERE UPPER(TRIM(alertaReal)) = 'CORTESIA' AND (cortesia IS NULL OR cortesia = 0)");
+    await sequelize.query('UPDATE planificador SET cortesia = 0 WHERE cortesia IS NULL');
     // recordatorios ganó `etapa` (secuencia de cobro antes / día / +3 días)
     await ensureModelColumns(Recordatorio);
     // ventas_equipos también ganó columnas tarde (costo, serial, garantia):
@@ -185,6 +188,10 @@ async function seedDevicesFromVentas() {
     // Self-healing: corrige desalineamientos cuentaId/idPantalla en cada arranque,
     // garantizando que producción quede sana sin necesidad de scripts manuales.
     await autoFixCuentaIdMismatches();
+    // Correcciones que antes corrían en CADA carga del Planificador (GET):
+    // ahora una vez al arrancar y tras los cambios que las necesitan.
+    await normalizeDuracionPlan();
+    await ensurePantallasCuentasPadre();
 
     // Guarda referencia al servidor para graceful shutdown
     const server = app.listen(PORT, () => {

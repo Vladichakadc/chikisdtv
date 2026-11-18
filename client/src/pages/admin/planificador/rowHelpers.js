@@ -10,6 +10,16 @@ export function parseFechaLocal(fecha) {
   return isNaN(d.getTime()) ? null : d
 }
 
+// Días de alerta ("próxima a vencer"). La fuente es el servidor (la API los
+// devuelve como `diasAlerta`, ver server/utils/planificadorAlerta.js); esto
+// es solo el respaldo mientras carga. Debe coincidir con el servidor: lo
+// verifica reglas.consistencia.test.js.
+export const DIAS_ALERTA_DEFAULT = 8
+
+// Cortesía: columna booleana `cortesia`; se acepta el texto legado "CORTESIA"
+export const esCortesia = (screen) =>
+  screen?.cortesia === true || String(screen?.alertaReal || '').trim().toUpperCase() === 'CORTESIA'
+
 export function calcDias(fechaFin) {
   if (!fechaFin) return null
   const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -18,7 +28,7 @@ export function calcDias(fechaFin) {
   return Math.round((fin - today) / 86400000)
 }
 
-export function getRowVariant(screen, diasAlerta) {
+export function getRowVariant(screen, diasAlerta = DIAS_ALERTA_DEFAULT) {
   const nombre = (String(screen.nombre ?? '') + String(screen.apellido ?? '')).trim()
   const nickname = (screen.nickname || '').trim()
   // "Libre" solo si no hay ni nombre ni nickname asignado (o el nickname lo indica explícitamente),
@@ -28,7 +38,7 @@ export function getRowVariant(screen, diasAlerta) {
   const dias = calcDias(screen.duracionReal || screen.finalizacion)
     ?? screen.diasVencimientoReal ?? screen.diasVencimiento
   if (dias != null && dias <= 0) return 'vencido'
-  if (screen.alertaReal === 'CORTESIA') return 'cortesia'
+  if (esCortesia(screen)) return 'cortesia'
   if (dias != null && dias <= diasAlerta) return 'alerta'
   return 'vigente'
 }

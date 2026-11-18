@@ -4,7 +4,7 @@ import { todayStr } from '../../utils/dateUtils'
 import {
   Monitor, Clock, AlertTriangle, CheckCircle2,
   Search, RefreshCw, Tv,
-  X, FileSpreadsheet, Save,
+  X, FileSpreadsheet,
   Link2, Undo2,
   XCircle, Wallet, Gift, DollarSign, Percent, Package,
   Users, Maximize2, Minimize2, KeyRound, Copy, Check,
@@ -446,7 +446,6 @@ export default function PlanificadorPage() {
   const [data, setData]                   = useState(null)
   const [loading, setLoading]             = useState(true)
   const [exporting, setExporting]         = useState(false)
-  const [saving, setSaving]               = useState(false)
   const [syncing, setSyncing]             = useState(false)
   const [showSyncDiff, setShowSyncDiff]   = useState(false)
   const [syncDiffData, setSyncDiffData]   = useState([])
@@ -533,19 +532,6 @@ export default function PlanificadorPage() {
     }
   }
 
-  const handleGuardar = async () => {
-    setSaving(true)
-    try {
-      const save = await api.post('/admin/planificador/save-to-excel')
-      const refresh = await api.get('/admin/planificador')
-      setData(refresh.data)
-      showToast(save.data.message, 'success')
-    } catch (e) {
-      showToast(e.response?.data?.error || e.message, 'error')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const handleSync = async () => {
     snapshotBeforeChange()
@@ -897,9 +883,6 @@ export default function PlanificadorPage() {
             </button>
             <button onClick={handleExport} disabled={exporting} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
               <FileSpreadsheet size={15} /> Exportar Excel
-            </button>
-            <button onClick={handleGuardar} disabled={saving} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
-              <Save size={15} /> {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={load} className="pl-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
               <RefreshCw size={15} /> Actualizar

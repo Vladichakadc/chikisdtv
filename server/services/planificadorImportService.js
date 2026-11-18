@@ -2,6 +2,7 @@ const path = require('path');
 const XLSX = require('xlsx');
 const sequelize = require('../config/database');
 const { Planificador, CuentaPadre } = require('../models');
+const { leerExcelOrigen } = require('../utils/excelOrigen');
 
 function excelToDate(n) {
   if (n === '' || n == null) return null;
@@ -110,7 +111,7 @@ async function ensurePantallasCuentasPadre() {
 // Aplica autofix de cuentaId inmediatamente después del import.
 async function importFromExcel() {
   const filePath = path.join(__dirname, '..', '..', 'Planificador de proyectos Magistv_v1_202602105.xlsm');
-  const wb = XLSX.readFile(filePath, { raw: true });
+  const wb = leerExcelOrigen(filePath, { raw: true });
   const ws = wb.Sheets['Planificador'];
   if (!ws) throw new Error('Hoja Planificador no encontrada en el archivo Excel');
   const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -139,6 +140,7 @@ async function importFromExcel() {
       inicioReal:   excelToDate(r[18]),
       duracionReal: excelToDate(r[19]),
       alertaReal:   String(r[23] || '').trim(),
+      cortesia:     String(r[23] || '').trim().toUpperCase() === 'CORTESIA',
       porcentaje:   r[24] !== '' ? Number(r[24]) : null,
     });
   }
@@ -147,7 +149,7 @@ async function importFromExcel() {
       updateOnDuplicate: [
         'cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion',
         'nombre', 'apellido', 'customerId', 'nickname', 'pantallas', 'duracionPlan',
-        'inicioReal', 'duracionReal', 'alertaReal', 'porcentaje',
+        'inicioReal', 'duracionReal', 'alertaReal', 'cortesia', 'porcentaje',
       ],
     });
   }

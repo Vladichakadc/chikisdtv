@@ -190,7 +190,7 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
     duracionPlan: row.duracionPlan != null ? Math.round(Number(row.duracionPlan)) : '',
     inicioReal:   row.inicioReal   || '',
     duracionReal: row.duracionReal || '',
-    alertaReal:   row.alertaReal   || '',
+    cortesia:     !!row.cortesia || String(row.alertaReal || '').toUpperCase() === 'CORTESIA',
     debe:         row.debe         ?? false,
     montoDebe:    row.montoDebe    ?? '',
     montoDebeUSD: row.montoDebeUSD ?? '',
@@ -623,11 +623,13 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
               <Field label="Fin real">
                 <Input value={form.duracionReal} onChange={set('duracionReal')} type="date" />
               </Field>
-              <Field label="Alerta" className="sm:col-span-2">
-                <Select value={form.alertaReal} onChange={set('alertaReal')}>
-                  <option value="">Normal</option>
-                  <option value="CORTESIA">CORTESIA</option>
-                </Select>
+              <Field label="Cortesía" className="sm:col-span-2">
+                <div className="flex items-center gap-2 h-[38px]">
+                  <Toggle checked={!!form.cortesia} onChange={v => set('cortesia')(v)} />
+                  <span className="text-xs text-gray-500">
+                    {form.cortesia ? 'Sí — no se le cobra ni se le envían recordatorios de pago' : 'No — pantalla de pago normal'}
+                  </span>
+                </div>
               </Field>
             </div>
 

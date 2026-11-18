@@ -231,9 +231,8 @@ export default function PaymentsPage() {
       setClientesTabla(resClientes.data || [])
 
       // Promos registradas en "Editar Pantalla" del Planificador (campo Tipo de Plan, p. ej. "3+1")
-      const resPlanificador = await api.get('/admin/planificador')
-      const promos = new Set((resPlanificador.data?.pantallas || []).map(p => (p.tipoPlan || '').trim()).filter(Boolean))
-      setPromosPlanificador([...promos])
+      const resPromos = await api.get('/admin/planificador/promos')
+      setPromosPlanificador(resPromos.data?.promos || [])
     } catch (e) {
       setError(e.response?.data?.error || e.message)
     } finally {
