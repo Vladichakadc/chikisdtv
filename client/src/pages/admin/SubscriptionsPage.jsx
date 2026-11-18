@@ -20,6 +20,7 @@ import { useUi } from '../../context/UiContext'
 import { Input, Select, Textarea } from '../../components/ui/Input'
 import { Card } from '../../components/ui/Card'
 import { PlanificadorTable } from '../../components/ui/PlanificadorTable'
+import { useCredenciales } from '../../hooks/useCredenciales'
 import { formatCurrency } from '../../utils/excelUtils'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
@@ -337,7 +338,8 @@ export default function SubscriptionsPage() {
   const [search, setSearch]             = useState('')
   const [filterEstado, setFilterEstado] = useState('Todos')
   const [sortConfig, setSortConfig]     = useState({ key: 'cuentaId', dir: 'asc' })
-  const [hidePwd, setHidePwd]           = useState({})
+  const [pwdVisible, setPwdVisible]     = useState({})
+  const { passwords, revelar, olvidar } = useCredenciales()
 
   /* ── Loaders ── */
   const loadSubs = useCallback(async () => {
@@ -360,9 +362,10 @@ export default function SubscriptionsPage() {
     try {
       const r = await api.get('/admin/planificador')
       setPlanData(r.data)
+      olvidar(); setPwdVisible({})
     } catch { showToast('Error al cargar el planificador.', 'error') }
     finally   { setLoadingPlan(false) }
-  }, [showToast])
+  }, [showToast, olvidar])
 
   useEffect(() => { loadSubs(); loadPlan() }, [loadSubs, loadPlan])
 
@@ -372,7 +375,13 @@ export default function SubscriptionsPage() {
       ? prev.dir === 'asc' ? { key, dir: 'desc' } : { key: null, dir: 'asc' }
       : { key, dir: 'asc' }
   )
-  const togglePwd = (id) => setHidePwd(p => ({ ...p, [id]: !p[id] }))
+  // Contraseñas ocultas por defecto; al revelar una cuenta se piden al backend
+  // (queda registrado quién las vio)
+  const togglePwd = async (cuentaId) => {
+    if (pwdVisible[cuentaId]) { setPwdVisible(p => ({ ...p, [cuentaId]: false })); return }
+    const ids = (planData?.pantallas || []).filter(p => p.cuentaId === cuentaId).map(p => p.idPantalla)
+    if (await revelar(ids, 'tabla')) setPwdVisible(p => ({ ...p, [cuentaId]: true }))
+  }
   const openNew   = () => { setEditing(null); setForm({ ...EMPTY, fechaInicio: todayStr() }); setShowDrawer(true) }
 
   const handleSubmit = async (e) => {
@@ -616,7 +625,8 @@ export default function SubscriptionsPage() {
                     stats={planStats}
                     sortConfig={sortConfig}
                     onSort={onSort}
-                    hidePwd={hidePwd}
+                    pwdVisible={pwdVisible}
+                    passwords={passwords}
                     onTogglePwd={togglePwd}
                     readOnly={true}
                   />

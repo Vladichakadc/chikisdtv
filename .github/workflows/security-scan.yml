@@ -61,6 +61,12 @@ jobs:
             npm run lint --if-present
           fi
 
+      - name: Pruebas (solo si existe script test)
+        run: |
+          if [ -f package.json ]; then
+            npm test --if-present
+          fi
+
       - name: npm audit (falla en high/critical salvo excepciones declaradas)
         run: |
           if [ -f package.json ]; then
