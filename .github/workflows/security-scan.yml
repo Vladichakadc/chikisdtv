@@ -61,10 +61,11 @@ jobs:
             npm run lint --if-present
           fi
 
-      - name: npm audit (falla en high/critical)
+      - name: npm audit (falla en high/critical salvo excepciones declaradas)
         run: |
           if [ -f package.json ]; then
-            npm audit --audit-level=high
+            # Excepciones con GHSA, motivo y caducidad (<= 30 dias) en .github/audit-exceptions.json
+            node "$GITHUB_WORKSPACE/.github/scripts/audit-gate.js"
           else
             echo "No package.json - se omite npm audit"
           fi
