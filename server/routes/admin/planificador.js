@@ -343,7 +343,8 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
 
   // Detalle por pantalla del cliente: cada pantalla con su último pago y si
   // está AL DÍA (fecha vigente, sin marca "debe" y con pago registrado). El
-  // comprobante consolida la suma cuando el cliente tiene 2+ pantallas al día.
+  // comprobante lista al día / vencidas, permite ocultar cuentas y consolida
+  // la suma cuando quedan 2+ pantallas al día visibles.
   let pantallasDetalle = [];
   if (customerId) {
     const filas = await Planificador.findAll({
@@ -351,7 +352,7 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
         customerId,
         nickname: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }, { [Op.notLike]: '%libre%' }] },
       },
-      attributes: ['idPantalla', 'nickname', 'duracionReal', 'debe', 'montoDebe', 'montoDebeUSD'],
+      attributes: ['idPantalla', 'nickname', 'duracionReal', 'debe', 'montoDebe', 'montoDebeUSD', 'cuentaId', 'cuenta', 'password', 'pantallas'],
       order: [['nickname', 'ASC']],
     });
     pantallasDetalle = await Promise.all(filas.map(async (f) => {
@@ -364,6 +365,12 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
       return {
         idPantalla: f.idPantalla,
         nickname: f.nickname,
+        // Cuenta padre + contraseña: el comprobante las muestra solo si el
+        // admin activa los interruptores (ruta ya protegida por rol admin).
+        cuentaId: f.cuentaId,
+        cuenta: f.cuenta,
+        password: f.password,
+        pantallas: f.pantallas,
         finPlan: f.duracionReal,
         dias,
         debe: !!f.debe,

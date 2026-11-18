@@ -8,7 +8,7 @@
 //    pantallas de la CUENTA que se renueva (la fila del Planificador, no el
 //    total del cliente); se envía como TEXTO prellenado vía wa.me o se copia.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { X, Copy, Check, Tv, Loader2, MessageCircle, Megaphone, Receipt } from 'lucide-react'
+import { X, Copy, Check, Tv, Loader2, MessageCircle, Megaphone, Receipt, Eye, EyeOff, KeyRound, Building2, SlidersHorizontal } from 'lucide-react'
 import * as htmlToImage from 'html-to-image'
 import api from '../../../config/api'
 import { cn } from '../../../utils/cn'
@@ -135,6 +135,43 @@ function construirMensaje({ row, pantallas, ofertas, combo, porPantalla, identif
   ].filter(Boolean).join('\n\n')
 }
 
+// Motivo por el que una pantalla del cliente NO está al día
+function motivoPendiente(p) {
+  if (p.debe) return { label: 'Debe', bg: '#fef3c7', text: '#b45309' }
+  if (p.dias == null || p.dias <= 0) return { label: 'Vencida', bg: '#fee2e2', text: '#b91c1c' }
+  return { label: 'Sin pago', bg: '#f1f5f9', text: '#475569' }
+}
+
+// Interruptor tipo píldora (fuera del área capturada como imagen)
+function Interruptor({ activo, onClick, icon: Icon, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activo}
+      className={cn(
+        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors',
+        activo
+          ? 'bg-orange-50 border-orange-300 text-orange-700'
+          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+      )}
+    >
+      <Icon size={12} /> {children}
+    </button>
+  )
+}
+
+// Línea secundaria con cuenta padre / contraseña de una pantalla
+function CredencialesLinea({ cuenta, password, mostrarCuenta, mostrarPassword }) {
+  if (!mostrarCuenta && !mostrarPassword) return null
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500" style={{ fontFamily: 'ui-monospace,monospace' }}>
+      {mostrarCuenta && <span>Cuenta: {cuenta || '—'}</span>}
+      {mostrarPassword && <span>Clave: {password || '—'}</span>}
+    </div>
+  )
+}
+
 function FilaCampo({ label, children, doble = false }) {
   return (
     <div className={doble ? '' : 'flex items-center justify-between gap-3'} style={{ padding: '5px 0', borderBottom: '1px solid #f1f5f9' }}>
@@ -157,6 +194,18 @@ export function ComprobanteModal({ row, onClose }) {
   const [cargando, setCargando] = useState(true)
   const [copiado, setCopiado] = useState(false)
   const [trabajando, setTrabajando] = useState(false)
+  // Personalización del comprobante (no se guarda: es por envío)
+  const [ocultas, setOcultas] = useState(() => new Set())
+  const [mostrarCuenta, setMostrarCuenta] = useState(false)
+  const [mostrarPassword, setMostrarPassword] = useState(false)
+  const toggleOculta = (id) => {
+    setCopiado(false)
+    setOcultas(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     let vivo = true
@@ -287,18 +336,17 @@ export function ComprobanteModal({ row, onClose }) {
   const alertaCss = chipStyle(row.alertaReal)
   const dias = diasRestantesDe(row)
 
-  // Comprobante consolidado: si el cliente tiene 2+ pantallas AL DÍA (fecha
-  // vigente, sin deuda y con pago registrado) el precio pasa a ser la suma de
-  // los últimos pagos de esas pantallas, con el detalle por pantalla.
-  const pantallasAlDia = pantallasDetalle.filter(p => p.alDia)
+  // Cliente con varias cuentas: el comprobante lista las pantallas AL DÍA
+  // (fecha vigente, sin deuda y con pago registrado) y las VENCIDAS /
+  // pendientes. El admin puede ocultar cuentas antes de copiar/enviar; el
+  // precio total es la suma de los últimos pagos de las pantallas al día
+  // VISIBLES (si quedan 2+), si no, el último pago de esta pantalla.
+  const multiCuenta = pantallasDetalle.length >= 2
+  const visibles = pantallasDetalle.filter(p => !ocultas.has(p.idPantalla))
+  const pantallasAlDia = visibles.filter(p => p.alDia)
+  const pantallasPendientes = visibles.filter(p => !p.alDia)
   const consolidado = pantallasAlDia.length >= 2
   const sumaAlDia = pantallasAlDia.reduce((s, p) => s + (Number(p.pago?.precioVenta) || 0), 0)
-  const pantallasExcluidas = consolidado ? pantallasDetalle.filter(p => !p.alDia) : []
-  const motivoExclusion = (p) => {
-    if (p.debe) return 'debe'
-    if (p.dias == null || p.dias <= 0) return 'vencida'
-    return 'sin pago'
-  }
 
   return (
     <div
@@ -408,6 +456,65 @@ export function ComprobanteModal({ row, onClose }) {
           </>
         ) : (
           <>
+            {/* ── Personalizar (fuera del área capturada) ── */}
+            <div className="rounded-xl bg-white border border-slate-200 p-3 mb-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                <SlidersHorizontal size={12} /> Personalizar comprobante
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <Interruptor activo={mostrarCuenta} onClick={() => { setMostrarCuenta(v => !v); setCopiado(false) }} icon={Building2}>
+                  Cuenta padre
+                </Interruptor>
+                <Interruptor activo={mostrarPassword} onClick={() => { setMostrarPassword(v => !v); setCopiado(false) }} icon={KeyRound}>
+                  Contraseña
+                </Interruptor>
+              </div>
+              {(mostrarCuenta || mostrarPassword) && (
+                <p className="text-[10px] text-amber-700 mt-1.5">Ojo: la imagen incluirá estos datos de acceso.</p>
+              )}
+
+              {multiCuenta && !cargando && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Cuentas del cliente ({pantallasDetalle.length}) · toca para ocultar
+                    </p>
+                    {ocultas.size > 0 && (
+                      <button type="button" onClick={() => { setOcultas(new Set()); setCopiado(false) }} className="shrink-0 whitespace-nowrap text-[10px] font-semibold text-orange-600 hover:underline">
+                        Mostrar todas
+                      </button>
+                    )}
+                  </div>
+                  <ul className="space-y-1">
+                    {pantallasDetalle.map(p => {
+                      const oculta = ocultas.has(p.idPantalla)
+                      const chip = p.alDia ? { label: 'Al día', bg: '#dcfce7', text: '#15803d' } : motivoPendiente(p)
+                      return (
+                        <li key={p.idPantalla}>
+                          <button
+                            type="button"
+                            onClick={() => toggleOculta(p.idPantalla)}
+                            aria-pressed={!oculta}
+                            aria-label={`${oculta ? 'Mostrar' : 'Ocultar'} ${p.nickname} en el comprobante`}
+                            className={cn(
+                              'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-colors',
+                              oculta ? 'border-dashed border-slate-200 bg-slate-50 opacity-60' : 'border-slate-200 bg-white hover:bg-slate-50'
+                            )}
+                          >
+                            {oculta ? <EyeOff size={13} className="text-slate-400 shrink-0" /> : <Eye size={13} className="text-orange-500 shrink-0" />}
+                            <span className={cn('text-[11px] font-semibold truncate flex-1', oculta ? 'line-through text-slate-400' : 'text-slate-700')}>
+                              {p.nickname}{p.idPantalla === row.idPantalla ? ' (esta)' : ''}
+                            </span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: chip.bg, color: chip.text }}>{chip.label}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+
             {/* ── El comprobante (área que se captura como imagen) ── */}
             <div ref={receiptRef} className="rounded-xl overflow-hidden shadow-sm" style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", background: '#ffffff' }}>
               <div className="px-5 py-4 text-white" style={{ background: 'linear-gradient(135deg,#f97316,#ea580c)' }}>
@@ -438,6 +545,16 @@ export function ComprobanteModal({ row, onClose }) {
                 <FilaCampo label="Nickname">
                   <span className="text-sm font-bold text-slate-800" style={{ fontFamily: 'ui-monospace,monospace' }}>{row.nickname || '—'}</span>
                 </FilaCampo>
+                {mostrarCuenta && (
+                  <FilaCampo label="Cuenta padre">
+                    <span className="text-xs font-semibold text-slate-700 truncate" style={{ fontFamily: 'ui-monospace,monospace' }}>{row.cuenta || row.cuentaId || '—'}</span>
+                  </FilaCampo>
+                )}
+                {mostrarPassword && (
+                  <FilaCampo label="Contraseña">
+                    <span className="text-xs font-semibold text-slate-700" style={{ fontFamily: 'ui-monospace,monospace' }}>{row.password || '—'}</span>
+                  </FilaCampo>
+                )}
                 <FilaCampo label="Tipo Plan">
                   <span className="text-sm font-bold" style={{ color: '#c2410c' }}>{cargando ? '…' : tipoPlanDe(row, pago)}</span>
                 </FilaCampo>
@@ -458,19 +575,42 @@ export function ComprobanteModal({ row, onClose }) {
                 </FilaCampo>
               </div>
 
-              {/* Detalle por pantalla cuando el cliente tiene 2+ pantallas al día */}
-              {!cargando && consolidado && (
+              {/* Cliente con varias cuentas: pantallas al día y vencidas/pendientes (solo las visibles) */}
+              {!cargando && multiCuenta && pantallasAlDia.length > 0 && (
                 <div className="mx-5 mt-2 pt-2" style={{ borderTop: '1px solid #f1f5f9' }}>
-                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                    Pantallas al día del cliente ({pantallasAlDia.length})
+                  <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: '#15803d' }}>
+                    Pantallas al día ({pantallasAlDia.length})
                   </p>
                   {pantallasAlDia.map(p => (
-                    <div key={p.idPantalla} className="flex items-center justify-between gap-2" style={{ padding: '3px 0' }}>
-                      <span className="text-[11px] font-semibold text-slate-700 truncate" style={{ fontFamily: 'ui-monospace,monospace' }}>{p.nickname}</span>
-                      <span className="text-[10px] text-slate-400 whitespace-nowrap">vence {formatDate(p.finPlan)}</span>
-                      <span className="text-[11px] font-bold text-slate-800 whitespace-nowrap">{formatCurrency(p.pago?.precioVenta)}</span>
+                    <div key={p.idPantalla} style={{ padding: '3px 0' }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-slate-700 truncate" style={{ fontFamily: 'ui-monospace,monospace' }}>{p.nickname}</span>
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap">vence {formatDate(p.finPlan)}</span>
+                        <span className="text-[11px] font-bold text-slate-800 whitespace-nowrap">{formatCurrency(p.pago?.precioVenta)}</span>
+                      </div>
+                      <CredencialesLinea cuenta={p.cuenta || p.cuentaId} password={p.password} mostrarCuenta={mostrarCuenta} mostrarPassword={mostrarPassword} />
                     </div>
                   ))}
+                </div>
+              )}
+              {!cargando && multiCuenta && pantallasPendientes.length > 0 && (
+                <div className="mx-5 mt-2 pt-2" style={{ borderTop: '1px solid #f1f5f9' }}>
+                  <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: '#b91c1c' }}>
+                    Pantallas vencidas / pendientes ({pantallasPendientes.length})
+                  </p>
+                  {pantallasPendientes.map(p => {
+                    const m = motivoPendiente(p)
+                    return (
+                      <div key={p.idPantalla} style={{ padding: '3px 0' }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-semibold text-slate-700 truncate" style={{ fontFamily: 'ui-monospace,monospace' }}>{p.nickname}</span>
+                          <span className="text-[10px] text-slate-400 whitespace-nowrap">{p.finPlan ? `${p.dias != null && p.dias <= 0 ? 'venció' : 'vence'} ${formatDate(p.finPlan)}` : 'sin fecha'}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: m.bg, color: m.text }}>{m.label}</span>
+                        </div>
+                        <CredencialesLinea cuenta={p.cuenta || p.cuentaId} password={p.password} mostrarCuenta={mostrarCuenta} mostrarPassword={mostrarPassword} />
+                      </div>
+                    )
+                  })}
                 </div>
               )}
 
@@ -491,9 +631,9 @@ export function ComprobanteModal({ row, onClose }) {
                     : pago?.precioVenta != null ? formatCurrency(pago.precioVenta) : '—'}
                 </span>
               </div>
-              {!cargando && consolidado && pantallasExcluidas.length > 0 && (
+              {!cargando && consolidado && pantallasPendientes.length > 0 && (
                 <p className="px-5 pb-1 text-[10px]" style={{ color: '#b45309' }}>
-                  No incluidas: {pantallasExcluidas.map(p => `${p.nickname} (${motivoExclusion(p)})`).join(' · ')}
+                  El total solo suma las pantallas al día.
                 </p>
               )}
               {!cargando && !consolidado && !pago && (
