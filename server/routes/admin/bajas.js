@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Client, Planificador, Baja, Venta } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { conCuentaPadre } = require('../../services/cuentaPadreDatos');
 const { importFromExcel } = require('../../services/planificadorImportService');
 const { Op } = require('sequelize');
 
@@ -30,7 +31,8 @@ router.get('/bajas/nicknames', asyncHandler(async (_req, res) => {
     await importFromExcel();
   }
 
-  const pantallas = await Planificador.findAll({ raw: true });
+  // Usuario IPTV de cada pantalla: el de su cuenta padre (única fuente)
+  const pantallas = await conCuentaPadre(await Planificador.findAll({ raw: true }));
   console.log(`[NICKNAMES] Planificador: ${pantallas.length} registros`);
 
   // Bajas históricas para enriquecer datos

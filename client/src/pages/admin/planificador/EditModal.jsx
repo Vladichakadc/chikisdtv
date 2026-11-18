@@ -412,7 +412,7 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
             icon={KeyRound}
             title="CUENTA"
             tone="blue"
-            aside={<span className="text-[11px] text-gray-400">Los cambios solo afectan a la pantalla <strong>{row.idPantalla}</strong></span>}
+            aside={<span className="text-[11px] text-gray-400">Datos de la cuenta padre <strong>{form.cuentaId || row.cuentaId}</strong>: aplican a todas sus pantallas</span>}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Usuario IPTV">

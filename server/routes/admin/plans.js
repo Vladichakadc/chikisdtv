@@ -3,6 +3,7 @@ const router = express.Router();
 const { Plan, Venta, Planificador, CostoPantalla } = require('../../models');
 const { getPeriodoActual } = require('../../utils/dateUtils');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { conCuentaPadre } = require('../../services/cuentaPadreDatos');
 
 // ============ PLANS CRUD ============
 router.get('/plans', asyncHandler(async (_req, res) => {
@@ -38,9 +39,9 @@ router.get('/plans/performance', asyncHandler(async (_req, res) => {
       raw: true,
     }),
     Planificador.findAll({
-      attributes: ['idPantalla', 'pantallas', 'finalizacion', 'duracionReal', 'debe', 'montoDebe', 'customerId'],
+      attributes: ['idPantalla', 'cuentaId', 'pantallas', 'finalizacion', 'duracionReal', 'debe', 'montoDebe', 'customerId'],
       raw: true,
-    }),
+    }).then(filas => conCuentaPadre(filas)), // fin de cuenta desde Cuentas Padre
     Plan.findAll({ raw: true }),
     CostoPantalla.findAll({ attributes: ['anio', 'costoPantallaCOP', 'itemQuantity', 'fecha', 'trm'], raw: true }),
   ]);

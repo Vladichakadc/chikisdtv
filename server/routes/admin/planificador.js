@@ -3,11 +3,12 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const { Planificador, CuentaPadre, Venta, Client, Plan, Recordatorio, AccesoCredencial, TablaCliente, PlanificadorCambio } = require('../../models');
-const { registrarCambio, presentar, deshacerCambio, deshacerLote, nuevoLote, ConflictoDeshacer } = require('../../services/historialPlanificador');
+const { registrarCambio, presentar, deshacerCambio, deshacerLote, ConflictoDeshacer } = require('../../services/historialPlanificador');
 const { registrarRenovacion, inicioSugerido, ErrorRenovacion } = require('../../services/renovacionService');
+const { conCuentaPadre, guardarDatosCuenta, mapaCuentas } = require('../../services/cuentaPadreDatos');
 const { buscarUltimosPagos } = require('../../utils/ultimosPagos');
 const asyncHandler = require('../../middleware/asyncHandler');
-const { importFromExcel, autoFixCuentaIdMismatches, ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
+const { importFromExcel, autoFixCuentaIdMismatches } = require('../../services/planificadorImportService');
 const { autoImportarSiDisponible } = require('../../utils/excelOrigen');
 // Reglas únicas de estado (ver utils/planificadorAlerta.js): la alerta se
 // recalcula según la fecha vigente y la cortesía es la columna `cortesia`.
@@ -45,14 +46,6 @@ function sinPassword(p) {
   if (!p) return p;
   const { password, ...resto } = p;
   return { ...resto, tienePassword: !!password };
-}
-
-// En el diff de sincronización con Cuentas Padre solo se indica QUE cambió la
-// contraseña, sin exponer el valor anterior ni el nuevo.
-function enmascararCambios(cambios = []) {
-  return cambios.map(c => (c.campo === 'password'
-    ? { ...c, antes: c.antes ? '••••••' : c.antes, despues: c.despues ? '••••••' : c.despues }
-    : c));
 }
 
 async function registrarAccesoCredencial(req, motivo, idPantallas) {
@@ -264,10 +257,12 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
   const count = await Planificador.count();
   if (count === 0) await autoImportarSiDisponible(importFromExcel);
   const records = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
-  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
+  // Datos de cuenta (usuario, crédito, fechas) desde Cuentas Padre: única fuente
+  const cuentas = await mapaCuentas();
+  const pantallas = (await conCuentaPadre(records.map(r => r.toJSON()), { cuentas })).map(enrichPantalla);
 
   // ── Cuentas Padre: estado en tiempo real ────────────────────────────────
-  const cps = await CuentaPadre.findAll();
+  const cps = [...cuentas.values()];
   const cpMap = Object.fromEntries(cps.map(cp => [String(cp.cuentaId).trim(), cp]));
 
   const cuentasPadreStatus = cps.map(cp => {
@@ -308,33 +303,12 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
     };
   }).sort((a, b) => a.cuentaId.localeCompare(b.cuentaId));
 
-  // ── Sync pendiente: alguna CP tiene datos distintos a los del Planificador
-  const planSnapshot = await Planificador.findAll({
-    attributes: ['cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion'],
-    raw: true,
-  });
-  const planMap = {};
-  planSnapshot.forEach(r => { if (!planMap[r.cuentaId]) planMap[r.cuentaId] = r; });
-  const syncPendiente = cps.some(cp => {
-    const plan = planMap[String(cp.cuentaId).trim()];
-    if (!plan) return false;
-    const newVals = {
-      cuenta:       cp.nombreUsuario || null,
-      password:     cp.contrasena    || null,
-      credito:      cp.credito       ?? null,
-      inicio:       cp.fechaInicio   || null,
-      finalizacion: cp.fechaFin      || null,
-    };
-    return SYNC_FIELDS.some(f => syncFieldChanged(newVals[f], plan[f], f === 'credito'));
-  });
-
   res.json({
     diasAlerta: DIAS_ALERTA,
     pantallas: pantallas.map(sinPassword),
     inconsistencias:     findCuentaIdMismatches(pantallas),
     cuentasPadreStatus,
     capacidadPorCuenta,
-    syncPendiente,
   });
 }));
 
@@ -363,6 +337,9 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
       })
     : [];
 
+  // Usuario IPTV de cada pantalla: el de su cuenta padre
+  const filasCuenta = await conCuentaPadre(filas);
+  filas.forEach((f, i) => { f.cuenta = filasCuenta[i].cuenta; });
   const objetivo = { idPantalla, customerId, nickname };
   const pagos = await buscarUltimosPagos([objetivo, ...filas]);
   const pago = pagos.get(idPantalla || `nick:${nickname}`) || null;
@@ -426,7 +403,9 @@ router.post('/planificador/credenciales', asyncHandler(async (req, res) => {
   if (ids.length > 1000) return res.status(400).json({ error: 'Máximo 1000 pantallas por solicitud.' });
   if (!MOTIVOS_CREDENCIAL.has(motivo)) return res.status(400).json({ error: 'Motivo de acceso no válido.' });
 
-  const filas = await Planificador.findAll({ where: { idPantalla: { [Op.in]: ids } }, attributes: ['idPantalla', 'password'], raw: true });
+  // La contraseña vive (cifrada) en Cuentas Padre; la columna del Planificador
+  // es solo respaldo para pantallas cuya cuenta no está en Cuentas Padre.
+  const filas = await conCuentaPadre(await Planificador.findAll({ where: { idPantalla: { [Op.in]: ids } }, attributes: ['idPantalla', 'cuentaId', 'password'], raw: true }));
   await registrarAccesoCredencial(req, motivo, filas.map(f => f.idPantalla));
   res.json({ credenciales: Object.fromEntries(filas.map(f => [f.idPantalla, f.password || ''])) });
 }));
@@ -601,65 +580,13 @@ router.get('/planificador/export', asyncHandler(async (req, res) => {
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   // El Excel incluye contraseñas: queda constancia en la bitácora
   await registrarAccesoCredencial(req, 'exportar_excel', records.map(r => r.idPantalla));
-  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
+  const pantallas = (await conCuentaPadre(records.map(r => r.toJSON()))).map(enrichPantalla);
   const workbook  = buildPlanificadorWorkbook(pantallas);
   const fecha = new Date().toISOString().split('T')[0];
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="Planificador_${fecha}.xlsx"`);
   await workbook.xlsx.write(res);
   res.end();
-}));
-
-// GET /planificador/sync-preview — diff de lo que cambiaría al sincronizar (sin aplicar cambios)
-router.get('/planificador/sync-preview', asyncHandler(async (_req, res) => {
-  const cuentas = await CuentaPadre.findAll();
-  const cuentaMap = Object.fromEntries(cuentas.map(c => [String(c.cuentaId).trim(), c]));
-
-  const planSnapshot = await Planificador.findAll({
-    attributes: ['cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion'],
-    raw: true,
-  });
-  const beforeMap = {};
-  const countMap  = {};
-  planSnapshot.forEach(r => {
-    if (!beforeMap[r.cuentaId]) beforeMap[r.cuentaId] = r;
-    countMap[r.cuentaId] = (countMap[r.cuentaId] || 0) + 1;
-  });
-
-  const diff = Object.entries(cuentaMap).map(([cuentaId, cp]) => {
-    const newVals = {
-      cuenta:       cp.nombreUsuario || null,
-      password:     cp.contrasena    || null,
-      credito:      cp.credito       ?? null,
-      inicio:       cp.fechaInicio   || null,
-      finalizacion: cp.fechaFin      || null,
-    };
-    const before    = beforeMap[cuentaId];
-    const count     = countMap[cuentaId] || 0;
-    const diasAlFin = calcDiasDB(cp.fechaFin);
-
-    if (count === 0) {
-      return { cuentaId, cuenta: cp.nombreUsuario || null, estado: cp.estado || null, diasAlFin, status: 'sin_pantallas', pantallasAfectadas: 0, cambios: [] };
-    }
-    const cambios = SYNC_FIELDS.flatMap(f => {
-      const oldVal = before ? (before[f] ?? null) : null;
-      const newVal = newVals[f] ?? null;
-      return syncFieldChanged(newVal, oldVal, f === 'credito')
-        ? [{ campo: f, antes: oldVal, despues: newVal }]
-        : [];
-    });
-    return {
-      cuentaId,
-      cuenta:             cp.nombreUsuario || null,
-      estado:             cp.estado || null,
-      diasAlFin,
-      status:             cambios.length > 0 ? 'actualizada' : 'sin_cambio',
-      pantallasAfectadas: count,
-      cambios,
-    };
-  });
-
-  res.json({ diff: diff.map(d => ({ ...d, cambios: enmascararCambios(d.cambios) })), totalConCambios: diff.filter(d => d.status === 'actualizada').length });
 }));
 
 // POST /planificador — crea una pantalla adicional dentro de una cuenta padre
@@ -675,21 +602,16 @@ router.post('/planificador', asyncHandler(async (req, res) => {
   const conflict = await Planificador.findByPk(idPantalla);
   if (conflict) return res.status(409).json({ error: `Ya existe una pantalla con el ID "${idPantalla}". Elige otro.` });
 
-  // El bloque CUENTA se hereda de una pantalla hermana o, en su defecto, de la CuentaPadre
-  const hermana = await Planificador.findOne({ where: { cuentaId } });
-  const cp      = await CuentaPadre.findOne({ where: { cuentaId } });
-  const base = hermana ? {
+  // Los datos de cuenta salen de Cuentas Padre (no se copian). Solo si la cuenta
+  // no existe allí se heredan de una pantalla hermana (respaldo legado).
+  const cp      = await CuentaPadre.findByPk(cuentaId);
+  const hermana = cp ? null : await Planificador.findOne({ where: { cuentaId } });
+  const base = cp ? {} : hermana ? {
     cuenta:       hermana.cuenta,
     password:     hermana.password,
     credito:      hermana.credito,
     inicio:       hermana.inicio,
     finalizacion: hermana.finalizacion,
-  } : cp ? {
-    cuenta:       cp.nombreUsuario || null,
-    password:     cp.contrasena    || null,
-    credito:      cp.credito       ?? null,
-    inicio:       cp.fechaInicio   || null,
-    finalizacion: cp.fechaFin      || null,
   } : null;
   if (!base) return res.status(404).json({ error: `No existe la cuenta padre "${cuentaId}" ni pantallas registradas en ella.` });
 
@@ -702,7 +624,7 @@ router.post('/planificador', asyncHandler(async (req, res) => {
     debe:      false,
   });
   await registrarCambio({ accion: 'crear', idPantalla, antes: null, despues: record, usuarioEmail: req.user?.email });
-  res.status(201).json(sinPassword(enrichPantalla(record.toJSON())));
+  res.status(201).json(sinPassword(enrichPantalla(await conCuentaPadre(record.toJSON()))));
 }));
 
 // PUT /planificador/:idPantalla — actualiza un registro
@@ -712,11 +634,13 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   const pantalla = await Planificador.findByPk(idPantalla);
   if (!pantalla) return res.status(404).json({ error: 'Pantalla no encontrada' });
 
-  const STRING_FIELDS = ['cuenta', 'password', 'nombre', 'apellido', 'customerId', 'nickname', 'tipoPlan'];
-  const FLOAT_FIELDS = ['credito', 'porcentaje', 'montoDebe', 'montoDebeUSD'];
+  // Usuario IPTV, contraseña, crédito y fechas de la CUENTA no se guardan aquí:
+  // van a Cuentas Padre (abajo) y aplican a todas las pantallas de esa cuenta.
+  const STRING_FIELDS = ['nombre', 'apellido', 'customerId', 'nickname', 'tipoPlan'];
+  const FLOAT_FIELDS = ['porcentaje', 'montoDebe', 'montoDebeUSD'];
   // duracionPlan se guarda como meses enteros (el Excel de origen traía días/30 con decimales)
   const INT_FIELDS = ['pantallas', 'duracionPlan'];
-  const DATE_FIELDS = ['inicio', 'finalizacion', 'inicioReal', 'duracionReal'];
+  const DATE_FIELDS = ['inicioReal', 'duracionReal'];
   const EDITABLE_FIELDS = [...STRING_FIELDS, ...FLOAT_FIELDS, ...INT_FIELDS, ...DATE_FIELDS, 'debe'];
 
   const update = {};
@@ -759,13 +683,15 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   if (Object.keys(update).length > 0) {
     await Planificador.update(update, { where: { idPantalla } });
   }
+  // Datos de la cuenta → Cuentas Padre (de la cuenta final si se reasignó)
+  const camposCuenta = await guardarDatosCuenta(update.cuentaId || pantalla.cuentaId, req.body);
   // Al mover la pantalla de cuenta o de slot se re-alinea cuentaId (antes lo
   // hacía la siguiente carga del Planificador)
   if (update.cuentaId || update.idPantalla) await autoFixCuentaIdMismatches();
 
   const updated = await Planificador.findByPk(finalId);
   await registrarCambio({ accion: 'editar', idPantalla, antes: pantalla, despues: updated, usuarioEmail: req.user?.email });
-  res.json(sinPassword(enrichPantalla(updated.toJSON())));
+  res.json({ ...sinPassword(enrichPantalla(await conCuentaPadre(updated.toJSON()))), cuentaPadreActualizada: camposCuenta });
 }));
 
 // DELETE /planificador/:idPantalla — elimina un registro
@@ -778,135 +704,6 @@ router.delete('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   res.json({ message: `Pantalla ${idPantalla} eliminada`, cambioId: cambio?.id ?? null });
 }));
 
-
-const SYNC_FIELDS = ['cuenta', 'password', 'credito', 'inicio', 'finalizacion'];
-
-function syncFieldChanged(nv, ov, isNum) {
-  const a = nv ?? null;
-  const b = ov ?? null;
-  if (a === null && b === null) return false;
-  if (a === null || b === null) return true;
-  return isNum ? Number(a) !== Number(b) : String(a).trim() !== String(b).trim();
-}
-
-// POST /planificador/sync-cuentas-padre — sincroniza datos de cuenta desde Cuentas Padre
-// y devuelve un diff por cuenta con los campos que cambiaron.
-router.post('/planificador/sync-cuentas-padre', asyncHandler(async (req, res) => {
-  const cuentas = await CuentaPadre.findAll();
-  if (cuentas.length === 0)
-    return res.status(404).json({ error: 'No hay cuentas padre en la base de datos' });
-
-  const cuentaMap = {};
-  cuentas.forEach(c => { cuentaMap[String(c.cuentaId).trim()] = c; });
-
-  // Cuentas padre sin pantallas en el Planificador → se crean libres antes del
-  // snapshot, así el diff las reporta como 'creada' (y "Deshacer" las elimina).
-  const creadas = new Set(await ensurePantallasCuentasPadre());
-
-  // Historial: toda la sincronización queda como un lote que se deshace junto
-  const lote = nuevoLote();
-  const fotoAntes = await Planificador.findAll({ raw: true });
-  for (const f of fotoAntes) {
-    if (creadas.has(String(f.cuentaId).trim())) {
-      await registrarCambio({ accion: 'crear', idPantalla: f.idPantalla, antes: null, despues: f, lote, usuarioEmail: req.user?.email });
-    }
-  }
-
-  // Snapshot previo: una fila representativa por cuentaId (todas las pantallas de
-  // la misma cuenta comparten los mismos campos de cuenta/password/credito/inicio/fin)
-  const allBefore = await Planificador.findAll({
-    attributes: ['cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion'],
-    raw: true,
-  });
-  const beforeMap = {};
-  allBefore.forEach(r => { if (!beforeMap[r.cuentaId]) beforeMap[r.cuentaId] = r; });
-
-  let updatedScreens = 0;
-  let updatedGroups  = 0;
-  let skipped        = 0;
-  const diff = [];
-
-  for (const [cuentaId, cp] of Object.entries(cuentaMap)) {
-    const newVals = {
-      cuenta:       cp.nombreUsuario || null,
-      password:     cp.contrasena    || null,
-      credito:      cp.credito       ?? null,
-      inicio:       cp.fechaInicio   || null,
-      finalizacion: cp.fechaFin      || null,
-    };
-
-    const [affectedCount] = await Planificador.update(newVals, { where: { cuentaId } });
-
-    const estadoCuenta = cp.estado || null;
-    const diasAlFin    = calcDiasDB(cp.fechaFin);
-
-    if (affectedCount === 0) {
-      skipped++;
-      diff.push({ cuentaId, cuenta: cp.nombreUsuario || null, estado: estadoCuenta, diasAlFin, status: 'sin_pantallas', pantallasAfectadas: 0, cambios: [] });
-      continue;
-    }
-
-    updatedScreens += affectedCount;
-    updatedGroups++;
-
-    const before = beforeMap[cuentaId];
-    const cambios = [];
-    for (const campo of SYNC_FIELDS) {
-      const oldVal = before ? (before[campo] ?? null) : null;
-      const newVal = newVals[campo] ?? null;
-      if (syncFieldChanged(newVal, oldVal, campo === 'credito')) {
-        cambios.push({ campo, antes: oldVal, despues: newVal });
-      }
-    }
-
-    diff.push({
-      cuentaId,
-      cuenta: cp.nombreUsuario || null,
-      estado: estadoCuenta,
-      diasAlFin,
-      status: creadas.has(cuentaId) ? 'creada' : cambios.length > 0 ? 'actualizada' : 'sin_cambio',
-      pantallasAfectadas: affectedCount,
-      cambios,
-    });
-  }
-
-  const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
-  const antesPorId = Object.fromEntries(fotoAntes.map(f => [f.idPantalla, f]));
-  for (const r of records) {
-    const antes = antesPorId[r.idPantalla];
-    if (antes && !creadas.has(String(antes.cuentaId).trim())) {
-      await registrarCambio({ accion: 'sincronizar', idPantalla: r.idPantalla, antes, despues: r, lote, usuarioEmail: req.user?.email });
-    }
-  }
-  const huboCambios = await PlanificadorCambio.count({ where: { lote } });
-  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-  const inconsistencias = findCuentaIdMismatches(pantallas);
-
-  const conCambios  = diff.filter(d => d.status === 'actualizada').length;
-  const sinCambioN  = diff.filter(d => d.status === 'sin_cambio').length;
-
-  const parts = [`${updatedGroups} cuenta(s) · ${updatedScreens} pantalla(s) actualizadas`];
-  if (creadas.size > 0) parts.push(`${creadas.size} cuenta(s) nueva(s) agregada(s)`);
-  if (conCambios > 0)  parts.push(`${conCambios} con cambios`);
-  if (sinCambioN > 0)  parts.push(`${sinCambioN} sin cambio`);
-  if (skipped > 0)     parts.push(`${skipped} sin pantallas`);
-  if (inconsistencias.length > 0) parts.push(`${inconsistencias.length} ID desalineado`);
-
-  res.json({
-    message: parts.join(' · '),
-    updatedGroups,
-    updatedScreens,
-    conCambios,
-    sinCambio: sinCambioN,
-    sinPantallas: skipped,
-    creadas: creadas.size,
-    diff: diff.map(d => ({ ...d, cambios: enmascararCambios(d.cambios) })),
-    diasAlerta: DIAS_ALERTA,
-    pantallas: pantallas.map(sinPassword),
-    inconsistencias,
-    lote: huboCambios ? lote : null,
-  });
-}));
 
 // POST /planificador/import — fuerza re-importación desde Excel (sobrescribe DB)
 // importFromExcel() aplica autofix internamente tras el import.
