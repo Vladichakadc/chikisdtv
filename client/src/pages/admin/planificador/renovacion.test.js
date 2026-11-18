@@ -203,3 +203,33 @@ describe('registrar renovación: sugerencias del formulario', () => {
     expect(inicioSugerido(null, '2026-11-18')).toBe('2026-11-18')
   })
 })
+
+import { datosPagoSugeridos } from './renovacion'
+import { tipoFireDeSku } from '../../../config/equipos'
+
+describe('datos del pago sugeridos (renovación)', () => {
+  const ultimo = { sku: '0014K', tipoFire: 'Fire TV 4K', cortesia: 'NO', tipoPantalla: 'Final', pantallas: 1 }
+  it('SKU, equipo y cortesía del último pago; Tipo Pantalla del Tipo Cliente', () => {
+    expect(datosPagoSugeridos({ pantallas: 1 }, ultimo, 'Individual')).toEqual({
+      sku: '0014K', tipoFire: 'Fire TV 4K', estado: 'Activo', cortesia: 'NO',
+      pantallas: 1, itemQuantity: 1, tipoPantalla: 'Individual', cuentaDedicada: 'NO',
+    })
+  })
+  it('sin Tipo Cliente usa el del último pago; 3 pantallas → cuenta dedicada SI', () => {
+    const d = datosPagoSugeridos({ pantallas: 3 }, ultimo, null)
+    expect(d.tipoPantalla).toBe('Final')
+    expect(d.cuentaDedicada).toBe('SI')
+  })
+  it('sin pagos previos queda vacío lo que no se puede inferir', () => {
+    const d = datosPagoSugeridos({ pantallas: 2 }, null, null)
+    expect(d.sku).toBe('')
+    expect(d.tipoFire).toBe('')
+    expect(d.cortesia).toBe('NO')
+    expect(d.cuentaDedicada).toBe('NO')
+  })
+  it('equipo según el SKU: fijo conocido o el último registrado', () => {
+    expect(tipoFireDeSku('ONN4KO')).toBe('Watch ONN 4K Original')
+    expect(tipoFireDeSku('0014K', { '0014K': 'Fire TV 4K' })).toBe('Fire TV 4K')
+    expect(tipoFireDeSku('', {})).toBe('')
+  })
+})

@@ -14,7 +14,7 @@ process.env.DATABASE_PATH = path.join(dir, 'test.sqlite');
 
 const express = require('express');
 const sequelize = require('../config/database');
-const { Planificador, CuentaPadre, Venta, AccesoCredencial, PlanificadorCambio } = require('../models');
+const { Planificador, CuentaPadre, Venta, AccesoCredencial, PlanificadorCambio, TablaCliente } = require('../models');
 const { migrarCredenciales } = require('../services/migrarCredenciales');
 const { daysFromNow, todayStr } = require('../utils/dateUtils');
 
@@ -35,7 +35,8 @@ before(async () => {
     { idPantalla: 'M001-1', cuentaId: 'M001', cuenta: 'usuario_VIEJO', password: 'copia_vieja', credito: 1, nombre: 'Ana', customerId: '100', nickname: 'Ana 1', pantallas: 1, duracionReal: daysFromNow(-5) },
     { idPantalla: 'M001-2', cuentaId: 'M001', cuenta: 'usuario_VIEJO', password: 'copia_vieja', credito: 1, nombre: 'Ana', customerId: '100', nickname: 'Ana 2', pantallas: 1, duracionReal: daysFromNow(20) },
   ]);
-  await Venta.create({ idVM: 'VM100', idPantalla: 'M001-1', customerId: '100', nickname: 'Ana 1', fecha: '2026-10-01', precioVenta: 15000, tipoPlan: 'Plan Mensual', medioPago: 'Nequi' });
+  await Venta.create({ idVM: 'VM100', idPantalla: 'M001-1', customerId: '100', nickname: 'Ana 1', fecha: '2026-10-01', precioVenta: 15000, tipoPlan: 'Plan Mensual', medioPago: 'Nequi', sku: '0014K', tipoFire: 'Fire TV 4K', cortesia: 'NO', tipoPantalla: 'Final' });
+  await TablaCliente.create({ customerId: '100', nombre: 'Ana', tipoCliente: 'Individual', pais: 'Colombia' });
 
   const app = express();
   app.use(express.json());
@@ -140,6 +141,37 @@ describe('renovación por la API', () => {
     assert.ok(!('password' in r.body.pantalla));
     assert.equal(await Venta.count(), 2);
     assert.equal((await PlanificadorCambio.findOne({ order: [['id', 'DESC']] })).accion, 'renovar');
+  });
+  test('datos del pago: SKU y equipo del último pago, Tipo Pantalla de Tabla Clientes', async () => {
+    const v = await Venta.findOne({ where: { tipoPago: 'Renovacion' }, order: [['createdAt', 'DESC']] });
+    assert.equal(v.sku, '0014K');
+    assert.equal(v.tipoFire, 'Fire TV 4K');
+    assert.equal(v.tipoPantalla, 'Individual');
+    assert.equal(v.cuentaDedicada, 'NO');
+    assert.equal(v.estado, 'Activo');
+    assert.equal(v.itemQuantity, 1);
+  });
+  test('lo que envía el formulario manda sobre lo sugerido (y el mes facturado)', async () => {
+    const r = await api('POST', '/planificador/M001-2/renovar', {
+      fecha: todayStr(), tipoPlan: 'Plan Mensual', meses: 1, precioVenta: 15000,
+      sku: '0024KMAX', tipoFire: 'Fire TV 4KMAX', cuentaDedicada: 'SI', tipoPantalla: 'Revendedor', mes: 'Enero',
+    });
+    assert.equal(r.status, 201);
+    assert.equal(r.body.venta.sku, '0024KMAX');
+    assert.equal(r.body.venta.tipoFire, 'Fire TV 4KMAX');
+    assert.equal(r.body.venta.cuentaDedicada, 'SI');
+    assert.equal(r.body.venta.tipoPantalla, 'Revendedor');
+    assert.equal(r.body.venta.mes, 'Enero');
+  });
+  test('opciones del formulario incluyen SKUs y el equipo por SKU', async () => {
+    const r = await api('GET', '/planificador/renovar/opciones');
+    assert.ok(r.body.skus.includes('0014K'));
+    assert.equal(r.body.tipoFirePorSku['0014K'], 'Fire TV 4K');
+  });
+  test('el comprobante trae el Tipo Cliente y el SKU del último pago', async () => {
+    const r = await api('GET', '/planificador/comprobante/Ana%201?idPantalla=M001-1&customerId=100');
+    assert.equal(r.body.tipoCliente, 'Individual');
+    assert.ok(r.body.pago.sku);
   });
   test('valida: plan vacío → 400; pantalla inexistente → 404', async () => {
     assert.equal((await api('POST', '/planificador/M001-1/renovar', { meses: 1, precioVenta: 1, tipoPlan: '' })).status, 400);

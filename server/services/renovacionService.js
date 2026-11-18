@@ -6,7 +6,8 @@
 // termina el actual (no se pierden días); si ya venció, arranca el día del
 // pago. El admin puede fijar otro inicio a mano.
 const sequelize = require('../config/database');
-const { Planificador, Venta } = require('../models');
+const { Planificador, Venta, TablaCliente } = require('../models');
+const { buscarUltimosPagos } = require('../utils/ultimosPagos');
 const { sanitizeVentaBody, siguienteIdVenta } = require('./ventasService');
 const { registrarCambio } = require('./historialPlanificador');
 const { calcDias } = require('../utils/planificadorAlerta');
@@ -27,6 +28,26 @@ function sumarMeses(fecha, meses) {
 function inicioSugerido(finActual, fechaPago) {
   const dias = calcDias(finActual);
   return dias != null && dias > 0 ? String(finActual).slice(0, 10) : fechaPago;
+}
+
+// Valores del pago cuando el formulario no los envía: último pago de la
+// pantalla, Tipo Cliente de la Tabla Clientes y las mismas reglas de "Nueva
+// Venta" en Pagos (cuenta dedicada SI con 3 pantallas, NO con 1 o 2).
+async function valoresPorDefecto(p, transaction) {
+  const pagos = await buscarUltimosPagos([{ idPantalla: p.idPantalla, customerId: p.customerId, nickname: p.nickname }]);
+  const u = pagos.get(p.idPantalla) || {};
+  const ficha = p.customerId ? await TablaCliente.findByPk(p.customerId, { attributes: ['tipoCliente'], raw: true, transaction }) : null;
+  const pantallas = Number(p.pantallas) || Number(u.pantallas) || 1;
+  return {
+    sku: u.sku || null,
+    tipoFire: u.tipoFire || null,
+    estado: 'Activo',
+    cortesia: u.cortesia || 'NO',
+    pantallas,
+    itemQuantity: 1,
+    tipoPantalla: ficha?.tipoCliente || u.tipoPantalla || null,
+    cuentaDedicada: pantallas >= 3 ? 'SI' : 'NO',
+  };
 }
 
 class ErrorRenovacion extends Error {
@@ -54,15 +75,22 @@ async function registrarRenovacion(idPantalla, datos, usuarioEmail) {
     const inicioReal = String(datos.inicioReal || inicioSugerido(p.duracionReal, fecha)).slice(0, 10);
     const duracionReal = sumarMeses(inicioReal, meses);
 
+    // Datos del pago: los que envía el formulario o, si faltan, los del último
+    // pago de esta pantalla (SKU, equipo, cortesía…) y las reglas de Pagos.
+    const def = await valoresPorDefecto(p, transaction);
+    const elegir = (campo) => (datos[campo] !== undefined && datos[campo] !== null && String(datos[campo]).trim() !== '' ? datos[campo] : def[campo]);
     const idVM = await siguienteIdVenta(transaction);
     const venta = await Venta.create(sanitizeVentaBody({
       idVM,
       customerId: p.customerId, nombre: p.nombre, apellido: p.apellido,
       idPantalla: p.idPantalla, nickname, cuentaId: p.cuentaId, cuenta: p.cuenta,
-      estado: 'Activo', cortesia: 'NO', pantallas: p.pantallas || 1, itemQuantity: 1,
       fecha, precioVenta: precio, medioPago: datos.medioPago || null,
       tipoPago: 'Renovacion', tipoPlan,
-      tipoPantalla: datos.tipoPantalla || 'Final', cuentaDedicada: datos.cuentaDedicada || 'NO',
+      sku: elegir('sku'), tipoFire: elegir('tipoFire'),
+      estado: elegir('estado'), cortesia: elegir('cortesia'),
+      pantallas: elegir('pantallas'), itemQuantity: elegir('itemQuantity'),
+      tipoPantalla: elegir('tipoPantalla'), cuentaDedicada: elegir('cuentaDedicada'),
+      mes: datos.mes || undefined, // mes facturado (si no, el de la fecha)
     }), { transaction });
 
     const cambios = {
@@ -80,4 +108,4 @@ async function registrarRenovacion(idPantalla, datos, usuarioEmail) {
   });
 }
 
-module.exports = { registrarRenovacion, sumarMeses, inicioSugerido, ErrorRenovacion };
+module.exports = { registrarRenovacion, sumarMeses, inicioSugerido, valoresPorDefecto, ErrorRenovacion };

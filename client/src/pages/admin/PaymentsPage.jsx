@@ -7,6 +7,7 @@ import {
   ChevronUp, ChevronDown, ChevronsUpDown, Sparkles, Calendar
 } from 'lucide-react'
 import api from '../../config/api'
+import { SKU_TIPO_FIRE, MESES } from '../../config/equipos'
 import { useUi } from '../../context/UiContext'
 import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
@@ -162,15 +163,9 @@ function renderCell(row, key, onEdit, onDelete) {
 
 // ─── SKU adicionales con su Tipo Fire correspondiente ───────────────────────
 
-const SKU_TIPO_FIRE = {
-  ONN4KCH: 'Watch ONN 4K china',
-  ONN4KO:  'Watch ONN 4K Original',
-  ONNHDO:  'Watch ONN HD Original',
-}
 
 // ─── Meses (orden cronológico) ─────────────────────────────────────────────
 
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 // Normaliza para comparar meses sin distinguir mayúsculas/minúsculas (hay registros
 // históricos con el mes en minúscula, p. ej. "julio" en vez de "Julio")
