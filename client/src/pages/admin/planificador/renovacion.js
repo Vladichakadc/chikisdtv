@@ -29,6 +29,34 @@ export function mesesGratisDe(duracionDias, mesesPago) {
   return Math.max(0, mesesDePlan(duracionDias) - mesesPago)
 }
 
+// ── Secuencia de cobro ────────────────────────────────────────────────────
+// Tres mensajes por ciclo de plan, cada uno con su tono:
+//  1. antes    (amable)  — mientras el plan está por vencer
+//  2. dia      (directo) — el día del vencimiento (y los 2 días siguientes si
+//                          no se alcanzó a enviar a tiempo)
+//  3. despues  (firme)   — desde el día 3 después de vencer
+export const DIAS_SEGUIMIENTO = 3
+export const ETAPAS_COBRO = {
+  antes:   { orden: 1, corto: 'Antes',   label: '1 · Antes de vencer',  tono: 'amable' },
+  dia:     { orden: 2, corto: 'Día',     label: '2 · Día del vencimiento', tono: 'directo' },
+  despues: { orden: 3, corto: '+3 días', label: `3 · A los ${DIAS_SEGUIMIENTO} días`, tono: 'firme' },
+}
+
+// Etapa que corresponde según los días al fin del plan
+export function etapaSugerida(dias) {
+  if (dias == null) return 'despues'
+  if (dias > 0) return 'antes'
+  if (dias > -DIAS_SEGUIMIENTO) return 'dia'
+  return 'despues'
+}
+
+// Etapa que TOCA enviar hoy: la sugerida, salvo que ya se haya enviado en
+// este ciclo (null = la secuencia está al día para esta pantalla).
+export function etapaPendiente(dias, enviadas = []) {
+  const e = etapaSugerida(dias)
+  return enviadas.includes(e) ? null : e
+}
+
 // El mensaje de renovación aplica a VENCIDO y ALERTA (PROXIMO A VENCER);
 // el marcador manual CORTESIA se respeta: a una cortesía no se le cobra.
 export function esRenovable(row) {
@@ -79,11 +107,12 @@ export function ofertasDe(catalogo = [], pantallas = 1) {
 // renovando: precio según las pantallas de esa cuenta, no la suma de todas las
 // cuentas del cliente. Si el cliente tiene varias cuentas, se nombra la cuenta
 // por su nickname para que sepa cuál es la que vence.
-export function construirMensaje({ row, pantallas, ofertas, combo, porPantalla, identificarCuenta }) {
+export function construirMensaje({ row, pantallas, ofertas, combo, porPantalla, identificarCuenta, etapa }) {
   const nombre = (row.nombre || '').trim() || (row.nickname || '').trim()
   const dias = diasRestantesDe(row)
   const fechaFin = formatDate(row.duracionReal || row.finalizacion)
   const vencido = dias == null || dias <= 0
+  const paso = ETAPAS_COBRO[etapa] ? etapa : etapaSugerida(dias)
 
   const cuenta = (row.nickname || '').trim()
   const plan = identificarCuenta && cuenta
@@ -97,9 +126,26 @@ export function construirMensaje({ row, pantallas, ofertas, combo, porPantalla, 
   else if (dias === 1) situacion = `${plan} vence MAÑANA (${fechaFin}) ⏳`
   else                 situacion = `${plan} vence en ${dias} días (el ${fechaFin}) ⏳`
 
-  const puente = vencido
-    ? 'La buena noticia: reactivarlo toma 1 minuto y te mantengo los mismos precios de siempre.'
-    : 'Renovando hoy sigues sin cortes — cero interrupciones y los mismos precios de siempre.'
+  // Tono según la etapa de la secuencia de cobro
+  let apertura, puente, cierre
+  if (paso === 'antes') {
+    apertura = `Te escribo rapidito: ${situacion} y no queremos que te quedes sin tus series, películas y deportes en vivo.`
+    puente = vencido
+      ? 'La buena noticia: reactivarlo toma 1 minuto y te mantengo los mismos precios de siempre.'
+      : 'Renovando hoy sigues sin cortes — cero interrupciones y los mismos precios de siempre.'
+    cierre = vencido
+      ? 'Me envías el pantallazo del pago y te reactivo de una, para que no te pierdas ni un segundo. 😉'
+      : 'Me envías el pantallazo del pago y te dejo renovado de una, sin que se te corte la señal. 😉'
+  } else if (paso === 'dia') {
+    apertura = `Te aviso: ${situacion}.`
+    puente = 'Si renuevas hoy mismo no pierdes ni un día de servicio y conservas tus precios de siempre.'
+    cierre = 'Envíame el pantallazo del pago y lo dejo activo de inmediato. ⏰'
+  } else {
+    const hace = dias != null && dias < 0 ? ` (hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? '' : 's'})` : ''
+    apertura = `Te escribo porque ${plan} se venció el ${fechaFin}${hace} y todavía no hemos recibido la renovación.`
+    puente = 'Queremos que sigas con nosotros: reactivarlo toma 1 minuto y te mantengo los mismos precios de siempre.'
+    cierre = 'Me envías el pantallazo del pago y te reactivo de una. Si prefieres no continuar, cuéntame y libero tu pantalla, sin problema. 🙏'
+  }
 
   let intro
   if (combo)            intro = `Como esta cuenta tiene ${pantallas} pantallas, te dejo los precios del combo para renovarla completa:`
@@ -119,16 +165,23 @@ export function construirMensaje({ row, pantallas, ofertas, combo, porPantalla, 
     return `${o.emoji} *${o.nombre}*${etiqueta}: ${precio} · pagas ${o.mesesPago} meses ¡y te REGALAMOS ${o.mesesGratis === 1 ? '1 mes' : `${o.mesesGratis} meses`}! Son ${total} meses corridos, a ${porMes}/mes${cola}`
   }).join('\n')
 
-  const cierre = vencido
-    ? 'Me envías el pantallazo del pago y te reactivo de una, para que no te pierdas ni un segundo. 😉'
-    : 'Me envías el pantallazo del pago y te dejo renovado de una, sin que se te corte la señal. 😉'
-
   return [
     nombre ? `¡Hola, ${nombre}! 📺 ¿Cómo estás?` : '¡Hola! 📺 ¿Cómo estás?',
-    `Te escribo rapidito: ${situacion} y no queremos que te quedes sin tus series, películas y deportes en vivo.`,
+    apertura,
     `${puente} ${intro}`,
     bullets,
     `Renuevas en un momento:\n📲 Nequi: ${PAGO_NEQUI}\n🔑 Llave: ${PAGO_LLAVE}`,
     cierre,
   ].filter(Boolean).join('\n\n')
+}
+
+// Arma todo lo del mensaje de renovación de UNA cuenta a partir de la
+// respuesta de /planificador/comprobante (catálogo y nº de cuentas del cliente)
+export function prepararRenovacion(row, datos = {}, etapa) {
+  const pantallas = Math.max(1, Math.floor(Number(row.pantallas)) || 1)
+  const oferta = ofertasDe(datos.catalogo || [], pantallas)
+  const identificarCuenta = (datos.pantallasCliente || 1) > 1
+  const paso = ETAPAS_COBRO[etapa] ? etapa : etapaSugerida(diasRestantesDe(row))
+  const mensaje = construirMensaje({ row, pantallas, ...oferta, identificarCuenta, etapa: paso })
+  return { ...oferta, pantallas, identificarCuenta, etapa: paso, mensaje }
 }

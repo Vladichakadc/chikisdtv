@@ -27,6 +27,7 @@ import { StatCard } from './planificador/StatCard'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 import { EditModal } from './planificador/EditModal'
 import { ComprobanteModal } from './planificador/ComprobanteModal'
+import { RecordatorioLote } from './planificador/RecordatorioLote'
 import {
   calcDias, getRowVariant, ROW_BG, estadoBadgeVariant, getPlanSortVal,
 } from './planificador/rowHelpers'
@@ -585,6 +586,7 @@ export default function PlanificadorPage() {
   // Recordatorios de renovación enviados (últimos 30 días): alimentan
   // "Recordado hace N días" y la efectividad en Vencidas / Próx. a vencer.
   const [recordatorios, setRecordatorios] = useState(null)
+  const [lote, setLote] = useState(null) // { catKey, screens } — Recordar a todos
   const loadRecordatorios = async () => {
     try {
       const r = await api.get('/admin/planificador/recordatorios/resumen', { params: { dias: 30 } })
@@ -858,6 +860,7 @@ export default function PlanificadorPage() {
           onEdit={(screen) => { setActivePanel(null); snapshotBeforeChange(); setEditRow(screen) }}
           onStatus={(screen) => setComprobanteRow(screen)}
           recordatorios={recordatorios}
+          onRecordarTodos={(screens) => setLote({ catKey: activePanel, screens })}
         />
       )}
 
@@ -1117,6 +1120,17 @@ export default function PlanificadorPage() {
           </button>
         </div>
       </div>
+
+      {/* Recordatorios en lote desde Vencidas / Próx. a vencer (z-[80], sobre el panel) */}
+      {lote && (
+        <RecordatorioLote
+          titulo={CATEGORY_CONFIG[lote.catKey]?.title || ''}
+          screens={lote.screens}
+          recordatorios={recordatorios}
+          onClose={() => setLote(null)}
+          onRegistrado={loadRecordatorios}
+        />
+      )}
 
       {/* Comprobante / recordatorio de renovación (desde Estatus Cliente y desde
           el botón "Status cliente" de Vencidas / Próx. a vencer). z-[80]: queda

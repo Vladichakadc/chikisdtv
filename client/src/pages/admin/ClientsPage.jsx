@@ -25,20 +25,8 @@ import { KpiCard } from '../../components/ui/KpiCard'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { useUi } from '../../context/UiContext'
+import { PAISES } from '../../config/paises'
 
-const PAISES = [
-  { nombre: 'Colombia', codigo: '+57' }, { nombre: 'México', codigo: '+52' },
-  { nombre: 'Venezuela', codigo: '+58' }, { nombre: 'Ecuador', codigo: '+593' },
-  { nombre: 'Perú', codigo: '+51' }, { nombre: 'Chile', codigo: '+56' },
-  { nombre: 'Argentina', codigo: '+54' }, { nombre: 'Bolivia', codigo: '+591' },
-  { nombre: 'Paraguay', codigo: '+595' }, { nombre: 'Uruguay', codigo: '+598' },
-  { nombre: 'Brasil', codigo: '+55' }, { nombre: 'Panamá', codigo: '+507' },
-  { nombre: 'Costa Rica', codigo: '+506' }, { nombre: 'Guatemala', codigo: '+502' },
-  { nombre: 'Honduras', codigo: '+504' }, { nombre: 'El Salvador', codigo: '+503' },
-  { nombre: 'Nicaragua', codigo: '+505' }, { nombre: 'República Dominicana', codigo: '+1' },
-  { nombre: 'Puerto Rico', codigo: '+1' }, { nombre: 'Cuba', codigo: '+53' },
-  { nombre: 'España', codigo: '+34' }, { nombre: 'Estados Unidos', codigo: '+1' },
-]
 
 /* ══════════════════════════════════════════════════════════════
    DESIGN TOKENS (Huashu — brand Teal/Emerald para Clientes)

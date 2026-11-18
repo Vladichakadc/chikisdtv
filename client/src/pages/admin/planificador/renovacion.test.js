@@ -1,7 +1,7 @@
 // Pruebas de la lógica de precios del mensaje de renovación (casos reales del
 // negocio). Correr con: cd client && npm test
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { ofertasDe, construirMensaje, esRenovable, mesesGratisDe, mesesDePlan } from './renovacion'
+import { ofertasDe, construirMensaje, esRenovable, mesesGratisDe, mesesDePlan, etapaSugerida, etapaPendiente, prepararRenovacion } from './renovacion'
 import { haceTexto } from './rowHelpers'
 
 // Catálogo de venta como el de producción: combos de 1, 2 y 3 pantallas.
@@ -125,5 +125,52 @@ describe('Recordado hace N días', () => {
     expect(haceTexto('2026-11-17T15:00:00.000Z')).toBe('ayer')
     expect(haceTexto('2026-11-16 15:00:00.000 +00:00')).toBe('hace 2 días')
     expect(haceTexto(null)).toBe('')
+  })
+})
+
+describe('secuencia de cobro (antes / día / +3 días)', () => {
+  it('sugiere la etapa según los días al vencimiento', () => {
+    expect(etapaSugerida(5)).toBe('antes')
+    expect(etapaSugerida(1)).toBe('antes')
+    expect(etapaSugerida(0)).toBe('dia')
+    expect(etapaSugerida(-2)).toBe('dia')      // se ponen al día si no salió a tiempo
+    expect(etapaSugerida(-3)).toBe('despues')
+    expect(etapaSugerida(-40)).toBe('despues')
+    expect(etapaSugerida(null)).toBe('despues')
+  })
+  it('lo pendiente hoy es la etapa sugerida si aún no se envió en este ciclo', () => {
+    expect(etapaPendiente(0, [])).toBe('dia')
+    expect(etapaPendiente(0, ['antes'])).toBe('dia')
+    expect(etapaPendiente(0, ['antes', 'dia'])).toBe(null)
+    expect(etapaPendiente(-5, ['antes', 'dia'])).toBe('despues')
+  })
+  it('cada etapa tiene su tono', () => {
+    const datos = { catalogo: CATALOGO, pantallasCliente: 1 }
+    const antes = prepararRenovacion(fila({ duracionReal: '2026-11-21', estadoReal: 'ALERTA' }), datos)
+    expect(antes.etapa).toBe('antes')
+    expect(antes.mensaje).toContain('Te escribo rapidito: tu plan de')
+    expect(antes.mensaje).toContain('vence en 3 días')
+
+    const dia = prepararRenovacion(fila({ duracionReal: '2026-11-18' }), datos)
+    expect(dia.etapa).toBe('dia')
+    expect(dia.mensaje).toContain('Te aviso: tu plan de')
+    expect(dia.mensaje).toContain('vence HOY (18-11-2026)')
+    expect(dia.mensaje).toContain('Si renuevas hoy mismo')
+
+    const despues = prepararRenovacion(fila({ duracionReal: '2026-11-15' }), datos)
+    expect(despues.etapa).toBe('despues')
+    expect(despues.mensaje).toContain('se venció el 15-11-2026 (hace 3 días)')
+    expect(despues.mensaje).toContain('libero tu pantalla')
+  })
+  it('la etapa se puede forzar (p. ej. reenviar la del día)', () => {
+    const r = prepararRenovacion(fila({ duracionReal: '2026-11-10' }), { catalogo: CATALOGO }, 'dia')
+    expect(r.etapa).toBe('dia')
+    expect(r.mensaje).toContain('se venció el 10-11-2026')
+    expect(r.mensaje).toContain('Si renuevas hoy mismo')
+  })
+  it('prepararRenovacion nombra la cuenta cuando el cliente tiene varias', () => {
+    const r = prepararRenovacion(fila(), { catalogo: CATALOGO, pantallasCliente: 3 })
+    expect(r.identificarCuenta).toBe(true)
+    expect(r.mensaje).toContain('*Xiomy 2*')
   })
 })
