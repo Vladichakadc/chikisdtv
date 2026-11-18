@@ -179,7 +179,7 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
               <Campo label="Fecha del pago">
                 <input className={inputCls} type="date" value={form.fecha} onChange={e => elegirFecha(e.target.value)} />
               </Campo>
-              <Campo label="Inicio del nuevo período" hint={form.inicioManual ? undefined : (dias != null && dias > 0 ? 'Sigue al plan actual: no pierde días' : 'Ya venció: arranca el día del pago')}>
+              <Campo label="Inicio del nuevo período" hint={form.inicioManual ? undefined : (finActual ? 'Desde la fecha de vencimiento' : 'Sin fecha de vencimiento: desde el día del pago')}>
                 {form.inicioManual
                   ? <input className={inputCls} type="date" value={form.inicioReal || inicio} onChange={e => setForm(f => ({ ...f, inicioReal: e.target.value }))} />
                   : <button type="button" onClick={() => setForm(f => ({ ...f, inicioManual: true, inicioReal: inicio }))}

@@ -199,8 +199,8 @@ describe('registrar renovación: sugerencias del formulario', () => {
     expect(sumarMeses('2026-01-15', 1)).toBe('2026-02-15')
     expect(sumarMeses('2026-11-18', 14)).toBe('2028-01-18')
     expect(inicioSugerido('2026-11-23', '2026-11-18')).toBe('2026-11-23') // vigente
-    expect(inicioSugerido('2026-11-10', '2026-11-18')).toBe('2026-11-18') // vencido
-    expect(inicioSugerido(null, '2026-11-18')).toBe('2026-11-18')
+    expect(inicioSugerido('2026-11-10', '2026-11-18')).toBe('2026-11-10') // vencido: desde el vencimiento
+    expect(inicioSugerido(null, '2026-11-18')).toBe('2026-11-18')        // sin fecha de fin
   })
 })
 
