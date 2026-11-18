@@ -3,14 +3,15 @@
 // sin deuda). Antes había que registrar la venta en Pagos y luego editar las
 // fechas a mano; si se olvidaba lo segundo, el cliente seguía "vencido".
 import { useEffect, useMemo, useState } from 'react'
-import { X, RefreshCcw, Loader2, ExternalLink, CalendarClock, ArrowRight } from 'lucide-react'
+import { X, RefreshCcw, Loader2, ExternalLink, CalendarClock, ArrowRight, ChevronDown, Tv } from 'lucide-react'
 import api from '../../../config/api'
 import { cn } from '../../../utils/cn'
 import { useUi } from '../../../context/UiContext'
 import { todayStr } from '../../../utils/dateUtils'
 import { formatDate, formatCurrency } from '../../../utils/excelUtils'
 import { CurrencyInput } from '../../../components/ui/CurrencyInput'
-import { mesesPorPlan, precioPorPlan, sumarMeses, inicioSugerido, diasRestantesDe } from './renovacion'
+import { mesesPorPlan, precioPorPlan, sumarMeses, inicioSugerido, diasRestantesDe, datosPagoSugeridos } from './renovacion'
+import { TIPOS_FIRE, MESES, tipoFireDeSku } from '../../../config/equipos'
 import { diasLabel } from './rowHelpers'
 
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40 focus:border-brand-primary'
@@ -32,7 +33,14 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
   const [ultimoPago, setUltimoPago] = useState(null)
   const [error, setError] = useState(null)
   const [guardando, setGuardando] = useState(false)
-  const [form, setForm] = useState({ fecha: todayStr(), tipoPlan: '', meses: '', precioVenta: '', medioPago: '', inicioManual: false, inicioReal: '' })
+  const [form, setForm] = useState({
+    fecha: todayStr(), tipoPlan: '', meses: '', precioVenta: '', medioPago: '', inicioManual: false, inicioReal: '',
+    // Datos del pago (como en "Nueva Venta"): se llenan con el último pago
+    sku: '', tipoFire: '', estado: 'Activo', cortesia: 'NO', pantallas: 1, itemQuantity: 1,
+    tipoPantalla: '', cuentaDedicada: 'NO', mes: MESES[new Date().getMonth()],
+  })
+  const [verPago, setVerPago] = useState(true)
+  const [tipoCliente, setTipoCliente] = useState(null)
 
   useEffect(() => {
     let vivo = true
@@ -49,6 +57,7 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
         const pago = comp.data?.pago || null
         setOpciones(op.data)
         setUltimoPago(pago)
+        setTipoCliente(comp.data?.tipoCliente || null)
         // Sugerencias: el plan y el medio de pago del último pago de esta pantalla
         const tipoPlan = pago?.tipoPlan || op.data.tiposPlan.find(t => /mensual/i.test(t)) || op.data.tiposPlan[0] || ''
         setForm(f => ({
@@ -57,6 +66,7 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
           meses: mesesPorPlan(tipoPlan, op.data.catalogo, pantallas) ?? '',
           precioVenta: precioPorPlan(tipoPlan, op.data.catalogo, pantallas, pago) ?? '',
           medioPago: pago?.medioPago || op.data.mediosPago.find(m => /nequi/i.test(m)) || '',
+          ...datosPagoSugeridos(row, pago, comp.data?.tipoCliente),
         }))
       })
       .catch(e => vivo && setError(e.response?.data?.error || 'No se pudieron cargar los planes.'))
@@ -76,6 +86,13 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
     precioVenta: precioPorPlan(tipoPlan, opciones?.catalogo, pantallas, ultimoPago) ?? f.precioVenta,
   }))
 
+  const set = (campo) => (e) => setForm(f => ({ ...f, [campo]: e.target.value }))
+  // Al cambiar el SKU se propone el equipo correspondiente (igual que en Pagos)
+  const elegirSku = (sku) => setForm(f => ({ ...f, sku, tipoFire: tipoFireDeSku(sku, opciones?.tipoFirePorSku) || f.tipoFire }))
+  // Al cambiar la fecha del pago, el mes facturado la sigue (se puede cambiar)
+  const elegirFecha = (fecha) => setForm(f => ({ ...f, fecha, mes: MESES[Number(String(fecha).slice(5, 7)) - 1] || f.mes }))
+  const opcionesCon = (lista = [], actual) => (actual && !lista.includes(actual) ? [actual, ...lista] : lista)
+
   const finActual = row.duracionReal || row.finalizacion
   const dias = diasRestantesDe(row)
   const inicio = form.inicioManual && form.inicioReal ? form.inicioReal : inicioSugerido(finActual, form.fecha)
@@ -93,8 +110,15 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
         precioVenta: Number(form.precioVenta),
         medioPago: form.medioPago || null,
         ...(form.inicioManual && form.inicioReal ? { inicioReal: form.inicioReal } : {}),
-        tipoPantalla: ultimoPago?.tipoPantalla || undefined,
-        cuentaDedicada: ultimoPago?.cuentaDedicada || undefined,
+        sku: form.sku || null,
+        tipoFire: form.tipoFire || null,
+        estado: form.estado || null,
+        cortesia: form.cortesia || null,
+        pantallas: Number(form.pantallas) || null,
+        itemQuantity: Number(form.itemQuantity) || 1,
+        tipoPantalla: form.tipoPantalla || null,
+        cuentaDedicada: form.cuentaDedicada || null,
+        mes: form.mes || null,
       })
       showToast(`Renovación registrada: venta ${r.data.venta.idVM} · ${row.nickname} vigente hasta ${formatDate(r.data.duracionReal)}.`, 'success')
       onRenovado?.(r.data)
@@ -110,7 +134,7 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-auto"
       onClick={e => { if (e.target === e.currentTarget && !guardando) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[460px] my-auto" role="dialog" aria-label="Registrar renovación">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[520px] my-auto" role="dialog" aria-label="Registrar renovación">
         <div className="rounded-t-2xl px-5 py-4 flex items-center justify-between text-white" style={{ background: 'linear-gradient(90deg,#16a34a,#22c55e)' }}>
           <div className="flex items-center gap-3">
             <div className="bg-white/20 rounded-lg p-2"><RefreshCcw size={20} /></div>
@@ -153,7 +177,7 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
                 </select>
               </Campo>
               <Campo label="Fecha del pago">
-                <input className={inputCls} type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} />
+                <input className={inputCls} type="date" value={form.fecha} onChange={e => elegirFecha(e.target.value)} />
               </Campo>
               <Campo label="Inicio del nuevo período" hint={form.inicioManual ? undefined : (dias != null && dias > 0 ? 'Sigue al plan actual: no pierde días' : 'Ya venció: arranca el día del pago')}>
                 {form.inicioManual
@@ -163,6 +187,69 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
                       {formatDate(inicio)} <span className="text-[11px] text-brand-primary ml-1">cambiar</span>
                     </button>}
               </Campo>
+            </div>
+
+            {/* Datos del pago (como en "Nueva Venta"), llenados con el último pago */}
+            <div className="rounded-xl border border-gray-200">
+              <button type="button" onClick={() => setVerPago(v => !v)} aria-expanded={verPago}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-gray-600">
+                <span className="flex items-center gap-1.5"><Tv size={13} /> Datos del pago</span>
+                <span className="flex items-center gap-2 font-normal text-gray-400">
+                  {ultimoPago ? `Del último pago${ultimoPago.idVM ? ` (${ultimoPago.idVM})` : ''}` : 'Sin pagos previos: complétalos'}
+                  <ChevronDown size={14} className={cn('transition-transform', verPago && 'rotate-180')} />
+                </span>
+              </button>
+              {verPago && (
+                <div className="grid grid-cols-2 gap-3 px-3 pb-3">
+                  <Campo label="SKU">
+                    <select className={cn(inputCls, 'font-mono')} value={form.sku} onChange={e => elegirSku(e.target.value)}>
+                      <option value="">Seleccionar dispositivo…</option>
+                      {opcionesCon(opciones?.skus, form.sku).map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Tipo Fire">
+                    <select className={inputCls} value={form.tipoFire} onChange={set('tipoFire')}>
+                      <option value="">Seleccionar equipo…</option>
+                      {opcionesCon([...new Set([...(opciones?.tiposFire || []), ...TIPOS_FIRE])], form.tipoFire).map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Estado">
+                    <select className={inputCls} value={form.estado} onChange={set('estado')}>
+                      {['Activo', 'Desactivado', 'Baja'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Cortesía">
+                    <select className={inputCls} value={form.cortesia} onChange={set('cortesia')}>
+                      {['NO', 'SI'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Pantallas">
+                    <input className={inputCls} type="number" min="1" step="1" value={form.pantallas} onChange={set('pantallas')} />
+                  </Campo>
+                  <Campo label="Cantidad">
+                    <input className={inputCls} type="number" min="1" step="1" value={form.itemQuantity} onChange={set('itemQuantity')} />
+                  </Campo>
+                  <Campo label="Tipo Pantalla" hint={tipoCliente ? `Tipo Cliente en Tabla Clientes: ${tipoCliente}` : undefined}>
+                    <select className={inputCls} value={form.tipoPantalla} onChange={set('tipoPantalla')}>
+                      <option value="">—</option>
+                      {opcionesCon(opciones?.tiposPantalla, form.tipoPantalla).map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Cuenta Dedicada">
+                    <select className={inputCls} value={form.cuentaDedicada} onChange={set('cuentaDedicada')}>
+                      {['NO', 'SI'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Mes facturado">
+                    <select className={inputCls} value={form.mes} onChange={set('mes')}>
+                      {MESES.map(m => <option key={m}>{m}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Tipo de pago">
+                    <input className={cn(inputCls, 'bg-gray-50 text-gray-500')} value="Renovacion" readOnly />
+                  </Campo>
+                </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 flex items-center gap-2 text-sm">

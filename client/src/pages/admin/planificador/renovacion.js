@@ -234,3 +234,21 @@ export function inicioSugerido(finActual, fechaPago) {
   const dias = calcDias(finActual)
   return dias != null && dias > 0 ? String(finActual).slice(0, 10) : fechaPago
 }
+
+// Datos del pago sugeridos para la renovación (mismas reglas que "Nueva Venta"
+// en Pagos y que el servidor): SKU, equipo y cortesía del último pago de la
+// pantalla; Tipo Pantalla según el Tipo Cliente de la Tabla Clientes; cuenta
+// dedicada SI con 3 pantallas y NO con 1 o 2.
+export function datosPagoSugeridos(row, ultimoPago = null, tipoCliente = null) {
+  const pantallas = Number(row?.pantallas) || Number(ultimoPago?.pantallas) || 1
+  return {
+    sku: ultimoPago?.sku || '',
+    tipoFire: ultimoPago?.tipoFire || '',
+    estado: 'Activo',
+    cortesia: ultimoPago?.cortesia || 'NO',
+    pantallas,
+    itemQuantity: 1,
+    tipoPantalla: tipoCliente || ultimoPago?.tipoPantalla || '',
+    cuentaDedicada: pantallas >= 3 ? 'SI' : 'NO',
+  }
+}

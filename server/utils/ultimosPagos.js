@@ -11,7 +11,10 @@
 const { Op } = require('sequelize');
 const { Venta } = require('../models');
 
-const ATRIBUTOS = ['idVM', 'idPantalla', 'nickname', 'customerId', 'tipoPlan', 'tipoPago', 'precioVenta', 'medioPago', 'tipoPantalla', 'cuentaDedicada', 'fecha', 'pantallas', 'createdAt'];
+const ATRIBUTOS = [
+  'idVM', 'idPantalla', 'nickname', 'customerId', 'tipoPlan', 'tipoPago', 'precioVenta', 'medioPago',
+  'tipoPantalla', 'cuentaDedicada', 'sku', 'tipoFire', 'cortesia', 'estado', 'itemQuantity', 'fecha', 'pantallas', 'createdAt',
+];
 
 const limpio = (v) => (v == null ? '' : String(v).trim());
 

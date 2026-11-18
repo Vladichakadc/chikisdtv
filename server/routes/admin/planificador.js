@@ -350,13 +350,15 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
   // Clientes; el país permite poner el indicativo correcto en WhatsApp.
   let telefono = null;
   let pais = null;
+  let tipoCliente = null; // Final / Individual / Revendedor → Tipo Pantalla de la venta
   if (customerId) {
     const [cliente, ficha] = await Promise.all([
       Client.findOne({ where: { customerId }, attributes: ['phone'] }),
-      TablaCliente.findByPk(customerId, { attributes: ['movil', 'pais'] }),
+      TablaCliente.findByPk(customerId, { attributes: ['movil', 'pais', 'tipoCliente'] }),
     ]);
     telefono = (cliente?.phone || '').trim() || (ficha?.movil || '').trim() || null;
     pais = (ficha?.pais || '').trim() || null;
+    tipoCliente = (ficha?.tipoCliente || '').trim() || null;
   }
 
   // Cada pantalla con su último pago y si está AL DÍA (fecha vigente, sin
@@ -388,7 +390,7 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
     order: [['numeroPantallas', 'ASC'], ['duracionDias', 'ASC']],
   });
 
-  res.json({ pago, telefono, pais, pantallasCliente, catalogo, pantallasDetalle });
+  res.json({ pago, telefono, pais, tipoCliente, pantallasCliente, catalogo, pantallasDetalle });
 }));
 
 // POST /planificador/credenciales — devuelve las contraseñas de las pantallas
@@ -512,13 +514,33 @@ router.get('/planificador/renovar/opciones', asyncHandler(async (_req, res) => {
     where: { [col]: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }] } },
     raw: true,
   })).map(r => String(r[col]).trim()).filter(Boolean);
-  const [tiposPlan, mediosPago, catalogo] = await Promise.all([
+  const [tiposPlan, mediosPago, skus, tiposFire, tiposPantalla, catalogo, skuFire] = await Promise.all([
     distintos('tipoPlan'),
     distintos('medioPago'),
+    distintos('sku'),
+    distintos('tipoFire'),
+    distintos('tipoPantalla'),
     Plan.findAll({ where: { activo: true }, attributes: ['nombre', 'precio', 'duracionDias', 'numeroPantallas'], raw: true }),
+    Venta.findAll({
+      attributes: ['sku', 'tipoFire', 'fecha'],
+      where: { sku: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }] }, tipoFire: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }] } },
+      order: [['fecha', 'ASC']],
+      raw: true,
+    }),
   ]);
   const unicos = (l) => [...new Set(l)].sort((a, b) => a.localeCompare(b, 'es'));
-  res.json({ tiposPlan: unicos(tiposPlan), mediosPago: unicos(mediosPago.filter(m => !/^cortes/i.test(m))), catalogo });
+  // Tipo de equipo más reciente registrado para cada SKU (al cambiar el SKU)
+  const tipoFirePorSku = {};
+  for (const v of skuFire) tipoFirePorSku[String(v.sku).trim()] = String(v.tipoFire).trim();
+  res.json({
+    tiposPlan: unicos(tiposPlan),
+    mediosPago: unicos(mediosPago.filter(m => !/^cortes/i.test(m))),
+    skus: unicos(skus),
+    tiposFire: unicos(tiposFire),
+    tiposPantalla: unicos(tiposPantalla),
+    tipoFirePorSku,
+    catalogo,
+  });
 }));
 
 // POST /planificador/:idPantalla/renovar — crea la venta y extiende el plan
