@@ -112,6 +112,10 @@ describe('cortesía y estados', () => {
   it('una cortesía nunca es renovable (no se le cobra)', () => {
     expect(esRenovable(fila({ alertaReal: 'CORTESIA' }))).toBe(false)
   })
+  it('la cortesía como campo propio (booleano) también bloquea el cobro', () => {
+    expect(esRenovable(fila({ cortesia: true, alertaReal: 'VENCIDO' }))).toBe(false)
+    expect(esRenovable(fila({ cortesia: false }))).toBe(true)
+  })
   it('vencida y próxima a vencer sí son renovables; vigente no', () => {
     expect(esRenovable(fila({ estadoReal: 'VENCIDO' }))).toBe(true)
     expect(esRenovable(fila({ estadoReal: 'ALERTA' }))).toBe(true)

@@ -345,10 +345,10 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   // alertaReal se recalcula desde la fecha de fin real (duracionReal): el texto
   // almacenado viene del import de Excel y queda obsoleto tras una renovación
   // (misma regla que enrichPantalla en routes/admin/planificador.js).
-  const alertaRowsRaw = await Planificador.findAll({ attributes: ['alertaReal', 'debe', 'customerId', 'cuentaId', 'nombre', 'apellido', 'nickname', 'pantallas', 'duracionReal'], raw: true });
+  const alertaRowsRaw = await Planificador.findAll({ attributes: ['cortesia', 'debe', 'customerId', 'cuentaId', 'nombre', 'apellido', 'nickname', 'pantallas', 'duracionReal'], raw: true });
   const alertaRows = alertaRowsRaw.map(r => {
     const diasRestantes = calcDias(r.duracionReal);
-    return { ...r, diasRestantes, alertaReal: alertaFromDias(diasRestantes, r.alertaReal) };
+    return { ...r, diasRestantes, alertaReal: alertaFromDias(diasRestantes, r.cortesia) };
   });
   const totalPantallas = alertaRows.reduce((s, r) => s + (Number(r.pantallas) || 0), 0);
   const ingresoPorPantalla = totalPantallas > 0 ? Math.round(totalIngresos / totalPantallas) : 0;

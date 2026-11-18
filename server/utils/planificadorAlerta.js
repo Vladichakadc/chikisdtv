@@ -1,10 +1,14 @@
-// Cálculo canónico de la alerta de una pantalla del Planificador a partir de
-// su fecha de fin real (`duracionReal`). El campo `alertaReal` almacenado en
-// la BD proviene del import de Excel y queda obsoleto cuando el cliente
-// renueva (la fecha se actualiza pero el texto no): nunca debe usarse como
-// fuente de verdad. Solo se respeta el marcador manual "CORTESIA".
-// Misma lógica que la UI del Planificador (client/src/pages/admin/planificador/rowHelpers.js).
+// Reglas canónicas de estado de una pantalla del Planificador (servidor).
+// La UI tiene su espejo en client/src/pages/admin/planificador/rowHelpers.js;
+// la prueba client/src/pages/admin/planificador/reglas.consistencia.test.js
+// verifica que ambas den el mismo resultado — si cambias una, cambia la otra.
+//
+// El campo `alertaReal` almacenado proviene del import de Excel y queda
+// obsoleto cuando el cliente renueva: nunca es fuente de verdad. La cortesía
+// es un dato propio (columna booleana `cortesia`).
 
+// Días antes del fin de plan en que una pantalla pasa a "próxima a vencer".
+// Única fuente: la API lo devuelve como `diasAlerta` y la UI lo usa.
 const DIAS_ALERTA = 8;
 
 // Parsea una fecha DATEONLY ("YYYY-MM-DD") como medianoche LOCAL (America/Bogota,
@@ -25,12 +29,38 @@ function calcDias(fecha) {
   return Math.round((d - today) / 86400000);
 }
 
-function alertaFromDias(dias, stored) {
-  if ((stored || '').trim().toUpperCase() === 'CORTESIA') return 'CORTESIA';
+// Acepta el booleano `cortesia` o, por compatibilidad, el texto legado "CORTESIA"
+function esCortesia(valor) {
+  if (valor === true || valor === 1) return true;
+  return String(valor || '').trim().toUpperCase() === 'CORTESIA';
+}
+
+function estadoFromDias(dias, diasAlerta = DIAS_ALERTA) {
   if (dias == null) return '';
   if (dias <= 0) return 'VENCIDO';
-  if (dias <= DIAS_ALERTA) return 'PROXIMO A VENCER';
+  if (dias <= diasAlerta) return 'ALERTA';
+  return 'VIGENTE';
+}
+
+function alertaFromDias(dias, cortesia, diasAlerta = DIAS_ALERTA) {
+  if (esCortesia(cortesia)) return 'CORTESIA';
+  if (dias == null) return '';
+  if (dias <= 0) return 'VENCIDO';
+  if (dias <= diasAlerta) return 'PROXIMO A VENCER';
   return '';
 }
 
-module.exports = { DIAS_ALERTA, calcDias, alertaFromDias };
+// Variante de fila: libre / vencido / cortesia / alerta / vigente
+function varianteDe(p, diasAlerta = DIAS_ALERTA) {
+  const nombre = (String(p.nombre ?? '') + String(p.apellido ?? '')).trim();
+  const nickname = String(p.nickname || '').trim();
+  if (nickname.toLowerCase().includes('libre')) return 'libre';
+  if (!nombre && !nickname) return 'libre';
+  const dias = calcDias(p.duracionReal || p.finalizacion) ?? p.diasVencimientoReal ?? p.diasVencimiento ?? null;
+  if (dias != null && dias <= 0) return 'vencido';
+  if (esCortesia(p.cortesia) || esCortesia(p.alertaReal)) return 'cortesia';
+  if (dias != null && dias <= diasAlerta) return 'alerta';
+  return 'vigente';
+}
+
+module.exports = { DIAS_ALERTA, parseFechaLocal, calcDias, esCortesia, estadoFromDias, alertaFromDias, varianteDe };

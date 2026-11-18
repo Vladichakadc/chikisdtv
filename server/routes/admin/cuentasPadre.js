@@ -8,6 +8,15 @@ const multer = require('multer');
 const { CuentaPadre } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
+const { ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
+
+// Toda cuenta padre nueva debe tener sus pantallas libres en el Planificador.
+// Antes se revisaba en cada carga del Planificador (escribiendo en un GET);
+// ahora se hace justo después de cada cambio en Cuentas Padre.
+async function asegurarPantallas() {
+  try { await ensurePantallasCuentasPadre(); }
+  catch (e) { console.warn('[CUENTAS PADRE] No se pudieron crear pantallas libres:', e.message); }
+}
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -299,6 +308,7 @@ router.post('/cuentas-padre/upload', upload.single('file'), asyncHandler(async (
   if (updatedCount > 0)   parts.push(`${updatedCount} actualizada(s)`);
   if (unchangedCount > 0) parts.push(`${unchangedCount} sin cambio`);
 
+  await asegurarPantallas();
   res.json({ message: parts.join(' · '), newCount, matchedCount, updatedCount, unchangedCount, diff, rows: all });
 }));
 
@@ -329,17 +339,20 @@ router.post('/cuentas-padre/restore', asyncHandler(async (req, res) => {
   }
 
   const all = await CuentaPadre.findAll({ order: [['cuentaId', 'ASC']] });
+  await asegurarPantallas();
   res.json({ message: 'Tabla restaurada al estado anterior', rows: all });
 }));
 
 router.post('/cuentas-padre/import', asyncHandler(async (_req, res) => {
   const count = await importCuentasPadre(true);
   const all = await CuentaPadre.findAll({ order: [['cuentaId', 'ASC']] });
+  await asegurarPantallas();
   res.json({ message: `${count} cuentas restauradas desde Tabla_Cuentaspadre.xlsx`, rows: all });
 }));
 
 router.post('/cuentas-padre', asyncHandler(async (req, res) => {
   const cuenta = await CuentaPadre.create(req.body);
+  await asegurarPantallas();
   res.status(201).json(cuenta);
 }));
 
@@ -347,6 +360,7 @@ router.put('/cuentas-padre/:cuentaId', asyncHandler(async (req, res) => {
   const cuenta = await CuentaPadre.findByPk(req.params.cuentaId);
   if (!cuenta) return res.status(404).json({ error: 'Cuenta no encontrada' });
   await cuenta.update(req.body);
+  await asegurarPantallas();
   res.json(cuenta);
 }));
 

@@ -1,21 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const { Planificador, CuentaPadre, Venta, Client, Plan, Recordatorio, AccesoCredencial, TablaCliente } = require('../../models');
 const { buscarUltimosPagos } = require('../../utils/ultimosPagos');
 const asyncHandler = require('../../middleware/asyncHandler');
-const { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan, ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
-// La alerta se recalcula según la fecha vigente; "CORTESIA" es un valor manual que se respeta
-const { DIAS_ALERTA, calcDias: calcDiasDB, alertaFromDias } = require('../../utils/planificadorAlerta');
-
-function estadoFromDias(dias) {
-  if (dias == null) return '';
-  if (dias <= 0) return 'VENCIDO';
-  if (dias <= DIAS_ALERTA) return 'ALERTA';
-  return 'VIGENTE';
-}
+const { importFromExcel, autoFixCuentaIdMismatches, ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
+const { autoImportarSiDisponible } = require('../../utils/excelOrigen');
+// Reglas únicas de estado (ver utils/planificadorAlerta.js): la alerta se
+// recalcula según la fecha vigente y la cortesía es la columna `cortesia`.
+const { DIAS_ALERTA, calcDias: calcDiasDB, alertaFromDias, estadoFromDias, varianteDe, esCortesia } = require('../../utils/planificadorAlerta');
 
 const DIAS_ALERTA_CP = 30;
 
@@ -84,7 +78,8 @@ function enrichPantalla(raw) {
     estado:     estadoFromDias(diasVencimiento),
     estadoReal: estadoFromDias(diasVencimientoReal),
     alerta:     '',
-    alertaReal: alertaFromDias(diasVencimientoReal, raw.alertaReal),
+    cortesia:   esCortesia(raw.cortesia),
+    alertaReal: alertaFromDias(diasVencimientoReal, raw.cortesia),
   };
 }
 
@@ -92,17 +87,8 @@ function enrichPantalla(raw) {
 // Replican rowHelpers.js (cliente) para que el archivo exportado tenga el
 // mismo color de fila y de badges "Estado"/"Alerta" que se ve en la tabla.
 
-function getRowVariantExport(p, diasAlerta) {
-  const nombre = (String(p.nombre ?? '') + String(p.apellido ?? '')).trim();
-  const nickname = (p.nickname || '').trim();
-  if (nickname.toLowerCase().includes('libre')) return 'libre';
-  if (!nombre && !nickname) return 'libre';
-  const dias = p.duracionReal != null ? p.diasVencimientoReal : p.diasVencimiento;
-  if (dias != null && dias <= 0) return 'vencido';
-  if (p.alertaReal === 'CORTESIA') return 'cortesia';
-  if (dias != null && dias <= diasAlerta) return 'alerta';
-  return 'vigente';
-}
+// Misma regla que la UI (utils/planificadorAlerta.varianteDe)
+const getRowVariantExport = (p, diasAlerta) => varianteDe(p, diasAlerta);
 
 const ROW_FILL = {
   vigente:  'FFF0FDF4', // green-50
@@ -156,7 +142,7 @@ function fmtDateDMY(d) {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : String(d);
 }
 
-// Construye el workbook ExcelJS del Planificador (usado por /export y /save-to-excel)
+// Construye el workbook ExcelJS del Planificador (usado por /export)
 function buildPlanificadorWorkbook(pantallas) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Planificador');
@@ -270,13 +256,11 @@ function buildPlanificadorWorkbook(pantallas) {
 // GET /planificador — lee desde DB, auto-importa desde Excel si está vacía,
 // y aplica autocorrección de cuentaId en cada carga (self-healing).
 router.get('/planificador', asyncHandler(async (_req, res) => {
+  // Lectura pura: las correcciones (autofix de cuentaId, duraciones enteras,
+  // pantallas libres de cuentas padre nuevas) corren al arrancar el servidor y
+  // tras cada cambio que las necesita — no en cada carga de la página.
   const count = await Planificador.count();
-  if (count === 0) await importFromExcel(); // importFromExcel ya llama autofix internamente
-  else {
-    await autoFixCuentaIdMismatches();      // self-healing en cada carga sobre BD existente
-    await normalizeDuracionPlan();          // meses siempre enteros (el Excel traía días/30)
-  }
-  await ensurePantallasCuentasPadre();      // cuentas padre nuevas → pantallas libres
+  if (count === 0) await autoImportarSiDisponible(importFromExcel);
   const records = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
 
@@ -538,6 +522,18 @@ router.get('/planificador/recordatorios/resumen', asyncHandler(async (req, res) 
   });
 }));
 
+// GET /planificador/promos — promociones registradas en "Tipo de Plan" de las
+// pantallas (p. ej. "3+1"). Pagos las usa para sugerirlas en Nueva Venta sin
+// descargar el Planificador completo.
+router.get('/planificador/promos', asyncHandler(async (_req, res) => {
+  const filas = await Planificador.findAll({
+    attributes: [[Planificador.sequelize.fn('DISTINCT', Planificador.sequelize.col('tipoPlan')), 'tipoPlan']],
+    where: { tipoPlan: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }] } },
+    raw: true,
+  });
+  res.json({ promos: [...new Set(filas.map(f => String(f.tipoPlan).trim()).filter(Boolean))].sort() });
+}));
+
 // GET /planificador/export — descarga el Planificador completo como .xlsx
 router.get('/planificador/export', asyncHandler(async (req, res) => {
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
@@ -550,22 +546,6 @@ router.get('/planificador/export', asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="Planificador_${fecha}.xlsx"`);
   await workbook.xlsx.write(res);
   res.end();
-}));
-
-// POST /planificador/save-to-excel — guarda el estado actual de la BD como
-// "Planificador_actualizado.xlsx" en la raíz del proyecto (NO toca el .xlsm original).
-// Wired al botón "Guardar" del frontend: mantiene el Excel sincronizado con la BD
-// para que futuros reimports no reintroduzcan datos obsoletos.
-router.post('/planificador/save-to-excel', asyncHandler(async (_req, res) => {
-  const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
-  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-  const workbook  = buildPlanificadorWorkbook(pantallas);
-  const outPath = path.join(__dirname, '..', '..', '..', 'Planificador_actualizado.xlsx');
-  await workbook.xlsx.writeFile(outPath);
-  res.json({
-    message: `Planificador guardado: ${pantallas.length} pantallas exportadas a Planificador_actualizado.xlsx`,
-    archivo: 'Planificador_actualizado.xlsx',
-  });
 }));
 
 // GET /planificador/sync-preview — diff de lo que cambiaría al sincronizar (sin aplicar cambios)
@@ -669,7 +649,7 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   const pantalla = await Planificador.findByPk(idPantalla);
   if (!pantalla) return res.status(404).json({ error: 'Pantalla no encontrada' });
 
-  const STRING_FIELDS = ['cuenta', 'password', 'nombre', 'apellido', 'customerId', 'nickname', 'alertaReal', 'tipoPlan'];
+  const STRING_FIELDS = ['cuenta', 'password', 'nombre', 'apellido', 'customerId', 'nickname', 'tipoPlan'];
   const FLOAT_FIELDS = ['credito', 'porcentaje', 'montoDebe', 'montoDebeUSD'];
   // duracionPlan se guarda como meses enteros (el Excel de origen traía días/30 con decimales)
   const INT_FIELDS = ['pantallas', 'duracionPlan'];
@@ -686,6 +666,13 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
     else if (FLOAT_FIELDS.includes(f)) update[f] = val !== '' && val != null ? Number(val) : null;
     else if (DATE_FIELDS.includes(f)) update[f] = (val || '').toString().trim() || null;
   }
+  // Cortesía: campo propio. Se acepta `cortesia` (booleano) o, por compatibilidad,
+  // `alertaReal: 'CORTESIA'`. El texto calculado de alerta (VENCIDO, PROXIMO A
+  // VENCER…) ya no se guarda; alertaReal solo conserva el marcador legado.
+  if (req.body.cortesia !== undefined) update.cortesia = Boolean(req.body.cortesia);
+  else if (req.body.alertaReal !== undefined) update.cortesia = esCortesia(req.body.alertaReal);
+  if (update.cortesia !== undefined) update.alertaReal = update.cortesia ? 'CORTESIA' : null;
+
   // Si se desactiva "Debe", los montos adeudados (COP y USD) no deben persistir
   if (update.debe === false) { update.montoDebe = null; update.montoDebeUSD = null; }
 
@@ -709,6 +696,9 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   if (Object.keys(update).length > 0) {
     await Planificador.update(update, { where: { idPantalla } });
   }
+  // Al mover la pantalla de cuenta o de slot se re-alinea cuentaId (antes lo
+  // hacía la siguiente carga del Planificador)
+  if (update.cuentaId || update.idPantalla) await autoFixCuentaIdMismatches();
 
   const updated = await Planificador.findByPk(finalId);
   res.json(sinPassword(enrichPantalla(updated.toJSON())));
@@ -727,7 +717,7 @@ router.delete('/planificador/:idPantalla', asyncHandler(async (req, res) => {
 const PLANIFICADOR_FIELDS = [
   'idPantalla', 'cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion',
   'nombre', 'apellido', 'customerId', 'nickname', 'pantallas', 'duracionPlan',
-  'inicioReal', 'duracionReal', 'alertaReal', 'porcentaje', 'tipoPlan',
+  'inicioReal', 'duracionReal', 'alertaReal', 'cortesia', 'porcentaje', 'tipoPlan',
   'debe', 'montoDebe', 'montoDebeUSD',
 ];
 router.post('/planificador/restore', asyncHandler(async (req, res) => {
@@ -751,6 +741,10 @@ router.post('/planificador/restore', asyncHandler(async (req, res) => {
       const record = {};
       for (const f of PLANIFICADOR_FIELDS) record[f] = r[f] ?? null;
       if (r.password === undefined) record.password = passwordActual[r.idPantalla] ?? null;
+      // La cortesía viaja como booleano; alertaReal (calculado en la respuesta)
+      // no se persiste: solo el marcador legado coherente con `cortesia`.
+      record.cortesia = r.cortesia !== undefined ? esCortesia(r.cortesia) : esCortesia(r.alertaReal);
+      record.alertaReal = record.cortesia ? 'CORTESIA' : null;
       return record;
     });
     await Planificador.bulkCreate(records, {

@@ -22,7 +22,7 @@ import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
 import { Badge } from './Badge'
 import { SortTh, DaysChip, MonthsChip } from '../../pages/admin/planificador/TableBits'
 import {
-  calcDias, getRowVariant, ROW_BG, estadoBadgeVariant,
+  calcDias, getRowVariant, ROW_BG, estadoBadgeVariant, DIAS_ALERTA_DEFAULT,
 } from '../../pages/admin/planificador/rowHelpers'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 
@@ -38,7 +38,7 @@ export function PlanificadorTable({
   onDelete,
   readOnly = false,
 }) {
-  const diasAlerta = stats.diasAlerta ?? 7
+  const diasAlerta = stats.diasAlerta ?? DIAS_ALERTA_DEFAULT
 
   return (
     <div

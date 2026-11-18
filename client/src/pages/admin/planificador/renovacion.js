@@ -3,7 +3,7 @@
 // cliente, así que cualquier cambio aquí debe venir con su prueba.
 import { formatDate, formatCurrency } from '../../../utils/excelUtils'
 import { MARCA_CLIENTE, PAGO_NEQUI, PAGO_LLAVE } from '../../../config/negocio'
-import { calcDias } from './rowHelpers'
+import { calcDias, esCortesia } from './rowHelpers'
 
 // Familias del catálogo que entran en la oferta (en este orden). Los meses que
 // se pagan definen la familia; los meses de REGALO salen del Catálogo de venta
@@ -61,8 +61,7 @@ export function etapaPendiente(dias, enviadas = []) {
 // el marcador manual CORTESIA se respeta: a una cortesía no se le cobra.
 export function esRenovable(row) {
   const estado = (row.estadoReal || '').toUpperCase()
-  const alerta = (row.alertaReal || '').toUpperCase()
-  return (estado === 'VENCIDO' || estado === 'ALERTA') && alerta !== 'CORTESIA'
+  return (estado === 'VENCIDO' || estado === 'ALERTA') && !esCortesia(row)
 }
 
 export function tipoPlanDe(row, pago) {
