@@ -5,8 +5,8 @@
 //    WhatsApp (Web Share en móvil; portapapeles + chat en escritorio).
 //  · Renovación (solo VENCIDO / PROXIMO A VENCER): mensaje de venta listo
 //    para WhatsApp con los precios del Catálogo de venta según el número de
-//    pantallas que el cliente tiene en el Planificador (agrupadas por
-//    customerId); se envía como TEXTO prellenado vía wa.me o se copia.
+//    pantallas de la CUENTA que se renueva (la fila del Planificador, no el
+//    total del cliente); se envía como TEXTO prellenado vía wa.me o se copia.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { X, Copy, Check, Tv, Loader2, MessageCircle, Megaphone, Receipt } from 'lucide-react'
 import * as htmlToImage from 'html-to-image'
@@ -78,26 +78,35 @@ function ofertasDe(catalogo = [], pantallas = 1) {
   return { ofertas, combo: exacto && pantallas > 1, porPantalla: !exacto && pantallas > 1 }
 }
 
-function construirMensaje({ row, pantallas, ofertas, combo, porPantalla }) {
+// El mensaje se arma SOLO para la cuenta (fila del Planificador) que se está
+// renovando: precio según las pantallas de esa cuenta, no la suma de todas las
+// cuentas del cliente. Si el cliente tiene varias cuentas, se nombra la cuenta
+// por su nickname para que sepa cuál es la que vence.
+function construirMensaje({ row, pantallas, ofertas, combo, porPantalla, identificarCuenta }) {
   const nombre = (row.nombre || '').trim() || (row.nickname || '').trim()
   const dias = diasRestantesDe(row)
   const fechaFin = formatDate(row.duracionReal || row.finalizacion)
   const vencido = dias == null || dias <= 0
 
+  const cuenta = (row.nickname || '').trim()
+  const plan = identificarCuenta && cuenta
+    ? `el plan de tu cuenta *${cuenta}* de ${MARCA_CLIENTE}`
+    : `tu plan de ${MARCA_CLIENTE}`
+
   let situacion
-  if (dias == null)    situacion = `tu plan de ${MARCA_CLIENTE} está pendiente de renovación 😅`
-  else if (dias < 0)   situacion = `tu plan de ${MARCA_CLIENTE} se venció el ${fechaFin} 😅`
-  else if (dias === 0) situacion = `tu plan de ${MARCA_CLIENTE} vence HOY (${fechaFin}) ⏳`
-  else if (dias === 1) situacion = `tu plan de ${MARCA_CLIENTE} vence MAÑANA (${fechaFin}) ⏳`
-  else                 situacion = `tu plan de ${MARCA_CLIENTE} vence en ${dias} días (el ${fechaFin}) ⏳`
+  if (dias == null)    situacion = `${plan} está pendiente de renovación 😅`
+  else if (dias < 0)   situacion = `${plan} se venció el ${fechaFin} 😅`
+  else if (dias === 0) situacion = `${plan} vence HOY (${fechaFin}) ⏳`
+  else if (dias === 1) situacion = `${plan} vence MAÑANA (${fechaFin}) ⏳`
+  else                 situacion = `${plan} vence en ${dias} días (el ${fechaFin}) ⏳`
 
   const puente = vencido
     ? 'La buena noticia: reactivarlo toma 1 minuto y te mantengo los mismos precios de siempre.'
     : 'Renovando hoy sigues sin cortes — cero interrupciones y los mismos precios de siempre.'
 
   let intro
-  if (combo)            intro = `Como tienes ${pantallas} pantallas con nosotros, te dejo los precios del combo completo para renovarlas todas de una:`
-  else if (porPantalla) intro = `Tienes ${pantallas} pantallas con nosotros — estos son los precios por cada pantalla:`
+  if (combo)            intro = `Como esta cuenta tiene ${pantallas} pantallas, te dejo los precios del combo para renovarla completa:`
+  else if (porPantalla) intro = `Esta cuenta tiene ${pantallas} pantallas — estos son los precios por cada pantalla:`
   else                  intro = 'Mira las opciones:'
 
   const etiqueta = combo ? ` (${pantallas} pantallas)` : ''
@@ -174,13 +183,16 @@ export function ComprobanteModal({ row, onClose }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Pantallas de la cuenta que se renueva (la fila), no del cliente completo.
+  const pantallasCuenta = Math.max(1, Math.floor(Number(row.pantallas)) || 1)
+  const identificarCuenta = pantallasCliente > 1
   const { ofertas, combo, porPantalla } = useMemo(
-    () => ofertasDe(catalogo, pantallasCliente),
-    [catalogo, pantallasCliente],
+    () => ofertasDe(catalogo, pantallasCuenta),
+    [catalogo, pantallasCuenta],
   )
   const mensaje = useMemo(
-    () => construirMensaje({ row, pantallas: pantallasCliente, ofertas, combo, porPantalla }),
-    [row, pantallasCliente, ofertas, combo, porPantalla],
+    () => construirMensaje({ row, pantallas: pantallasCuenta, ofertas, combo, porPantalla, identificarCuenta }),
+    [row, pantallasCuenta, ofertas, combo, porPantalla, identificarCuenta],
   )
 
   const numeroWhatsApp = () => {
@@ -335,8 +347,16 @@ export function ComprobanteModal({ row, onClose }) {
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: estadoCss.bg, color: estadoCss.text }}>{estado}</span>
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{diasLabel(dias)}</span>
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
-                {pantallasCliente} pantalla{pantallasCliente === 1 ? '' : 's'} en Planificador
+                Cuenta {row.nickname || row.idPantalla} · {pantallasCuenta} pantalla{pantallasCuenta === 1 ? '' : 's'}
               </span>
+              {identificarCuenta && (
+                <span
+                  className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                  title="El cliente tiene otras cuentas; el mensaje solo cobra la renovación de esta."
+                >
+                  Cliente con {pantallasCliente} cuentas · solo se renueva esta
+                </span>
+              )}
             </div>
 
             {/* Vista previa estilo WhatsApp */}
@@ -353,7 +373,7 @@ export function ComprobanteModal({ row, onClose }) {
 
             {porPantalla && !cargando && (
               <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2">
-                El Catálogo de venta no tiene combo de {pantallasCliente} pantallas — se ofertan precios por pantalla.
+                El Catálogo de venta no tiene combo de {pantallasCuenta} pantallas — se ofertan precios por pantalla.
               </p>
             )}
             {!cargando && ofertas.length === 0 && (
