@@ -51,6 +51,8 @@ export function DataTable({ columns, data, emptyMessage = 'Sin datos para mostra
             <tr>
               {columns.map((col) => {
                 const noSort = col.key === 'actions' || col.sortable === false
+                // Acciones fijas a la derecha: en móvil no quedan fuera de la pantalla
+                const fija = col.key === 'actions' || col.sticky === 'right'
                 const isActive = sortKey === col.key
                 return (
                   <th
@@ -61,6 +63,7 @@ export function DataTable({ columns, data, emptyMessage = 'Sin datos para mostra
                       'sticky top-0 z-10 whitespace-nowrap border-b border-ui-border bg-slate-50/95 px-2 py-2 md:px-4 md:py-3 text-left text-xs font-semibold uppercase tracking-wider text-brand-accent shadow-[0_1px_0_0_theme(colors.ui.border)] backdrop-blur-sm',
                       !noSort && 'cursor-pointer select-none hover:bg-slate-100',
                       isActive && 'text-brand-dark',
+                      fija && 'right-0 z-20',
                       col.className
                     )}
                   >
@@ -89,7 +92,7 @@ export function DataTable({ columns, data, emptyMessage = 'Sin datos para mostra
                 )}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className={cn('border-b border-ui-border/70 px-2 py-2 md:px-4 md:py-3 text-sm text-brand-accent', col.cellClassName)}>
+                  <td key={col.key} className={cn('border-b border-ui-border/70 px-2 py-2 md:px-4 md:py-3 text-sm text-brand-accent', (col.key === 'actions' || col.sticky === 'right') && 'sticky right-0 z-[5] bg-white shadow-[-8px_0_10px_-8px_rgba(15,23,42,0.25)]', col.cellClassName)}>
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}

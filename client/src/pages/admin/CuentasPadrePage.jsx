@@ -489,6 +489,8 @@ export default function CuentasPadrePage() {
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true) }
   const openEdit = (row) => { setEditing(row); setForm({ ...EMPTY, ...row }); setShowForm(true) }
+  // Cerraba con una función inexistente: abrir "Nueva Cuenta" o editar rompía la página
+  const closeForm = () => { setShowForm(false); setEditing(null) }
   const f = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }))
 
   const handleSubmit = async (e) => {

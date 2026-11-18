@@ -489,7 +489,7 @@ export default function DevicesPage() {
     },
     {
       key: 'actions', label: '', render: (r) => (
-        <div className="flex justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
+        <div className="flex justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100">
           <button title="Editar" onClick={() => openEditInv(r)} className="rounded-md p-1.5 text-blue-600 hover:bg-blue-50"><Pencil size={15} /></button>
           <button title="Eliminar" onClick={() => handleInvDelete(r)} className="rounded-md p-1.5 text-red-600 hover:bg-red-50"><Trash2 size={15} /></button>
         </div>

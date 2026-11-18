@@ -939,7 +939,7 @@ export default function PlansPage() {
                           <th className="px-6 py-4 text-right">Costo pantallas</th>
                           <th className="px-6 py-4 text-right">Rentabilidad</th>
                           <th className="px-6 py-4 text-center">Estado</th>
-                          <th className="px-6 py-4 w-20"></th>
+                          <th className="px-6 py-4 w-20 sticky right-0 bg-slate-50"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -978,7 +978,7 @@ export default function PlansPage() {
                                 ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><CheckCircle2 size={10} />Activo</span>
                                 : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500"><XCircle size={10} />Inactivo</span>}
                             </td>
-                            <td className="px-4 py-4 text-right">
+                            <td className="px-4 py-4 text-right sticky right-0 z-[5] bg-white shadow-[-8px_0_10px_-8px_rgba(15,23,42,0.25)]">
                               <div className="flex items-center justify-end gap-1">
                                 <button onClick={() => openEdit(p)}
                                   className="pl-action-btn w-8 h-8 rounded-lg flex items-center justify-center text-sky-500 hover:bg-sky-50"
