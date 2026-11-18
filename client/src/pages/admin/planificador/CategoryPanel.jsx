@@ -1,4 +1,4 @@
-import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil, MessageCircle, ListChecks } from 'lucide-react'
+import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil, MessageCircle, ListChecks, RefreshCcw } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
 import { STAT_TONES } from './StatCard'
@@ -94,9 +94,11 @@ export function screenToVentaPrefill(screen, catKey) {
 // en VENCIDO/ALERTA arranca en la vista "Renovación" con el mensaje listo).
 const CATEGORIAS_RECORDATORIO = new Set(['vencido', 'alerta'])
 
-export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus, recordatorios, onRecordarTodos }) {
+export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus, recordatorios, onRecordarTodos, onRenovar }) {
   const config = CATEGORY_CONFIG[catKey]
   const conRecordatorio = CATEGORIAS_RECORDATORIO.has(catKey) && !!onStatus
+  // Vencidas / Próx. a vencer: "Renovar" registra venta + nuevo plan en un paso
+  const conRenovar = CATEGORIAS_RECORDATORIO.has(catKey) && !!onRenovar
   // Secuencia de cobro: qué etapa le toca hoy a cada pantalla (null = al día)
   const pendienteDe = (p) => (p.nickname
     ? etapaPendiente(p._dias, recordatorios?.ultimos?.[p.idPantalla]?.etapas || [])
@@ -224,14 +226,25 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
                               <MessageCircle size={13} /> Status cliente
                             </button>
                           )}
-                          <button
-                            onClick={() => onGenerate(p, catKey)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold shadow-sm transition-colors"
-                          >
-                            {catKey === 'libre'
-                              ? <><MonitorCheck size={13} /> Asignar Pantalla</>
-                              : <><Receipt size={13} /> Generar venta</>}
-                          </button>
+                          {conRenovar ? (
+                            <button
+                              onClick={() => onRenovar(p)}
+                              disabled={!p.nickname}
+                              title={p.nickname ? 'Registra la venta y extiende el plan en un solo paso' : 'Sin titular: asigna la pantalla antes de renovar'}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-40"
+                            >
+                              <RefreshCcw size={13} /> Renovar
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => onGenerate(p, catKey)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold shadow-sm transition-colors"
+                            >
+                              {catKey === 'libre'
+                                ? <><MonitorCheck size={13} /> Asignar Pantalla</>
+                                : <><Receipt size={13} /> Generar venta</>}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -247,7 +260,9 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
             {catKey === 'libre'
               ? '"Asignar Pantalla" abre el formulario de edición de la pantalla para asignarle un nuevo titular.'
               : conRecordatorio
-                ? 'El lápiz abre Editar Pantalla; "Status cliente" prepara el recordatorio de pago por WhatsApp; "Generar venta" abre Pagos con los datos ya cargados.'
+                ? (conRenovar
+                    ? 'El lápiz abre Editar Pantalla; "Status cliente" prepara el recordatorio por WhatsApp; "Renovar" registra la venta y extiende el plan en un paso.'
+                    : 'El lápiz abre Editar Pantalla; "Status cliente" prepara el recordatorio de pago por WhatsApp; "Generar venta" abre Pagos con los datos ya cargados.')
                 : 'El lápiz abre Editar Pantalla directamente; "Generar venta" abre Pagos con los datos ya cargados.'}
           </p>
           <button onClick={onClose} className="shrink-0 px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors">

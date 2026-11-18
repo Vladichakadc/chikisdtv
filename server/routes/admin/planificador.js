@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
-const { Planificador, CuentaPadre, Venta, Client, Plan, Recordatorio, AccesoCredencial, TablaCliente } = require('../../models');
+const { Planificador, CuentaPadre, Venta, Client, Plan, Recordatorio, AccesoCredencial, TablaCliente, PlanificadorCambio } = require('../../models');
+const { registrarCambio, presentar, deshacerCambio, deshacerLote, nuevoLote, ConflictoDeshacer } = require('../../services/historialPlanificador');
+const { registrarRenovacion, inicioSugerido, ErrorRenovacion } = require('../../services/renovacionService');
 const { buscarUltimosPagos } = require('../../utils/ultimosPagos');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { importFromExcel, autoFixCuentaIdMismatches, ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
@@ -522,6 +524,66 @@ router.get('/planificador/recordatorios/resumen', asyncHandler(async (req, res) 
   });
 }));
 
+// ── Renovación en un paso ───────────────────────────────────────────────
+// GET /planificador/renovar/opciones — planes y medios de pago usados en Pagos
+// + catálogo activo, para el formulario "Registrar renovación".
+router.get('/planificador/renovar/opciones', asyncHandler(async (_req, res) => {
+  const distintos = async (col) => (await Venta.findAll({
+    attributes: [[Venta.sequelize.fn('DISTINCT', Venta.sequelize.col(col)), col]],
+    where: { [col]: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }] } },
+    raw: true,
+  })).map(r => String(r[col]).trim()).filter(Boolean);
+  const [tiposPlan, mediosPago, catalogo] = await Promise.all([
+    distintos('tipoPlan'),
+    distintos('medioPago'),
+    Plan.findAll({ where: { activo: true }, attributes: ['nombre', 'precio', 'duracionDias', 'numeroPantallas'], raw: true }),
+  ]);
+  const unicos = (l) => [...new Set(l)].sort((a, b) => a.localeCompare(b, 'es'));
+  res.json({ tiposPlan: unicos(tiposPlan), mediosPago: unicos(mediosPago.filter(m => !/^cortes/i.test(m))), catalogo });
+}));
+
+// POST /planificador/:idPantalla/renovar — crea la venta y extiende el plan
+// en una sola transacción (ver services/renovacionService.js)
+router.post('/planificador/:idPantalla/renovar', asyncHandler(async (req, res) => {
+  try {
+    const r = await registrarRenovacion(req.params.idPantalla, req.body || {}, req.user?.email);
+    res.status(201).json({ ...r, pantalla: sinPassword(enrichPantalla(r.pantalla)) });
+  } catch (e) {
+    if (e instanceof ErrorRenovacion) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+}));
+
+// ── Historial y deshacer ────────────────────────────────────────────────
+// GET /planificador/historial?limit=50&idPantalla=…
+router.get('/planificador/historial', asyncHandler(async (req, res) => {
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+  const where = req.query.idPantalla ? { idPantalla: String(req.query.idPantalla) } : {};
+  const cambios = await PlanificadorCambio.findAll({ where, order: [['id', 'DESC']], limit });
+  res.json({ cambios: cambios.map(presentar) });
+}));
+
+const responderDeshacer = (fn) => asyncHandler(async (req, res) => {
+  try {
+    res.json({ ok: true, ...(await fn(req)) });
+  } catch (e) {
+    if (e instanceof ConflictoDeshacer) return res.status(409).json({ error: e.message, detalles: e.detalles });
+    throw e;
+  }
+});
+
+// POST /planificador/historial/:id/deshacer — revierte un cambio puntual
+router.post('/planificador/historial/:id/deshacer', responderDeshacer(async (req) => {
+  const r = await deshacerCambio(Number(req.params.id), req.user?.email);
+  return { resultado: r, message: `Cambio deshecho en la pantalla ${r.idPantalla}.` };
+}));
+
+// POST /planificador/historial/lote/:lote/deshacer — revierte una operación completa
+router.post('/planificador/historial/lote/:lote/deshacer', responderDeshacer(async (req) => {
+  const r = await deshacerLote(String(req.params.lote), req.user?.email);
+  return { ...r, message: `${r.deshechos} cambio(s) deshecho(s).` };
+}));
+
 // GET /planificador/promos — promociones registradas en "Tipo de Plan" de las
 // pantallas (p. ej. "3+1"). Pagos las usa para sugerirlas en Nueva Venta sin
 // descargar el Planificador completo.
@@ -639,6 +701,7 @@ router.post('/planificador', asyncHandler(async (req, res) => {
     pantallas: 1,
     debe:      false,
   });
+  await registrarCambio({ accion: 'crear', idPantalla, antes: null, despues: record, usuarioEmail: req.user?.email });
   res.status(201).json(sinPassword(enrichPantalla(record.toJSON())));
 }));
 
@@ -701,6 +764,7 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   if (update.cuentaId || update.idPantalla) await autoFixCuentaIdMismatches();
 
   const updated = await Planificador.findByPk(finalId);
+  await registrarCambio({ accion: 'editar', idPantalla, antes: pantalla, despues: updated, usuarioEmail: req.user?.email });
   res.json(sinPassword(enrichPantalla(updated.toJSON())));
 }));
 
@@ -710,55 +774,10 @@ router.delete('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   const pantalla = await Planificador.findByPk(idPantalla);
   if (!pantalla) return res.status(404).json({ error: 'Pantalla no encontrada' });
   await Planificador.destroy({ where: { idPantalla } });
-  res.json({ message: `Pantalla ${idPantalla} eliminada` });
+  const cambio = await registrarCambio({ accion: 'eliminar', idPantalla, antes: pantalla, despues: null, usuarioEmail: req.user?.email });
+  res.json({ message: `Pantalla ${idPantalla} eliminada`, cambioId: cambio?.id ?? null });
 }));
 
-// POST /planificador/restore — restaura el planificador a un snapshot previo (deshacer)
-const PLANIFICADOR_FIELDS = [
-  'idPantalla', 'cuentaId', 'cuenta', 'password', 'credito', 'inicio', 'finalizacion',
-  'nombre', 'apellido', 'customerId', 'nickname', 'pantallas', 'duracionPlan',
-  'inicioReal', 'duracionReal', 'alertaReal', 'cortesia', 'porcentaje', 'tipoPlan',
-  'debe', 'montoDebe', 'montoDebeUSD',
-];
-router.post('/planificador/restore', asyncHandler(async (req, res) => {
-  const snapshot = req.body;
-  if (!Array.isArray(snapshot)) return res.status(400).json({ error: 'Se esperaba un arreglo de registros' });
-
-  const snapshotIds = snapshot.map(r => r.idPantalla);
-  if (snapshotIds.length > 0) {
-    await Planificador.destroy({ where: { idPantalla: { [Op.notIn]: snapshotIds } } });
-  } else {
-    await Planificador.destroy({ where: {} });
-  }
-
-  if (snapshot.length > 0) {
-    // El snapshot viene del navegador, que ya no recibe contraseñas: si una
-    // fila no trae `password` se conserva la que está en la BD (si no, deshacer
-    // borraría todas las contraseñas).
-    const actuales = await Planificador.findAll({ attributes: ['idPantalla', 'password'], raw: true });
-    const passwordActual = Object.fromEntries(actuales.map(a => [a.idPantalla, a.password]));
-    const records = snapshot.map(r => {
-      const record = {};
-      for (const f of PLANIFICADOR_FIELDS) record[f] = r[f] ?? null;
-      if (r.password === undefined) record.password = passwordActual[r.idPantalla] ?? null;
-      // La cortesía viaja como booleano; alertaReal (calculado en la respuesta)
-      // no se persiste: solo el marcador legado coherente con `cortesia`.
-      record.cortesia = r.cortesia !== undefined ? esCortesia(r.cortesia) : esCortesia(r.alertaReal);
-      record.alertaReal = record.cortesia ? 'CORTESIA' : null;
-      return record;
-    });
-    await Planificador.bulkCreate(records, {
-      updateOnDuplicate: PLANIFICADOR_FIELDS.filter(f => f !== 'idPantalla'),
-    });
-  }
-
-  // Autocorregir tras restaurar (el snapshot podría contener datos previos al fix)
-  await autoFixCuentaIdMismatches();
-
-  const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
-  const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-  res.json({ message: 'Planificador restaurado al estado anterior', diasAlerta: DIAS_ALERTA, pantallas: pantallas.map(sinPassword), inconsistencias: findCuentaIdMismatches(pantallas) });
-}));
 
 const SYNC_FIELDS = ['cuenta', 'password', 'credito', 'inicio', 'finalizacion'];
 
@@ -772,7 +791,7 @@ function syncFieldChanged(nv, ov, isNum) {
 
 // POST /planificador/sync-cuentas-padre — sincroniza datos de cuenta desde Cuentas Padre
 // y devuelve un diff por cuenta con los campos que cambiaron.
-router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) => {
+router.post('/planificador/sync-cuentas-padre', asyncHandler(async (req, res) => {
   const cuentas = await CuentaPadre.findAll();
   if (cuentas.length === 0)
     return res.status(404).json({ error: 'No hay cuentas padre en la base de datos' });
@@ -783,6 +802,15 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
   // Cuentas padre sin pantallas en el Planificador → se crean libres antes del
   // snapshot, así el diff las reporta como 'creada' (y "Deshacer" las elimina).
   const creadas = new Set(await ensurePantallasCuentasPadre());
+
+  // Historial: toda la sincronización queda como un lote que se deshace junto
+  const lote = nuevoLote();
+  const fotoAntes = await Planificador.findAll({ raw: true });
+  for (const f of fotoAntes) {
+    if (creadas.has(String(f.cuentaId).trim())) {
+      await registrarCambio({ accion: 'crear', idPantalla: f.idPantalla, antes: null, despues: f, lote, usuarioEmail: req.user?.email });
+    }
+  }
 
   // Snapshot previo: una fila representativa por cuentaId (todas las pantallas de
   // la misma cuenta comparten los mismos campos de cuenta/password/credito/inicio/fin)
@@ -843,6 +871,14 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
   }
 
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
+  const antesPorId = Object.fromEntries(fotoAntes.map(f => [f.idPantalla, f]));
+  for (const r of records) {
+    const antes = antesPorId[r.idPantalla];
+    if (antes && !creadas.has(String(antes.cuentaId).trim())) {
+      await registrarCambio({ accion: 'sincronizar', idPantalla: r.idPantalla, antes, despues: r, lote, usuarioEmail: req.user?.email });
+    }
+  }
+  const huboCambios = await PlanificadorCambio.count({ where: { lote } });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
   const inconsistencias = findCuentaIdMismatches(pantallas);
 
@@ -868,6 +904,7 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
     diasAlerta: DIAS_ALERTA,
     pantallas: pantallas.map(sinPassword),
     inconsistencias,
+    lote: huboCambios ? lote : null,
   });
 }));
 

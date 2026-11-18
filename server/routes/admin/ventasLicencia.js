@@ -5,18 +5,11 @@ const XLSX = require('xlsx');
 const { Venta, Client, Device } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
+const { normalizeTipoPago, sanitizeVentaBody, siguienteIdVenta } = require('../../services/ventasService');
 
 function excelSerial(n) {
   if (typeof n !== 'number') return n || null;
   return new Date(Date.UTC(1899, 11, 30) + n * 86400000).toISOString().split('T')[0];
-}
-
-// "Cambio de Plan" (valor histórico del Excel) cuenta como renovación en el
-// negocio: la BD se normalizó el 2026-07-02 y ni un reimport del .xlsx ni una
-// venta creada por API deben reintroducirlo.
-function normalizeTipoPago(v) {
-  if (!v) return v;
-  return /^cambio de plan$/i.test(String(v).trim()) ? 'Renovacion' : v;
 }
 
 async function importVentas() {
@@ -63,58 +56,6 @@ async function importVentas() {
   return records.length;
 }
 
-// Sanea el body del formulario "Nueva Venta" antes de persistirlo: recorta espacios en
-// los campos de texto y convierte cadenas vacías a null en campos numéricos/fecha
-// (evita que SQLite guarde "Invalid date" o "" en columnas DATEONLY/INTEGER/FLOAT).
-const VENTA_STRING_FIELDS = [
-  'idVM', 'customerId', 'nombre', 'apellido', 'sku', 'tipoFire', 'idPantalla', 'nickname',
-  'cuentaId', 'cuenta', 'estado', 'cortesia', 'anio', 'mes', 'medioPago', 'tipoPago',
-  'tipoPlan', 'tipoPantalla', 'cuentaDedicada',
-];
-const VENTA_INT_FIELDS = ['pantallas', 'itemQuantity'];
-const VENTA_FLOAT_FIELDS = ['precioVenta'];
-const VENTA_DATE_FIELDS = ['fecha', 'fechaAlta'];
-
-function sanitizeVentaBody(body) {
-  const out = {};
-  for (const f of VENTA_STRING_FIELDS) {
-    if (body[f] === undefined) continue;
-    const trimmed = (body[f] ?? '').toString().trim();
-    out[f] = trimmed || null;
-  }
-  for (const f of VENTA_INT_FIELDS) {
-    if (body[f] === undefined) continue;
-    out[f] = body[f] !== '' && body[f] != null ? parseInt(body[f], 10) : null;
-  }
-  for (const f of VENTA_FLOAT_FIELDS) {
-    if (body[f] === undefined) continue;
-    out[f] = body[f] !== '' && body[f] != null ? Number(body[f]) : null;
-  }
-  for (const f of VENTA_DATE_FIELDS) {
-    if (body[f] === undefined) continue;
-    out[f] = (body[f] || '').toString().trim() || null;
-  }
-  if (out.tipoPago) out.tipoPago = normalizeTipoPago(out.tipoPago);
-
-  // Auto-calcular año desde la fecha siempre que venga; mes solo si el usuario
-  // no lo eligió explícitamente (el formulario permite que fecha y mes sean independientes,
-  // p.ej. cuando un socio paga en diciembre pero el mes facturado es enero).
-  if (out.fecha) {
-    const parts = out.fecha.split('-');
-    if (parts.length === 3) {
-      out.anio = parts[0];
-      const mesExplicito = (body.mes || '').toString().trim();
-      if (!mesExplicito) {
-        const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-        const monthIndex = parseInt(parts[1], 10) - 1;
-        if (monthIndex >= 0 && monthIndex < 12) out.mes = meses[monthIndex];
-      }
-    }
-  }
-
-  return out;
-}
-
 function mapTipoFireToDeviceType(tipoFire) {
   if (!tipoFire) return 'Otro';
   const t = tipoFire.toLowerCase();
@@ -127,10 +68,7 @@ function mapTipoFireToDeviceType(tipoFire) {
 
 // ============ VENTAS LICENCIA CRUD ============
 router.get('/payments/ventas-licencia/next-id', asyncHandler(async (_req, res) => {
-  const all = await Venta.findAll({ attributes: ['idVM'] });
-  const nums = all.map(v => parseInt(v.idVM?.replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
-  const next = nums.length ? Math.max(...nums) + 1 : 1;
-  res.json({ nextId: `VM${next}` });
+  res.json({ nextId: await siguienteIdVenta() });
 }));
 
 router.post('/payments/ventas-licencia/import', asyncHandler(async (_req, res) => {

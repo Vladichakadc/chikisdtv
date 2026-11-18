@@ -5,7 +5,7 @@ import {
   Monitor, Clock, AlertTriangle, CheckCircle2,
   Search, RefreshCw, Tv,
   X, FileSpreadsheet,
-  Link2, Undo2,
+  Link2, Undo2, History,
   XCircle, Wallet, Gift, DollarSign, Percent, Package,
   Users, Maximize2, Minimize2, KeyRound, Copy, Check,
   Building2, ExternalLink, ChevronDown,
@@ -28,6 +28,8 @@ import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planific
 import { EditModal } from './planificador/EditModal'
 import { ComprobanteModal } from './planificador/ComprobanteModal'
 import { RecordatorioLote } from './planificador/RecordatorioLote'
+import { RenovarModal } from './planificador/RenovarModal'
+import { HistorialPanel, ACCIONES, puedeDeshacer, deshacerCambioApi } from './planificador/HistorialPanel'
 import {
   calcDias, getRowVariant, ROW_BG, estadoBadgeVariant, getPlanSortVal,
 } from './planificador/rowHelpers'
@@ -456,8 +458,12 @@ export default function PlanificadorPage() {
   const { passwords, revelar, olvidar }   = useCredenciales()
   const [editRow, setEditRow]             = useState(null)
   const [sortConfig, setSortConfig]       = useState({ key: 'cuentaId', dir: 'asc' })
-  const [prevPantallas, setPrevPantallas] = useState(null)
   const [undoing, setUndoing]             = useState(false)
+  // Historial en el servidor: último cambio deshacible y lote de la última sincronización
+  const [ultimoCambio, setUltimoCambio]   = useState(null)
+  const [showHistorial, setShowHistorial] = useState(false)
+  const [syncLote, setSyncLote]           = useState(null)
+  const [renovarRow, setRenovarRow]       = useState(null)
   const [activePanel, setActivePanel]     = useState(null)
   const [explain, setExplain]             = useState(null)
   const [showEstatusPanel, setShowEstatusPanel] = useState(false)
@@ -472,25 +478,26 @@ export default function PlanificadorPage() {
   const [cpPanelVariante, setCpPanelVariante]   = useState('vencida')
   const [showCapacidad, setShowCapacidad]       = useState(false)
 
-  // Guarda una "foto" del estado actual antes de aplicar un cambio, para poder deshacerlo
-  const snapshotBeforeChange = () => {
-    if (data?.pantallas) setPrevPantallas(data.pantallas)
+  // Deshacer = revertir en el servidor el último cambio del historial (ya no se
+  // reenvía una copia de toda la tabla desde el navegador, que podía borrar
+  // trabajo hecho entretanto en otra pestaña).
+  const loadUltimoCambio = async () => {
+    try {
+      const r = await api.get('/admin/planificador/historial', { params: { limit: 20 } })
+      setUltimoCambio((r.data.cambios || []).find(puedeDeshacer) || null)
+    } catch { setUltimoCambio(null) }
   }
 
   const handleUndo = async () => {
-    if (!prevPantallas) return
-    if (!confirm('¿Deshacer el último cambio realizado en el planificador?')) return
+    const c = ultimoCambio
+    if (!c) return
+    const que = `${ACCIONES[c.accion]?.label || c.accion} de ${c.accion === 'sincronizar' ? 'la sincronización' : c.idPantalla}`
+    const extra = c.accion === 'renovar' && c.ventaId ? `\nTambién se eliminará la venta ${c.ventaId} de Pagos.` : ''
+    if (!confirm(`¿Deshacer el último cambio? (${que})${extra}`)) return
     setUndoing(true)
-    try {
-      const r = await api.post('/admin/planificador/restore', prevPantallas)
-      setData(r.data)
-      setPrevPantallas(null)
-      showToast(r.data.message, 'success')
-    } catch (e) {
-      showToast(e.response?.data?.error || e.message, 'error')
-    } finally {
-      setUndoing(false)
-    }
+    const ok = await deshacerCambioApi(c, showToast)
+    setUndoing(false)
+    if (ok) { await load(); loadRecordatorios() }
   }
 
   const onSort = (key) => setSortConfig(prev =>
@@ -504,6 +511,7 @@ export default function PlanificadorPage() {
     try {
       const r = await api.get('/admin/planificador')
       setData(r.data)
+      loadUltimoCambio()
     } catch (e) {
       setError(e.response?.data?.error || e.message)
     } finally {
@@ -534,11 +542,12 @@ export default function PlanificadorPage() {
 
 
   const handleSync = async () => {
-    snapshotBeforeChange()
     setSyncing(true)
     try {
       const r = await api.post('/admin/planificador/sync-cuentas-padre')
       setData(r.data)
+      setSyncLote(r.data.lote || null)
+      loadUltimoCambio()
       if (r.data.diff?.length > 0) {
         setSyncDiffData(r.data.diff)
         setShowSyncDiff(true)
@@ -553,19 +562,15 @@ export default function PlanificadorPage() {
   }
 
   const handleSyncUndo = async () => {
-    if (!prevPantallas) return
+    if (!syncLote) return
     setUndoing(true)
-    try {
-      const r = await api.post('/admin/planificador/restore', prevPantallas)
-      setData(r.data)
-      setPrevPantallas(null)
+    const ok = await deshacerCambioApi({ accion: 'sincronizar', lote: syncLote }, showToast)
+    setUndoing(false)
+    if (ok) {
+      setSyncLote(null)
       setShowSyncDiff(false)
       setSyncDiffData([])
-      showToast(r.data.message, 'success')
-    } catch (e) {
-      showToast(e.response?.data?.error || e.message, 'error')
-    } finally {
-      setUndoing(false)
+      await load()
     }
   }
 
@@ -697,7 +702,6 @@ export default function PlanificadorPage() {
   const handleGenerateVenta = (screen, catKey) => {
     setActivePanel(null)
     if (catKey === 'libre') {
-      snapshotBeforeChange()
       setEditRow(screen)
       return
     }
@@ -765,10 +769,10 @@ export default function PlanificadorPage() {
       `¿Eliminar la pantalla ${row.idPantalla} (${cliente})?\n\nPodrás deshacer este cambio con el botón "Deshacer".`
     )
     if (!ok) return
-    snapshotBeforeChange()
     try {
       await api.delete(`/admin/planificador/${row.idPantalla}`)
       setData(d => ({ ...d, pantallas: d.pantallas.filter(p => p.idPantalla !== row.idPantalla) }))
+      loadUltimoCambio()
       showToast(`Pantalla ${row.idPantalla} eliminada correctamente.`, 'success')
     } catch (e) {
       showToast(e.response?.data?.error || e.message, 'error')
@@ -800,7 +804,7 @@ export default function PlanificadorPage() {
       {showSyncDiff && syncDiffData.length > 0 && (
         <SyncDiffModal
           diff={syncDiffData}
-          canUndo={!!prevPantallas}
+          canUndo={!!syncLote}
           onUndo={handleSyncUndo}
           onClose={() => setShowSyncDiff(false)}
           undoing={undoing}
@@ -831,7 +835,7 @@ export default function PlanificadorPage() {
           onClose={() => setEditRow(null)}
           onSaved={() => { setEditRow(null); load() }}
           onCreated={(nueva) => { setEditRow(nueva); load() }}
-          onSwitchPantalla={(sibling) => { snapshotBeforeChange(); setEditRow(sibling) }}
+          onSwitchPantalla={(sibling) => { setEditRow(sibling) }}
           onDeleteSibling={handleDelete}
         />
       )}
@@ -843,10 +847,11 @@ export default function PlanificadorPage() {
           screens={categoryLists[activePanel] || []}
           onClose={() => setActivePanel(null)}
           onGenerate={handleGenerateVenta}
-          onEdit={(screen) => { setActivePanel(null); snapshotBeforeChange(); setEditRow(screen) }}
+          onEdit={(screen) => { setActivePanel(null); setEditRow(screen) }}
           onStatus={(screen) => setComprobanteRow(screen)}
           recordatorios={recordatorios}
           onRecordarTodos={(screens) => setLote({ catKey: activePanel, screens })}
+          onRenovar={(screen) => setRenovarRow(screen)}
         />
       )}
 
@@ -870,11 +875,16 @@ export default function PlanificadorPage() {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
-            {prevPantallas && (
-              <button onClick={handleUndo} disabled={undoing} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
+            {ultimoCambio && (
+              <button onClick={handleUndo} disabled={undoing}
+                title={`Deshacer: ${ACCIONES[ultimoCambio.accion]?.label || ultimoCambio.accion} · ${ultimoCambio.accion === 'sincronizar' ? 'sincronización' : ultimoCambio.idPantalla}`}
+                className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
                 <Undo2 size={15} /> {undoing ? 'Deshaciendo…' : 'Deshacer'}
               </button>
             )}
+            <button onClick={() => setShowHistorial(true)} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
+              <History size={15} /> Historial
+            </button>
             <button onClick={handleSync} disabled={syncing} className="pl-btn-ghost relative px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
               <Link2 size={15} /> {syncing ? 'Sincronizando…' : 'Sincronizar CP'}
               {syncPendiente && !syncing && (
@@ -914,7 +924,7 @@ export default function PlanificadorPage() {
                       </span>
                       {row && (
                         <button
-                          onClick={() => { snapshotBeforeChange(); setEditRow(row) }}
+                          onClick={() => { setEditRow(row) }}
                           className="shrink-0 text-amber-700 hover:text-amber-900 underline font-medium"
                         >
                           Editar
@@ -1103,6 +1113,21 @@ export default function PlanificadorPage() {
           </button>
         </div>
       </div>
+
+      {/* Registrar renovación en un paso (venta + plan) — z-[80], sobre el panel */}
+      {renovarRow && (
+        <RenovarModal
+          row={renovarRow}
+          onClose={() => setRenovarRow(null)}
+          onAbrirPagos={() => { const r = renovarRow; setRenovarRow(null); handleGenerateVenta(r, activePanel || 'vencido') }}
+          onRenovado={async () => { setRenovarRow(null); await load(); loadRecordatorios() }}
+        />
+      )}
+
+      {/* Historial de cambios con deshacer por cambio */}
+      {showHistorial && (
+        <HistorialPanel onClose={() => setShowHistorial(false)} onCambio={() => { load(); loadRecordatorios() }} />
+      )}
 
       {/* Recordatorios en lote desde Vencidas / Próx. a vencer (z-[80], sobre el panel) */}
       {lote && (
@@ -1328,7 +1353,7 @@ export default function PlanificadorPage() {
           pwdVisible={pwdVisible}
           passwords={passwords}
           onTogglePwd={togglePwd}
-          onEdit={(row) => { snapshotBeforeChange(); setEditRow(row) }}
+          onEdit={(row) => { setEditRow(row) }}
           onDelete={handleDelete}
         />
       </Card>

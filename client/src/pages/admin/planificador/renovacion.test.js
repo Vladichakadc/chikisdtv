@@ -178,3 +178,28 @@ describe('secuencia de cobro (antes / día / +3 días)', () => {
     expect(r.mensaje).toContain('*Xiomy 2*')
   })
 })
+
+import { mesesPorPlan, precioPorPlan, sumarMeses, inicioSugerido } from './renovacion'
+
+describe('registrar renovación: sugerencias del formulario', () => {
+  it('meses según el catálogo (y respaldo por familia)', () => {
+    expect(mesesPorPlan('Plan Mensual', CATALOGO, 1)).toBe(1)
+    expect(mesesPorPlan('Plan Semestral', CATALOGO, 1)).toBe(7)
+    expect(mesesPorPlan('Plan Anual', CATALOGO, 2)).toBe(14)
+    expect(mesesPorPlan('Plan Anual', [], 1)).toBe(14)
+    expect(mesesPorPlan('3+1 Mundial', CATALOGO, 1)).toBe(null)
+  })
+  it('precio del catálogo según pantallas; si no, el último pago del mismo plan', () => {
+    expect(precioPorPlan('Plan Mensual', CATALOGO, 1)).toBe(15000)
+    expect(precioPorPlan('Plan Mensual', CATALOGO, 2)).toBe(25000)
+    expect(precioPorPlan('Plan Semestral', CATALOGO, 3, { tipoPlan: 'Plan Semestral', precioVenta: 120000 })).toBe(120000)
+    expect(precioPorPlan('3+1 Mundial', CATALOGO, 1, { tipoPlan: 'Plan Mensual', precioVenta: 15000 })).toBe(null)
+  })
+  it('fechas iguales a las del servidor', () => {
+    expect(sumarMeses('2026-01-15', 1)).toBe('2026-02-15')
+    expect(sumarMeses('2026-11-18', 14)).toBe('2028-01-18')
+    expect(inicioSugerido('2026-11-23', '2026-11-18')).toBe('2026-11-23') // vigente
+    expect(inicioSugerido('2026-11-10', '2026-11-18')).toBe('2026-11-18') // vencido
+    expect(inicioSugerido(null, '2026-11-18')).toBe('2026-11-18')
+  })
+})
