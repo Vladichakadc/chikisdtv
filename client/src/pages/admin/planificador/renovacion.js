@@ -184,3 +184,53 @@ export function prepararRenovacion(row, datos = {}, etapa) {
   const mensaje = construirMensaje({ row, pantallas, ...oferta, identificarCuenta, etapa: paso })
   return { ...oferta, pantallas, identificarCuenta, etapa: paso, mensaje }
 }
+
+// ── Registrar renovación (formulario del Planificador) ────────────────────
+// Meses por familia cuando el catálogo no trae el plan (coincide con la
+// duración que el Planificador ya usaba: Mensual 1, Semestral 7, Anual 14).
+const MESES_POR_FAMILIA = [
+  { match: /mensual/i, meses: 1 },
+  { match: /semestral/i, meses: 7 },
+  { match: /anual/i, meses: 14 },
+]
+
+// Plan del catálogo que corresponde a un tipo de plan de Pagos ("Plan Anual")
+// y a las pantallas de la cuenta
+export function planCatalogoDe(tipoPlan, catalogo = [], pantallas = 1) {
+  const fam = MESES_POR_FAMILIA.find(f => f.match.test(tipoPlan || ''))
+  if (!fam) return null
+  return catalogo.find(p => fam.match.test(p.nombre || '') && Number(p.numeroPantallas) === Number(pantallas))
+    || null
+}
+
+// Meses que se suman al renovar con ese plan (null = promoción: escribirlos a mano)
+export function mesesPorPlan(tipoPlan, catalogo = [], pantallas = 1) {
+  const plan = planCatalogoDe(tipoPlan, catalogo, pantallas)
+  const desdeCatalogo = plan ? mesesDePlan(plan.duracionDias) : 0
+  if (desdeCatalogo) return desdeCatalogo
+  return MESES_POR_FAMILIA.find(f => f.match.test(tipoPlan || ''))?.meses ?? null
+}
+
+// Precio sugerido: el del catálogo; si no, el último pago con ese mismo plan
+export function precioPorPlan(tipoPlan, catalogo = [], pantallas = 1, ultimoPago = null) {
+  const plan = planCatalogoDe(tipoPlan, catalogo, pantallas)
+  if (plan) return Number(plan.precio)
+  if (ultimoPago?.tipoPlan === tipoPlan && ultimoPago?.precioVenta != null) return Number(ultimoPago.precioVenta)
+  return null
+}
+
+// Suma meses a YYYY-MM-DD en hora local (misma regla que el servidor)
+export function sumarMeses(fecha, meses) {
+  const m = String(fecha || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  const n = Math.trunc(Number(meses))
+  if (!m || !Number.isFinite(n)) return ''
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  d.setMonth(d.getMonth() + n)
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
+}
+
+// Vigente: el nuevo período arranca al final del actual; vencido: el día del pago
+export function inicioSugerido(finActual, fechaPago) {
+  const dias = calcDias(finActual)
+  return dias != null && dias > 0 ? String(finActual).slice(0, 10) : fechaPago
+}
