@@ -80,3 +80,18 @@ export function diasLabelClass(dias) {
   if (dias <= 8) return 'text-amber-600 font-semibold'
   return 'text-green-700 font-medium'
 }
+
+// Texto relativo de una marca de tiempo del backend ("Recordado hace N días").
+// Acepta ISO o el formato de SQLite "YYYY-MM-DD HH:MM:SS.mmm +00:00".
+export function haceTexto(fecha, ahora = new Date()) {
+  if (!fecha) return ''
+  const iso = String(fecha).trim().replace(' ', 'T').replace(/\s*\+00:00$/, 'Z')
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const hoy = new Date(ahora); hoy.setHours(0, 0, 0, 0)
+  const dia = new Date(d); dia.setHours(0, 0, 0, 0)
+  const n = Math.round((hoy - dia) / 86400000)
+  if (n <= 0) return 'hoy'
+  if (n === 1) return 'ayer'
+  return `hace ${n} días`
+}

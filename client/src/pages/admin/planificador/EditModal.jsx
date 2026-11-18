@@ -119,6 +119,27 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
   const [clientesList, setClientesList] = useState([])
   const [planes, setPlanes]             = useState([])
   const [showPwd, setShowPwd]           = useState(false)
+  // La contraseña ya no llega con la fila: se pide al tocar el ojo (queda
+  // registrado) y solo se envía al guardar si se cargó o se escribió una nueva.
+  const [pwdTocado, setPwdTocado]       = useState(false)
+  const [cargandoPwd, setCargandoPwd]   = useState(false)
+  const verPassword = async () => {
+    if (showPwd) { setShowPwd(false); return }
+    if (!pwdTocado && row.tienePassword) {
+      setCargandoPwd(true)
+      try {
+        const r = await api.post('/admin/planificador/credenciales', { idPantallas: [row.idPantalla], motivo: 'edicion' })
+        setForm(f => ({ ...f, password: r.data?.credenciales?.[row.idPantalla] || '' }))
+        setPwdTocado(true)
+      } catch (e) {
+        showToast(e.response?.data?.error || 'No se pudo cargar la contraseña.', 'error')
+        return
+      } finally {
+        setCargandoPwd(false)
+      }
+    }
+    setShowPwd(true)
+  }
 
   useEffect(() => {
     api.get('/admin/cuentas-padre')
@@ -265,6 +286,7 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
     setSelectedCuentaId(cuentaId)
     const cp = cuentasPadre.find(c => c.cuentaId === cuentaId)
     if (!cp) return
+    setPwdTocado(true) // la contraseña pasa a ser la de la nueva cuenta padre
     setForm(f => ({
       ...f,
       cuentaId:     cp.cuentaId,
@@ -303,7 +325,9 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
   const handleSave = async () => {
     setSaving(true); setError(null)
     try {
-      await api.put(`/admin/planificador/${row.idPantalla}`, form)
+      // Sin cargar ni escribir la contraseña no se envía: así no se borra la guardada
+      const { password, ...resto } = form
+      await api.put(`/admin/planificador/${row.idPantalla}`, pwdTocado ? form : resto)
       showToast(`Pantalla ${row.idPantalla} actualizada correctamente.`, 'success')
       onSaved()
     } catch (e) {
@@ -404,14 +428,21 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
               </Field>
               <Field label="Contraseña">
                 <div className="relative">
-                  <Input value={form.password} onChange={set('password')} type={showPwd ? 'text' : 'password'} className="pr-9" />
+                  <Input
+                    value={form.password}
+                    onChange={val => { setPwdTocado(true); set('password')(val) }}
+                    type={showPwd ? 'text' : 'password'}
+                    placeholder={!pwdTocado && row.tienePassword ? '•••••• (toca el ojo para verla)' : ''}
+                    className="pr-9"
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowPwd(v => !v)}
+                    onClick={verPassword}
+                    disabled={cargandoPwd}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-                    title={showPwd ? 'Ocultar contraseña' : 'Ver contraseña'}
+                    title={showPwd ? 'Ocultar contraseña' : 'Ver contraseña — el acceso queda registrado'}
                   >
-                    {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {cargandoPwd ? <Loader2 size={14} className="animate-spin" /> : showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
               </Field>
