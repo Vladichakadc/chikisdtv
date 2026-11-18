@@ -37,3 +37,17 @@ Respuestas Automatizadas FLUJOTV.docx
 Magistv.png
 Nuevo Imagen de mapa de bits.bmp
 Servicio de IPTV.txt
+
+# Datos de clientes: NUNCA al repositorio (contienen teléfonos y contraseñas
+# de cuentas padre). Quedan solo en el equipo local / volumen de Railway.
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+Backup/
+Tablas/
+*.xlsx
+*.xlsm
+*.pbix
+~$*
+.playwright-mcp/
+Informe_Planificador_Mejoras.pdf

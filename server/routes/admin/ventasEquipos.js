@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { VentaEquipo, Client, Device, TablaCliente } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
 const XLSX = require('xlsx');
 const path = require('path');
 
@@ -62,7 +63,7 @@ async function importVentasEquipos() {
   const filepath = path.join(__dirname, '..', '..', '..', 'Tablas', '1-orders_table_Ventas_Firetv2024.xlsx');
   let wb;
   try {
-    wb = XLSX.readFile(filepath);
+    wb = leerExcelOrigen(filepath);
   } catch (e) {
     console.error('[IMPORT EXCEL] Error leyendo order_inventario2026.xlsx:', e.message);
     return 0; // Abort early so we don't wipe the DB
@@ -220,7 +221,7 @@ router.post('/payments/ventas-equipos/import', asyncHandler(async (_req, res) =>
 router.get('/payments/ventas-equipos/debug-xlsx', asyncHandler(async (_req, res) => {
   const filepath = path.join(__dirname, '..', '..', '..', 'Tablas', 'order_inventario2026.xlsx');
   try {
-    const wb = XLSX.readFile(filepath);
+    const wb = leerExcelOrigen(filepath);
     const sheetName = wb.SheetNames[0];
     const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1 });
     res.json({ sheetNames: wb.SheetNames, firstSheetRows: data.slice(0, 3) });
@@ -231,7 +232,7 @@ router.get('/payments/ventas-equipos/debug-xlsx', asyncHandler(async (_req, res)
 
 router.get('/payments/ventas-equipos', asyncHandler(async (_req, res) => {
   const count = await VentaEquipo.count();
-  if (count === 0) await importVentasEquipos();
+  if (count === 0) await autoImportarSiDisponible(importVentasEquipos);
   const rows = await VentaEquipo.findAll({ order: [['fecha', 'DESC']] });
   // La garantía se recalcula en cada lectura: una venta que cumple el año
   // debe pasar de SI a NO sin esperar a que alguien edite el registro.

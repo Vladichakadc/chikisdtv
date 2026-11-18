@@ -7,6 +7,7 @@ const { Op } = require('sequelize');
 const multer = require('multer');
 const { CuentaPadre } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -64,7 +65,7 @@ function fmtDateDMYCP(d) {
 async function importCuentasPadre(clearFirst = false) {
   if (clearFirst) await CuentaPadre.destroy({ where: {} });
   const filePath = path.join(__dirname, '../../../Tablas/Tabla_Cuentaspadre.xlsx');
-  const wb = XLSX.readFile(filePath);
+  const wb = leerExcelOrigen(filePath);
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
   const records = raw.slice(1)
@@ -89,7 +90,7 @@ async function importCuentasPadre(clearFirst = false) {
 
 router.get('/cuentas-padre', asyncHandler(async (_req, res) => {
   const count = await CuentaPadre.count();
-  if (count === 0) await importCuentasPadre();
+  if (count === 0) await autoImportarSiDisponible(importCuentasPadre);
   const rows = await CuentaPadre.findAll({ order: [['cuentaId', 'ASC']] });
   res.json(rows);
 }));
