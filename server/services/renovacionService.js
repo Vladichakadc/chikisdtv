@@ -2,15 +2,15 @@
 // actualiza el Planificador (inicio real, meses, fin real, sin deuda), y deja
 // el cambio en el historial para poder deshacerlo (incluida la venta).
 //
-// Regla de fechas: si el plan aún está vigente, la renovación arranca donde
-// termina el actual (no se pierden días); si ya venció, arranca el día del
-// pago. El admin puede fijar otro inicio a mano.
+// Regla de fechas: la renovación arranca en la fecha de vencimiento del plan
+// actual (vigente o ya vencido), así el período es continuo. Solo si la
+// pantalla no tiene fecha de fin se usa la fecha del pago. El admin puede
+// fijar otro inicio a mano.
 const sequelize = require('../config/database');
 const { Planificador, Venta, TablaCliente } = require('../models');
 const { buscarUltimosPagos } = require('../utils/ultimosPagos');
 const { sanitizeVentaBody, siguienteIdVenta } = require('./ventasService');
 const { registrarCambio } = require('./historialPlanificador');
-const { calcDias } = require('../utils/planificadorAlerta');
 const { conCuentaPadre } = require('./cuentaPadreDatos');
 const { todayStr } = require('../utils/dateUtils');
 
@@ -24,10 +24,10 @@ function sumarMeses(fecha, meses) {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 }
 
-// Inicio por defecto del nuevo período
+// Inicio por defecto del nuevo período: la fecha de vencimiento actual
 function inicioSugerido(finActual, fechaPago) {
-  const dias = calcDias(finActual);
-  return dias != null && dias > 0 ? String(finActual).slice(0, 10) : fechaPago;
+  const fin = String(finActual || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(fin) ? fin : fechaPago;
 }
 
 // Valores del pago cuando el formulario no los envía: último pago de la

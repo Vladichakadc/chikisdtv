@@ -229,10 +229,11 @@ export function sumarMeses(fecha, meses) {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
 }
 
-// Vigente: el nuevo período arranca al final del actual; vencido: el día del pago
+// El nuevo período arranca en la fecha de vencimiento actual (vigente o ya
+// vencido); solo sin fecha de fin se usa la fecha del pago. Igual que el servidor.
 export function inicioSugerido(finActual, fechaPago) {
-  const dias = calcDias(finActual)
-  return dias != null && dias > 0 ? String(finActual).slice(0, 10) : fechaPago
+  const fin = String(finActual || '').slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(fin) ? fin : fechaPago
 }
 
 // Datos del pago sugeridos para la renovación (mismas reglas que "Nueva Venta"

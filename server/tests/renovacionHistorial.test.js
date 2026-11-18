@@ -43,25 +43,27 @@ describe('fechas de la renovación', () => {
     assert.equal(sumarMeses('2026-06-01', 7), '2027-01-01');
     assert.equal(sumarMeses('2026-11-18', 14), '2028-01-18');
   });
-  test('vigente: arranca al final del plan actual; vencido: el día del pago', () => {
+  test('el nuevo período arranca en la fecha de vencimiento (vigente o vencido); sin fecha, el día del pago', () => {
     assert.equal(inicioSugerido(daysFromNow(5), '2026-11-18'), daysFromNow(5));
-    assert.equal(inicioSugerido(daysFromNow(-3), '2026-11-18'), '2026-11-18');
+    assert.equal(inicioSugerido(daysFromNow(-3), '2026-11-18'), daysFromNow(-3));
     assert.equal(inicioSugerido(null, '2026-11-18'), '2026-11-18');
+    assert.equal(inicioSugerido('basura', '2026-11-18'), '2026-11-18');
   });
 });
 
 describe('registrarRenovacion', () => {
-  test('plan vencido: crea la venta y extiende desde el día del pago, sin deuda', async () => {
+  test('plan vencido: crea la venta y extiende desde la fecha de vencimiento, sin deuda', async () => {
     const hoy = todayStr();
+    const venc = daysFromNow(-10);
     const r = await registrarRenovacion('M001-1', { fecha: hoy, meses: 1, precioVenta: 15000, tipoPlan: 'Plan Mensual', medioPago: 'Nequi' }, 'admin@x.com');
     assert.equal(r.venta.idVM, 'VM2564');
     assert.equal(r.venta.tipoPago, 'Renovacion');
     assert.equal(r.venta.idPantalla, 'M001-1');
     assert.equal(r.venta.customerId, '100');
-    assert.equal(r.inicioReal, hoy);
-    assert.equal(r.duracionReal, sumarMeses(hoy, 1));
+    assert.equal(r.inicioReal, venc);
+    assert.equal(r.duracionReal, sumarMeses(venc, 1));
     const p = await Planificador.findByPk('M001-1');
-    assert.equal(p.duracionReal, sumarMeses(hoy, 1));
+    assert.equal(p.duracionReal, sumarMeses(venc, 1));
     assert.equal(p.duracionPlan, 1);
     assert.equal(p.debe, false);
     assert.equal(p.montoDebe, null);
