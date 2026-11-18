@@ -3,7 +3,7 @@ const router = express.Router();
 const path = require('path');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
-const { Planificador, CuentaPadre, Venta, Client, Plan, Recordatorio, AccesoCredencial } = require('../../models');
+const { Planificador, CuentaPadre, Venta, Client, Plan, Recordatorio, AccesoCredencial, TablaCliente } = require('../../models');
 const { buscarUltimosPagos } = require('../../utils/ultimosPagos');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan, ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
@@ -383,10 +383,17 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
 
   // Sin customerId en la fila se usa el de la última venta (comportamiento previo)
   if (!customerId) customerId = pago?.customerId || null;
+  // Teléfono: el de la ficha del cliente (Client.phone) o el móvil de Tabla
+  // Clientes; el país permite poner el indicativo correcto en WhatsApp.
   let telefono = null;
+  let pais = null;
   if (customerId) {
-    const cliente = await Client.findOne({ where: { customerId }, attributes: ['phone'] });
-    telefono = cliente?.phone || null;
+    const [cliente, ficha] = await Promise.all([
+      Client.findOne({ where: { customerId }, attributes: ['phone'] }),
+      TablaCliente.findByPk(customerId, { attributes: ['movil', 'pais'] }),
+    ]);
+    telefono = (cliente?.phone || '').trim() || (ficha?.movil || '').trim() || null;
+    pais = (ficha?.pais || '').trim() || null;
   }
 
   // Cada pantalla con su último pago y si está AL DÍA (fecha vigente, sin
@@ -418,7 +425,7 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
     order: [['numeroPantallas', 'ASC'], ['duracionDias', 'ASC']],
   });
 
-  res.json({ pago, telefono, pantallasCliente, catalogo, pantallasDetalle });
+  res.json({ pago, telefono, pais, pantallasCliente, catalogo, pantallasDetalle });
 }));
 
 // POST /planificador/credenciales — devuelve las contraseñas de las pantallas
@@ -447,6 +454,7 @@ router.get('/planificador/credenciales/accesos', asyncHandler(async (req, res) =
 
 // POST /planificador/recordatorios — registra un recordatorio/comprobante enviado
 const TIPOS_RECORDATORIO  = new Set(['renovacion', 'comprobante']);
+const ETAPAS_COBRO = new Set(['antes', 'dia', 'despues']);
 const CANALES_RECORDATORIO = new Set(['whatsapp', 'copiado']);
 router.post('/planificador/recordatorios', asyncHandler(async (req, res) => {
   const idPantalla = String(req.body?.idPantalla || '').trim();
@@ -456,6 +464,8 @@ router.post('/planificador/recordatorios', asyncHandler(async (req, res) => {
   if (!TIPOS_RECORDATORIO.has(tipo) || !CANALES_RECORDATORIO.has(canal)) {
     return res.status(400).json({ error: 'Tipo o canal de recordatorio no válido.' });
   }
+  const etapa = req.body?.etapa ? String(req.body.etapa).trim() : null;
+  if (etapa && !ETAPAS_COBRO.has(etapa)) return res.status(400).json({ error: 'Etapa de cobro no válida.' });
   const pantalla = await Planificador.findByPk(idPantalla, { raw: true });
   if (!pantalla) return res.status(404).json({ error: 'Pantalla no encontrada' });
 
@@ -466,12 +476,13 @@ router.post('/planificador/recordatorios', asyncHandler(async (req, res) => {
     customerId:      pantalla.customerId || null,
     tipo,
     canal,
+    etapa:           tipo === 'renovacion' ? etapa : null,
     estadoAlEnviar:  estadoFromDias(dias) || null,
     diasAlEnviar:    dias,
     finPlanAlEnviar: pantalla.duracionReal || null,
     usuarioEmail:    req.user?.email || null,
   });
-  res.status(201).json({ id: rec.id, idPantalla, tipo, canal, createdAt: rec.createdAt });
+  res.status(201).json({ id: rec.id, idPantalla, tipo, canal, etapa: rec.etapa, createdAt: rec.createdAt });
 }));
 
 // GET /planificador/recordatorios/resumen?dias=30 — último recordatorio de
@@ -504,6 +515,16 @@ router.get('/planificador/recordatorios/resumen', asyncHandler(async (req, res) 
     return ahora && (!antes || String(ahora) > String(antes));
   });
   renovaron.forEach(id => { if (ultimos[id]) ultimos[id].renovo = true; });
+
+  // Secuencia de cobro: etapas ya enviadas en el CICLO actual de la pantalla
+  // (recordatorios cuyo fin de plan al enviar es el fin de plan vigente). Si
+  // la pantalla renovó, su ciclo cambió y la secuencia vuelve a empezar.
+  for (const r of recs) {
+    if (!r.etapa || !ultimos[r.idPantalla]) continue;
+    if (String(r.finPlanAlEnviar || '') !== String(finActual[r.idPantalla] || '')) continue;
+    const u = ultimos[r.idPantalla];
+    u.etapas = [...new Set([...(u.etapas || []), r.etapa])];
+  }
 
   res.json({
     dias,

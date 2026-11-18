@@ -1,8 +1,9 @@
-import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil, MessageCircle } from 'lucide-react'
+import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil, MessageCircle, ListChecks } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
 import { STAT_TONES } from './StatCard'
 import { cn } from '../../../utils/cn'
+import { etapaPendiente, ETAPAS_COBRO } from './renovacion'
 import { diasLabel, diasLabelClass, estadoBadgeVariant, haceTexto } from './rowHelpers'
 
 // ─── Tarjetas inteligentes: configuración de cada categoría accionable ──────
@@ -93,9 +94,14 @@ export function screenToVentaPrefill(screen, catKey) {
 // en VENCIDO/ALERTA arranca en la vista "Renovación" con el mensaje listo).
 const CATEGORIAS_RECORDATORIO = new Set(['vencido', 'alerta'])
 
-export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus, recordatorios }) {
+export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus, recordatorios, onRecordarTodos }) {
   const config = CATEGORY_CONFIG[catKey]
   const conRecordatorio = CATEGORIAS_RECORDATORIO.has(catKey) && !!onStatus
+  // Secuencia de cobro: qué etapa le toca hoy a cada pantalla (null = al día)
+  const pendienteDe = (p) => (p.nickname
+    ? etapaPendiente(p._dias, recordatorios?.ultimos?.[p.idPantalla]?.etapas || [])
+    : null)
+  const totalPendientes = conRecordatorio ? screens.filter(pendienteDe).length : 0
   if (!config) return null
   const t = STAT_TONES[config.tone] || STAT_TONES.orange
   const Icon = config.icon
@@ -112,9 +118,20 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
               <p className="text-white/80 text-sm">{screens.length} {screens.length === 1 ? 'registro encontrado' : 'registros encontrados'}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {conRecordatorio && onRecordarTodos && screens.length > 0 && (
+              <button
+                onClick={() => onRecordarTodos(screens)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/90 hover:bg-white text-xs font-bold text-slate-800 shadow-sm transition-colors"
+                title="Abre el mensaje de cada cliente, uno tras otro, con la etapa de cobro que le toca"
+              >
+                <ListChecks size={14} /> Recordar a todos{totalPendientes ? ` (${totalPendientes} hoy)` : ''}
+              </button>
+            )}
+            <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors" aria-label="Cerrar">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="px-6 py-3 text-xs border-b text-slate-700" style={{ background: `${t.from}14`, borderColor: `${t.from}33` }}>
@@ -151,6 +168,12 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
                       <td className="px-4 py-2.5">
                         <p className="font-medium text-gray-800">{cliente}</p>
                         {p.nickname && p.nickname !== cliente && <p className="text-xs text-gray-400">{p.nickname}</p>}
+                        {conRecordatorio && p.nickname && (() => {
+                          const pend = pendienteDe(p)
+                          return pend
+                            ? <span className="mt-0.5 mr-1 inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800" title={`Secuencia de cobro: toca enviar "${ETAPAS_COBRO[pend].label}"`}>Toca: {ETAPAS_COBRO[pend].orden}. {ETAPAS_COBRO[pend].corto}</span>
+                            : <span className="mt-0.5 mr-1 inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700" title="La etapa de cobro de hoy ya se envió">Secuencia al día</span>
+                        })()}
                         {conRecordatorio && recordatorios?.ultimos?.[p.idPantalla] && (() => {
                           const u = recordatorios.ultimos[p.idPantalla]
                           return (

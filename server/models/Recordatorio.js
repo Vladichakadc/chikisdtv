@@ -11,6 +11,7 @@ const Recordatorio = sequelize.define('Recordatorio', {
   customerId:      DataTypes.STRING,
   tipo:            { type: DataTypes.STRING, allowNull: false },   // 'renovacion' | 'comprobante'
   canal:           { type: DataTypes.STRING, allowNull: false },   // 'whatsapp' | 'copiado'
+  etapa:           DataTypes.STRING,                                // secuencia de cobro: 'antes' | 'dia' | 'despues'
   estadoAlEnviar:  DataTypes.STRING,                                // VENCIDO / ALERTA / VIGENTE
   diasAlEnviar:    DataTypes.INTEGER,
   finPlanAlEnviar: DataTypes.DATEONLY,                              // para detectar si luego renovó

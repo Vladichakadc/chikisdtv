@@ -6,7 +6,8 @@
 //  · Renovación (solo VENCIDO / PROXIMO A VENCER): mensaje de venta listo
 //    para WhatsApp con los precios del Catálogo de venta según el número de
 //    pantallas de la CUENTA que se renueva (la fila del Planificador, no el
-//    total del cliente); se envía como TEXTO prellenado vía wa.me o se copia.
+//    total del cliente), con el tono de la etapa de la secuencia de cobro
+//    (antes / día / +3 días); se envía como TEXTO prellenado o se copia.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { X, Copy, Check, Tv, Loader2, MessageCircle, Megaphone, Receipt, Eye, EyeOff, KeyRound, Building2, SlidersHorizontal } from 'lucide-react'
 import * as htmlToImage from 'html-to-image'
@@ -16,7 +17,8 @@ import { useUi } from '../../../context/UiContext'
 import { useCredenciales } from '../../../hooks/useCredenciales'
 import { formatDate, formatCurrency } from '../../../utils/excelUtils'
 import { diasLabel, haceTexto } from './rowHelpers'
-import { esRenovable, tipoPlanDe, diasRestantesDe, mesRestanteDe, ofertasDe, construirMensaje } from './renovacion'
+import { esRenovable, tipoPlanDe, diasRestantesDe, mesRestanteDe, prepararRenovacion, etapaSugerida, ETAPAS_COBRO } from './renovacion'
+import { normalizarTelefono, urlWhatsAppTexto } from '../../../utils/telefono'
 
 const ESTADO_STYLE = {
   VIGENTE:  { bg: '#dcfce7', text: '#15803d' },
@@ -80,6 +82,7 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
   const [vista, setVista] = useState(renovable ? 'renovacion' : 'comprobante')
   const [pago, setPago] = useState(null)
   const [telefono, setTelefono] = useState(null)
+  const [pais, setPais] = useState(null)
   const [pantallasCliente, setPantallasCliente] = useState(1)
   const [pantallasDetalle, setPantallasDetalle] = useState([])
   const [catalogo, setCatalogo] = useState([])
@@ -101,7 +104,7 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
   // Deja constancia del envío (Recordado hace N días / efectividad). No
   // bloquea ni interrumpe al usuario si falla.
   const registrar = (tipo, canal) => {
-    api.post('/admin/planificador/recordatorios', { idPantalla: row.idPantalla, tipo, canal })
+    api.post('/admin/planificador/recordatorios', { idPantalla: row.idPantalla, tipo, canal, ...(tipo === 'renovacion' ? { etapa } : {}) })
       .then(() => onRegistrado?.())
       .catch(() => {})
   }
@@ -125,6 +128,7 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
         if (!vivo) return
         setPago(r.data.pago)
         setTelefono(r.data.telefono)
+        setPais(r.data.pais || null)
         setPantallasCliente(r.data.pantallasCliente || 1)
         setPantallasDetalle(r.data.pantallasDetalle || [])
         setCatalogo(r.data.catalogo || [])
@@ -141,22 +145,17 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Secuencia de cobro: la etapa sugerida por los días; el admin puede elegir otra
+  const [etapa, setEtapa] = useState(() => etapaSugerida(diasRestantesDe(row)))
   // Pantallas de la cuenta que se renueva (la fila), no del cliente completo.
-  const pantallasCuenta = Math.max(1, Math.floor(Number(row.pantallas)) || 1)
-  const identificarCuenta = pantallasCliente > 1
-  const { ofertas, combo, porPantalla } = useMemo(
-    () => ofertasDe(catalogo, pantallasCuenta),
-    [catalogo, pantallasCuenta],
-  )
-  const mensaje = useMemo(
-    () => construirMensaje({ row, pantallas: pantallasCuenta, ofertas, combo, porPantalla, identificarCuenta }),
-    [row, pantallasCuenta, ofertas, combo, porPantalla, identificarCuenta],
+  const { ofertas, combo, porPantalla, pantallas: pantallasCuenta, identificarCuenta, mensaje } = useMemo(
+    () => prepararRenovacion(row, { catalogo, pantallasCliente }, etapa),
+    [row, catalogo, pantallasCliente, etapa],
   )
 
-  const numeroWhatsApp = () => {
-    const digitos = (telefono || '').replace(/\D/g, '')
-    return digitos.length === 10 && digitos.startsWith('3') ? `57${digitos}` : digitos
-  }
+  // Número con indicativo (país del cliente; celular colombiano por defecto)
+  const tel = useMemo(() => normalizarTelefono(telefono, pais), [telefono, pais])
+  const numeroWhatsApp = () => tel.numero
 
   const cambiarVista = (v) => { setVista(v); setCopiado(false) }
 
@@ -233,11 +232,7 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
     // Se usa api.whatsapp.com directo (el destino oficial de wa.me): el
     // redirect de wa.me reemplaza los emojis del texto por U+FFFD (�).
     const numero = numeroWhatsApp()
-    const texto = encodeURIComponent(mensaje)
-    const url = numero
-      ? `https://api.whatsapp.com/send/?phone=${numero}&text=${texto}`
-      : `https://api.whatsapp.com/send/?text=${texto}`
-    window.open(url, '_blank')
+    window.open(urlWhatsAppTexto(numero, mensaje), '_blank')
     registrar('renovacion', 'whatsapp')
     showToast(numero
       ? 'WhatsApp abierto con el mensaje listo — solo dale enviar.'
@@ -326,6 +321,31 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
               )}
             </div>
 
+            {/* Secuencia de cobro: etapa del mensaje (cambia el tono) */}
+            <div className="flex items-center gap-1 mb-2" role="radiogroup" aria-label="Etapa de la secuencia de cobro">
+              {Object.entries(ETAPAS_COBRO).map(([clave, e]) => {
+                const enviada = (ultimoRecordatorio?.etapas || []).includes(clave)
+                return (
+                  <button
+                    key={clave}
+                    type="button"
+                    role="radio"
+                    aria-checked={etapa === clave}
+                    onClick={() => { setEtapa(clave); setCopiado(false) }}
+                    title={`${e.label} · tono ${e.tono}${enviada ? ' · ya enviado en este ciclo' : ''}`}
+                    className={cn(
+                      'flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors',
+                      etapa === clave
+                        ? 'bg-emerald-600 border-emerald-600 text-white'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300'
+                    )}
+                  >
+                    {enviada && <Check size={11} />} {e.orden}. {e.corto}
+                  </button>
+                )
+              })}
+            </div>
+
             {/* Vista previa estilo WhatsApp */}
             <div className="rounded-xl p-3 shadow-sm" style={{ background: '#ECE5DD' }}>
               <div
@@ -370,8 +390,13 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
             </div>
             <p className="text-[11px] text-slate-400 text-center mt-2.5">
               Va como texto prellenado en WhatsApp; los *asteriscos* se ven en negrita.
-              {telefono ? ` Chat directo: ${telefono}.` : ' Sin teléfono registrado: WhatsApp abre para elegir el chat.'}
+              {tel.numero ? ` Chat directo: +${tel.numero}.` : ' Sin teléfono registrado: WhatsApp abre para elegir el chat.'}
             </p>
+            {!cargando && tel.origen === 'sin_indicativo' && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2">
+                El teléfono {telefono} no tiene indicativo de país y el cliente no tiene país registrado: WhatsApp podría no encontrar el chat. Corrígelo en Clientes (ej. +34…).
+              </p>
+            )}
           </>
         ) : (
           <>
@@ -589,7 +614,7 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
             </div>
             <p className="text-[11px] text-slate-400 text-center mt-2.5">
               Se copia y se envía como imagen, con el mismo formato del comprobante.
-              {telefono ? ` Chat directo: ${telefono}.` : ''}
+              {tel.numero ? ` Chat directo: +${tel.numero}.` : ''}
             </p>
           </>
         )}
