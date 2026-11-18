@@ -1,7 +1,8 @@
-import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil } from 'lucide-react'
+import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil, MessageCircle } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
 import { STAT_TONES } from './StatCard'
+import { cn } from '../../../utils/cn'
 import { diasLabel, diasLabelClass, estadoBadgeVariant } from './rowHelpers'
 
 // ─── Tarjetas inteligentes: configuración de cada categoría accionable ──────
@@ -87,8 +88,14 @@ export function screenToVentaPrefill(screen, catKey) {
 
 // Panel de detalle accionable: lista las pantallas/clientes de una categoría y permite
 // generar la venta correspondiente directamente desde Pagos, ya pre-cargada.
-export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit }) {
+// Categorías en las que tiene sentido enviar el recordatorio de pago por
+// WhatsApp (abre el mismo ComprobanteModal del panel Estatus Cliente, que
+// en VENCIDO/ALERTA arranca en la vista "Renovación" con el mensaje listo).
+const CATEGORIAS_RECORDATORIO = new Set(['vencido', 'alerta'])
+
+export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus }) {
   const config = CATEGORY_CONFIG[catKey]
+  const conRecordatorio = CATEGORIAS_RECORDATORIO.has(catKey) && !!onStatus
   if (!config) return null
   const t = STAT_TONES[config.tone] || STAT_TONES.orange
   const Icon = config.icon
@@ -155,6 +162,24 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit }) 
                               <Pencil size={13} />
                             </button>
                           )}
+                          {conRecordatorio && (
+                            <button
+                              onClick={() => onStatus(p)}
+                              disabled={!p.nickname}
+                              aria-label={`Status cliente — recordatorio de pago por WhatsApp para ${cliente}`}
+                              title={p.nickname
+                                ? 'Status cliente — enviar recordatorio de pago por WhatsApp'
+                                : 'Sin nickname — no se puede generar el recordatorio'}
+                              className={cn(
+                                'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors',
+                                p.nickname
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300'
+                                  : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                              )}
+                            >
+                              <MessageCircle size={13} /> Status cliente
+                            </button>
+                          )}
                           <button
                             onClick={() => onGenerate(p, catKey)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold shadow-sm transition-colors"
@@ -177,7 +202,9 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit }) 
           <p className="text-xs text-gray-400">
             {catKey === 'libre'
               ? '"Asignar Pantalla" abre el formulario de edición de la pantalla para asignarle un nuevo titular.'
-              : 'El lápiz abre Editar Pantalla directamente; "Generar venta" abre Pagos con los datos ya cargados.'}
+              : conRecordatorio
+                ? 'El lápiz abre Editar Pantalla; "Status cliente" prepara el recordatorio de pago por WhatsApp; "Generar venta" abre Pagos con los datos ya cargados.'
+                : 'El lápiz abre Editar Pantalla directamente; "Generar venta" abre Pagos con los datos ya cargados.'}
           </p>
           <button onClick={onClose} className="shrink-0 px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors">
             Cerrar
