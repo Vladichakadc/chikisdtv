@@ -15,6 +15,7 @@ const adminRoutes = require('./routes/admin');
 const { autoFixCuentaIdMismatches } = require('./services/planificadorImportService');
 const { ensureVentasEquiposSchema } = require('./utils/ensureVentasEquiposSchema');
 const { ensureModelColumns, dropStaleBackupTables } = require('./utils/ensureModelColumns');
+const { ensureIndexes } = require('./utils/ensureIndexes');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -173,6 +174,8 @@ async function seedDevicesFromVentas() {
     // ALTER dirigido e idempotente — debe correr ANTES de seedDevicesFromVentas,
     // que hace el primer SELECT del modelo y falla si falta alguna columna.
     await ensureVentasEquiposSchema();
+    // Índices del comprobante/último pago y de recordatorios (idempotente)
+    await ensureIndexes();
     console.log('[DB] Tablas sincronizadas');
     await seedAdminAndPlans();
     await emergencyAdminPasswordReset();

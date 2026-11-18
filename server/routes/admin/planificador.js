@@ -3,7 +3,8 @@ const router = express.Router();
 const path = require('path');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
-const { Planificador, CuentaPadre, Venta, Client, Plan } = require('../../models');
+const { Planificador, CuentaPadre, Venta, Client, Plan, Recordatorio, AccesoCredencial } = require('../../models');
+const { buscarUltimosPagos } = require('../../utils/ultimosPagos');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { importFromExcel, autoFixCuentaIdMismatches, normalizeDuracionPlan, ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
 // La alerta se recalcula según la fecha vigente; "CORTESIA" es un valor manual que se respeta
@@ -39,6 +40,38 @@ function findCuentaIdMismatches(pantallas) {
       cuentaId: p.cuentaId,
       cuentaIdEsperado: p.idPantalla.split('-')[0],
     }));
+}
+
+// Las contraseñas de cuentas padre NO viajan en las cargas del Planificador:
+// el navegador las pide solo cuando el admin decide verlas
+// (POST /planificador/credenciales), y cada acceso queda en la bitácora.
+function sinPassword(p) {
+  if (!p) return p;
+  const { password, ...resto } = p;
+  return { ...resto, tienePassword: !!password };
+}
+
+// En el diff de sincronización con Cuentas Padre solo se indica QUE cambió la
+// contraseña, sin exponer el valor anterior ni el nuevo.
+function enmascararCambios(cambios = []) {
+  return cambios.map(c => (c.campo === 'password'
+    ? { ...c, antes: c.antes ? '••••••' : c.antes, despues: c.despues ? '••••••' : c.despues }
+    : c));
+}
+
+async function registrarAccesoCredencial(req, motivo, idPantallas) {
+  try {
+    await AccesoCredencial.create({
+      usuarioId:    req.user?.id ?? null,
+      usuarioEmail: req.user?.email ?? null,
+      motivo,
+      cantidad:     idPantallas.length,
+      idPantallas:  JSON.stringify(idPantallas.slice(0, 1000)),
+      ip:           req.ip || null,
+    });
+  } catch (e) {
+    console.warn('[CREDENCIALES] No se pudo registrar el acceso:', e.message);
+  }
 }
 
 function enrichPantalla(raw) {
@@ -311,7 +344,7 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
 
   res.json({
     diasAlerta: DIAS_ALERTA,
-    pantallas,
+    pantallas: pantallas.map(sinPassword),
     inconsistencias:     findCuentaIdMismatches(pantallas),
     cuentasPadreStatus,
     capacidadPorCuenta,
@@ -319,68 +352,64 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
   });
 }));
 
-// Comprobante de renovación: último pago registrado para un nickname en la
-// tabla de ventas (módulo Pagos) + teléfono del cliente para reenviarlo por
-// WhatsApp. El nickname es la llave que une Planificador con Pagos.
-// Para el mensaje de renovación (VENCIDO / PROXIMO A VENCER) también se
-// devuelve cuántas pantallas tiene el cliente en el Planificador (agrupadas
-// por customerId — cada pantalla es una fila con nickname propio) y el
-// catálogo de venta activo, para ofertar el precio del combo que le aplica.
+// Comprobante de renovación: último pago de la pantalla en la tabla de ventas
+// (módulo Pagos) + teléfono del cliente para reenviarlo por WhatsApp.
+// Vínculo con Pagos: idPantalla + customerId, con el nickname como respaldo
+// (ver utils/ultimosPagos.js) — renombrar un nickname ya no pierde el pago.
+// También devuelve las pantallas del cliente (agrupadas por customerId) con su
+// último pago y si están AL DÍA, y el catálogo activo para el mensaje de
+// renovación. Todo con un número fijo de consultas (sin N+1). Las contraseñas
+// NO se incluyen: se piden aparte con POST /planificador/credenciales.
 router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) => {
-  const { nickname } = req.params;
-  const pago = await Venta.findOne({
-    where: { nickname },
-    order: [['fecha', 'DESC'], ['createdAt', 'DESC']],
-    attributes: ['idVM', 'tipoPlan', 'tipoPago', 'precioVenta', 'fecha', 'customerId', 'pantallas'],
-  });
+  const nickname   = String(req.params.nickname || '').trim();
+  const idPantalla = String(req.query.idPantalla || '').trim();
+  let customerId   = String(req.query.customerId || '').trim() || null;
 
+  const filas = customerId
+    ? await Planificador.findAll({
+        where: {
+          customerId,
+          nickname: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }, { [Op.notLike]: '%libre%' }] },
+        },
+        attributes: ['idPantalla', 'nickname', 'customerId', 'duracionReal', 'debe', 'montoDebe', 'montoDebeUSD', 'cuentaId', 'cuenta', 'pantallas'],
+        order: [['nickname', 'ASC']],
+        raw: true,
+      })
+    : [];
+
+  const objetivo = { idPantalla, customerId, nickname };
+  const pagos = await buscarUltimosPagos([objetivo, ...filas]);
+  const pago = pagos.get(idPantalla || `nick:${nickname}`) || null;
+
+  // Sin customerId en la fila se usa el de la última venta (comportamiento previo)
+  if (!customerId) customerId = pago?.customerId || null;
   let telefono = null;
-  const customerId = req.query.customerId || pago?.customerId || null;
   if (customerId) {
     const cliente = await Client.findOne({ where: { customerId }, attributes: ['phone'] });
     telefono = cliente?.phone || null;
   }
 
-  // Detalle por pantalla del cliente: cada pantalla con su último pago y si
-  // está AL DÍA (fecha vigente, sin marca "debe" y con pago registrado). El
-  // comprobante lista al día / vencidas, permite ocultar cuentas y consolida
-  // la suma cuando quedan 2+ pantallas al día visibles.
-  let pantallasDetalle = [];
-  if (customerId) {
-    const filas = await Planificador.findAll({
-      where: {
-        customerId,
-        nickname: { [Op.and]: [{ [Op.not]: null }, { [Op.ne]: '' }, { [Op.notLike]: '%libre%' }] },
-      },
-      attributes: ['idPantalla', 'nickname', 'duracionReal', 'debe', 'montoDebe', 'montoDebeUSD', 'cuentaId', 'cuenta', 'password', 'pantallas'],
-      order: [['nickname', 'ASC']],
-    });
-    pantallasDetalle = await Promise.all(filas.map(async (f) => {
-      const ultimo = await Venta.findOne({
-        where: { nickname: f.nickname },
-        order: [['fecha', 'DESC'], ['createdAt', 'DESC']],
-        attributes: ['tipoPlan', 'precioVenta', 'fecha'],
-      });
-      const dias = calcDiasDB(f.duracionReal);
-      return {
-        idPantalla: f.idPantalla,
-        nickname: f.nickname,
-        // Cuenta padre + contraseña: el comprobante las muestra solo si el
-        // admin activa los interruptores (ruta ya protegida por rol admin).
-        cuentaId: f.cuentaId,
-        cuenta: f.cuenta,
-        password: f.password,
-        pantallas: f.pantallas,
-        finPlan: f.duracionReal,
-        dias,
-        debe: !!f.debe,
-        montoDebe: f.montoDebe,
-        montoDebeUSD: f.montoDebeUSD,
-        alDia: dias != null && dias > 0 && !f.debe && !!ultimo,
-        pago: ultimo,
-      };
-    }));
-  }
+  // Cada pantalla con su último pago y si está AL DÍA (fecha vigente, sin
+  // marca "debe" y con pago registrado). El comprobante lista al día /
+  // vencidas, permite ocultar cuentas y consolida la suma de las al día.
+  const pantallasDetalle = filas.map((f) => {
+    const ultimo = pagos.get(f.idPantalla) || null;
+    const dias = calcDiasDB(f.duracionReal);
+    return {
+      idPantalla:   f.idPantalla,
+      nickname:     f.nickname,
+      cuentaId:     f.cuentaId,
+      cuenta:       f.cuenta,
+      pantallas:    f.pantallas,
+      finPlan:      f.duracionReal,
+      dias,
+      debe:         !!f.debe,
+      montoDebe:    f.montoDebe,
+      montoDebeUSD: f.montoDebeUSD,
+      alDia:        dias != null && dias > 0 && !f.debe && !!ultimo,
+      pago:         ultimo ? { tipoPlan: ultimo.tipoPlan, precioVenta: ultimo.precioVenta, fecha: ultimo.fecha, vinculo: ultimo.vinculo } : null,
+    };
+  });
   const pantallasCliente = Math.max(1, pantallasDetalle.length);
 
   const catalogo = await Plan.findAll({
@@ -392,9 +421,107 @@ router.get('/planificador/comprobante/:nickname', asyncHandler(async (req, res) 
   res.json({ pago, telefono, pantallasCliente, catalogo, pantallasDetalle });
 }));
 
+// POST /planificador/credenciales — devuelve las contraseñas de las pantallas
+// pedidas y deja constancia de quién las vio, cuándo y para qué.
+const MOTIVOS_CREDENCIAL = new Set(['tabla', 'estatus', 'comprobante', 'edicion']);
+router.post('/planificador/credenciales', asyncHandler(async (req, res) => {
+  const ids = Array.isArray(req.body?.idPantallas)
+    ? [...new Set(req.body.idPantallas.map(v => String(v || '').trim()).filter(Boolean))]
+    : [];
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!ids.length) return res.status(400).json({ error: 'Indica al menos una pantalla (idPantallas).' });
+  if (ids.length > 1000) return res.status(400).json({ error: 'Máximo 1000 pantallas por solicitud.' });
+  if (!MOTIVOS_CREDENCIAL.has(motivo)) return res.status(400).json({ error: 'Motivo de acceso no válido.' });
+
+  const filas = await Planificador.findAll({ where: { idPantalla: { [Op.in]: ids } }, attributes: ['idPantalla', 'password'], raw: true });
+  await registrarAccesoCredencial(req, motivo, filas.map(f => f.idPantalla));
+  res.json({ credenciales: Object.fromEntries(filas.map(f => [f.idPantalla, f.password || ''])) });
+}));
+
+// GET /planificador/credenciales/accesos — bitácora de accesos (más recientes primero)
+router.get('/planificador/credenciales/accesos', asyncHandler(async (req, res) => {
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+  const accesos = await AccesoCredencial.findAll({ order: [['createdAt', 'DESC']], limit, raw: true });
+  res.json({ accesos: accesos.map(a => ({ ...a, idPantallas: (() => { try { return JSON.parse(a.idPantallas || '[]') } catch { return [] } })() })) });
+}));
+
+// POST /planificador/recordatorios — registra un recordatorio/comprobante enviado
+const TIPOS_RECORDATORIO  = new Set(['renovacion', 'comprobante']);
+const CANALES_RECORDATORIO = new Set(['whatsapp', 'copiado']);
+router.post('/planificador/recordatorios', asyncHandler(async (req, res) => {
+  const idPantalla = String(req.body?.idPantalla || '').trim();
+  const tipo  = String(req.body?.tipo || '').trim();
+  const canal = String(req.body?.canal || '').trim();
+  if (!idPantalla) return res.status(400).json({ error: 'idPantalla es obligatorio.' });
+  if (!TIPOS_RECORDATORIO.has(tipo) || !CANALES_RECORDATORIO.has(canal)) {
+    return res.status(400).json({ error: 'Tipo o canal de recordatorio no válido.' });
+  }
+  const pantalla = await Planificador.findByPk(idPantalla, { raw: true });
+  if (!pantalla) return res.status(404).json({ error: 'Pantalla no encontrada' });
+
+  const dias = calcDiasDB(pantalla.duracionReal);
+  const rec = await Recordatorio.create({
+    idPantalla,
+    nickname:        pantalla.nickname || null,
+    customerId:      pantalla.customerId || null,
+    tipo,
+    canal,
+    estadoAlEnviar:  estadoFromDias(dias) || null,
+    diasAlEnviar:    dias,
+    finPlanAlEnviar: pantalla.duracionReal || null,
+    usuarioEmail:    req.user?.email || null,
+  });
+  res.status(201).json({ id: rec.id, idPantalla, tipo, canal, createdAt: rec.createdAt });
+}));
+
+// GET /planificador/recordatorios/resumen?dias=30 — último recordatorio de
+// renovación por pantalla + efectividad: de las pantallas recordadas en la
+// ventana, cuántas renovaron después (su fin de plan se movió hacia adelante).
+router.get('/planificador/recordatorios/resumen', asyncHandler(async (req, res) => {
+  const dias = Math.min(365, Math.max(1, Number(req.query.dias) || 30));
+  const desde = new Date(Date.now() - dias * 86400000);
+  const recs = await Recordatorio.findAll({
+    where: { tipo: 'renovacion', createdAt: { [Op.gte]: desde } },
+    order: [['createdAt', 'ASC']],
+    raw: true,
+  });
+
+  const ultimos = {};
+  const primeroPorPantalla = {};
+  for (const r of recs) {
+    if (!primeroPorPantalla[r.idPantalla]) primeroPorPantalla[r.idPantalla] = r;
+    ultimos[r.idPantalla] = { fecha: r.createdAt, canal: r.canal, total: (ultimos[r.idPantalla]?.total || 0) + 1 };
+  }
+
+  const ids = Object.keys(primeroPorPantalla);
+  const actuales = ids.length
+    ? await Planificador.findAll({ where: { idPantalla: { [Op.in]: ids } }, attributes: ['idPantalla', 'duracionReal'], raw: true })
+    : [];
+  const finActual = Object.fromEntries(actuales.map(a => [a.idPantalla, a.duracionReal]));
+  const renovaron = ids.filter(id => {
+    const antes = primeroPorPantalla[id].finPlanAlEnviar;
+    const ahora = finActual[id];
+    return ahora && (!antes || String(ahora) > String(antes));
+  });
+  renovaron.forEach(id => { if (ultimos[id]) ultimos[id].renovo = true; });
+
+  res.json({
+    dias,
+    ultimos,
+    efectividad: {
+      enviados:  recs.length,
+      pantallas: ids.length,
+      renovaron: renovaron.length,
+      tasa:      ids.length ? Math.round((renovaron.length / ids.length) * 100) : 0,
+    },
+  });
+}));
+
 // GET /planificador/export — descarga el Planificador completo como .xlsx
-router.get('/planificador/export', asyncHandler(async (_req, res) => {
+router.get('/planificador/export', asyncHandler(async (req, res) => {
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
+  // El Excel incluye contraseñas: queda constancia en la bitácora
+  await registrarAccesoCredencial(req, 'exportar_excel', records.map(r => r.idPantalla));
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
   const workbook  = buildPlanificadorWorkbook(pantallas);
   const fecha = new Date().toISOString().split('T')[0];
@@ -469,7 +596,7 @@ router.get('/planificador/sync-preview', asyncHandler(async (_req, res) => {
     };
   });
 
-  res.json({ diff, totalConCambios: diff.filter(d => d.status === 'actualizada').length });
+  res.json({ diff: diff.map(d => ({ ...d, cambios: enmascararCambios(d.cambios) })), totalConCambios: diff.filter(d => d.status === 'actualizada').length });
 }));
 
 // POST /planificador — crea una pantalla adicional dentro de una cuenta padre
@@ -511,7 +638,7 @@ router.post('/planificador', asyncHandler(async (req, res) => {
     pantallas: 1,
     debe:      false,
   });
-  res.status(201).json(enrichPantalla(record.toJSON()));
+  res.status(201).json(sinPassword(enrichPantalla(record.toJSON())));
 }));
 
 // PUT /planificador/:idPantalla — actualiza un registro
@@ -563,7 +690,7 @@ router.put('/planificador/:idPantalla', asyncHandler(async (req, res) => {
   }
 
   const updated = await Planificador.findByPk(finalId);
-  res.json(enrichPantalla(updated.toJSON()));
+  res.json(sinPassword(enrichPantalla(updated.toJSON())));
 }));
 
 // DELETE /planificador/:idPantalla — elimina un registro
@@ -594,9 +721,15 @@ router.post('/planificador/restore', asyncHandler(async (req, res) => {
   }
 
   if (snapshot.length > 0) {
+    // El snapshot viene del navegador, que ya no recibe contraseñas: si una
+    // fila no trae `password` se conserva la que está en la BD (si no, deshacer
+    // borraría todas las contraseñas).
+    const actuales = await Planificador.findAll({ attributes: ['idPantalla', 'password'], raw: true });
+    const passwordActual = Object.fromEntries(actuales.map(a => [a.idPantalla, a.password]));
     const records = snapshot.map(r => {
       const record = {};
       for (const f of PLANIFICADOR_FIELDS) record[f] = r[f] ?? null;
+      if (r.password === undefined) record.password = passwordActual[r.idPantalla] ?? null;
       return record;
     });
     await Planificador.bulkCreate(records, {
@@ -609,7 +742,7 @@ router.post('/planificador/restore', asyncHandler(async (req, res) => {
 
   const records   = await Planificador.findAll({ order: [['cuentaId', 'ASC'], ['idPantalla', 'ASC']] });
   const pantallas = records.map(r => enrichPantalla(r.toJSON()));
-  res.json({ message: 'Planificador restaurado al estado anterior', diasAlerta: DIAS_ALERTA, pantallas, inconsistencias: findCuentaIdMismatches(pantallas) });
+  res.json({ message: 'Planificador restaurado al estado anterior', diasAlerta: DIAS_ALERTA, pantallas: pantallas.map(sinPassword), inconsistencias: findCuentaIdMismatches(pantallas) });
 }));
 
 const SYNC_FIELDS = ['cuenta', 'password', 'credito', 'inicio', 'finalizacion'];
@@ -716,9 +849,9 @@ router.post('/planificador/sync-cuentas-padre', asyncHandler(async (_req, res) =
     sinCambio: sinCambioN,
     sinPantallas: skipped,
     creadas: creadas.size,
-    diff,
+    diff: diff.map(d => ({ ...d, cambios: enmascararCambios(d.cambios) })),
     diasAlerta: DIAS_ALERTA,
-    pantallas,
+    pantallas: pantallas.map(sinPassword),
     inconsistencias,
   });
 }));

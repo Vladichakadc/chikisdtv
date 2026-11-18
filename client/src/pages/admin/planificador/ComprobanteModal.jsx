@@ -13,18 +13,10 @@ import * as htmlToImage from 'html-to-image'
 import api from '../../../config/api'
 import { cn } from '../../../utils/cn'
 import { useUi } from '../../../context/UiContext'
+import { useCredenciales } from '../../../hooks/useCredenciales'
 import { formatDate, formatCurrency } from '../../../utils/excelUtils'
-import { MARCA_CLIENTE, PAGO_NEQUI, PAGO_LLAVE } from '../../../config/negocio'
-import { calcDias, diasLabel } from './rowHelpers'
-
-// Familias del catálogo que entran en la oferta (en este orden). Los meses de
-// regalo son la política comercial: Semestral paga 6 y goza 7; Anual paga 12
-// y goza 14 — coherente con duracionDias 210/426 del Catálogo de venta.
-const FAMILIAS_OFERTA = [
-  { match: /mensual/i,   emoji: '📌', mesesPago: 1,  mesesGratis: 0, gancho: 'ideal para ir mes a mes' },
-  { match: /semestral/i, emoji: '⭐', mesesPago: 6,  mesesGratis: 1, gancho: '' },
-  { match: /anual/i,     emoji: '👑', mesesPago: 12, mesesGratis: 2, gancho: 'el favorito' },
-]
+import { diasLabel, haceTexto } from './rowHelpers'
+import { esRenovable, tipoPlanDe, diasRestantesDe, mesRestanteDe, ofertasDe, construirMensaje } from './renovacion'
 
 const ESTADO_STYLE = {
   VIGENTE:  { bg: '#dcfce7', text: '#15803d' },
@@ -33,107 +25,6 @@ const ESTADO_STYLE = {
   CORTESIA: { bg: '#dbeafe', text: '#1d4ed8' },
 }
 const chipStyle = (valor) => ESTADO_STYLE[(valor || '').toUpperCase()] || { bg: '#f1f5f9', text: '#475569' }
-
-// El mensaje de renovación aplica a VENCIDO y ALERTA (PROXIMO A VENCER);
-// el marcador manual CORTESIA se respeta: a una cortesía no se le cobra.
-function esRenovable(row) {
-  const estado = (row.estadoReal || '').toUpperCase()
-  const alerta = (row.alertaReal || '').toUpperCase()
-  return (estado === 'VENCIDO' || estado === 'ALERTA') && alerta !== 'CORTESIA'
-}
-
-function tipoPlanDe(row, pago) {
-  if (pago?.tipoPlan) return pago.tipoPlan
-  if (row.tipoPlan) return row.tipoPlan
-  const d = row.duracionPlan != null ? Math.floor(Number(row.duracionPlan)) : null
-  return { 14: 'Plan Anual', 7: 'Plan Semestral', 1: 'Plan Mensual' }[d] || '—'
-}
-
-function diasRestantesDe(row) {
-  return calcDias(row.duracionReal || row.finalizacion) ?? row.diasVencimientoReal ?? row.diasVencimiento ?? null
-}
-
-function mesRestanteDe(row) {
-  const dias = diasRestantesDe(row)
-  if (dias == null) return '—'
-  if (dias < 0) return `Vencido hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? '' : 's'}`
-  if (dias < 30) return `${dias} día${dias === 1 ? '' : 's'}`
-  return `${+(dias / 30).toFixed(1)} meses`
-}
-
-// Arma la oferta con precios del Catálogo de venta. Si el cliente tiene un
-// número de pantallas con combo exacto en el catálogo (1, 2, 3…) se ofrece el
-// combo; si no existe combo para esa cantidad, se ofertan precios por
-// pantalla (los de 1 pantalla) — nunca se inventan precios no catalogados.
-function ofertasDe(catalogo = [], pantallas = 1) {
-  const disponibles = new Set(catalogo.map(p => p.numeroPantallas))
-  const exacto = disponibles.has(pantallas)
-  const nPrecio = exacto ? pantallas : 1
-  const ofertas = FAMILIAS_OFERTA
-    .map(f => {
-      const plan = catalogo.find(p => f.match.test(p.nombre || '') && p.numeroPantallas === nPrecio)
-      return plan ? { ...f, nombre: plan.nombre, precio: Number(plan.precio) } : null
-    })
-    .filter(Boolean)
-  return { ofertas, combo: exacto && pantallas > 1, porPantalla: !exacto && pantallas > 1 }
-}
-
-// El mensaje se arma SOLO para la cuenta (fila del Planificador) que se está
-// renovando: precio según las pantallas de esa cuenta, no la suma de todas las
-// cuentas del cliente. Si el cliente tiene varias cuentas, se nombra la cuenta
-// por su nickname para que sepa cuál es la que vence.
-function construirMensaje({ row, pantallas, ofertas, combo, porPantalla, identificarCuenta }) {
-  const nombre = (row.nombre || '').trim() || (row.nickname || '').trim()
-  const dias = diasRestantesDe(row)
-  const fechaFin = formatDate(row.duracionReal || row.finalizacion)
-  const vencido = dias == null || dias <= 0
-
-  const cuenta = (row.nickname || '').trim()
-  const plan = identificarCuenta && cuenta
-    ? `el plan de tu cuenta *${cuenta}* de ${MARCA_CLIENTE}`
-    : `tu plan de ${MARCA_CLIENTE}`
-
-  let situacion
-  if (dias == null)    situacion = `${plan} está pendiente de renovación 😅`
-  else if (dias < 0)   situacion = `${plan} se venció el ${fechaFin} 😅`
-  else if (dias === 0) situacion = `${plan} vence HOY (${fechaFin}) ⏳`
-  else if (dias === 1) situacion = `${plan} vence MAÑANA (${fechaFin}) ⏳`
-  else                 situacion = `${plan} vence en ${dias} días (el ${fechaFin}) ⏳`
-
-  const puente = vencido
-    ? 'La buena noticia: reactivarlo toma 1 minuto y te mantengo los mismos precios de siempre.'
-    : 'Renovando hoy sigues sin cortes — cero interrupciones y los mismos precios de siempre.'
-
-  let intro
-  if (combo)            intro = `Como esta cuenta tiene ${pantallas} pantallas, te dejo los precios del combo para renovarla completa:`
-  else if (porPantalla) intro = `Esta cuenta tiene ${pantallas} pantallas — estos son los precios por cada pantalla:`
-  else                  intro = 'Mira las opciones:'
-
-  const etiqueta = combo ? ` (${pantallas} pantallas)` : ''
-  const bullets = ofertas.map(o => {
-    const precio = formatCurrency(o.precio)
-    if (!o.mesesGratis) {
-      return `${o.emoji} *${o.nombre}*${etiqueta}: ${precio} · ${o.mesesPago} mes${o.mesesPago === 1 ? '' : 'es'} — ${o.gancho}`
-    }
-    const total = o.mesesPago + o.mesesGratis
-    const porMes = formatCurrency(Math.round(o.precio / total))
-    const cola = o.gancho ? ` — ${o.gancho}` : ''
-    return `${o.emoji} *${o.nombre}*${etiqueta}: ${precio} · pagas ${o.mesesPago} meses ¡y te REGALAMOS ${o.mesesGratis === 1 ? '1 mes' : `${o.mesesGratis} meses`}! Son ${total} meses corridos, a ${porMes}/mes${cola}`
-  }).join('\n')
-
-  const cierre = vencido
-    ? 'Me envías el pantallazo del pago y te reactivo de una, para que no te pierdas ni un segundo. 😉'
-    : 'Me envías el pantallazo del pago y te dejo renovado de una, sin que se te corte la señal. 😉'
-
-  return [
-    nombre ? `¡Hola, ${nombre}! 📺 ¿Cómo estás?` : '¡Hola! 📺 ¿Cómo estás?',
-    `Te escribo rapidito: ${situacion} y no queremos que te quedes sin tus series, películas y deportes en vivo.`,
-    `${puente} ${intro}`,
-    bullets,
-    `Renuevas en un momento:\n📲 Nequi: ${PAGO_NEQUI}\n🔑 Llave: ${PAGO_LLAVE}`,
-    cierre,
-  ].filter(Boolean).join('\n\n')
-}
 
 // Motivo por el que una pantalla del cliente NO está al día
 function motivoPendiente(p) {
@@ -181,8 +72,9 @@ function FilaCampo({ label, children, doble = false }) {
   )
 }
 
-export function ComprobanteModal({ row, onClose }) {
+export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatorio }) {
   const { showToast } = useUi()
+  const { passwords, revelar } = useCredenciales()
   const receiptRef = useRef(null)
   const renovable = esRenovable(row)
   const [vista, setVista] = useState(renovable ? 'renovacion' : 'comprobante')
@@ -198,6 +90,22 @@ export function ComprobanteModal({ row, onClose }) {
   const [ocultas, setOcultas] = useState(() => new Set())
   const [mostrarCuenta, setMostrarCuenta] = useState(false)
   const [mostrarPassword, setMostrarPassword] = useState(false)
+  // Las contraseñas se piden al encender el interruptor (queda registrado)
+  const togglePassword = async () => {
+    setCopiado(false)
+    if (mostrarPassword) { setMostrarPassword(false); return }
+    const ids = [row.idPantalla, ...pantallasDetalle.map(p => p.idPantalla)]
+    if (await revelar(ids, 'comprobante')) setMostrarPassword(true)
+  }
+
+  // Deja constancia del envío (Recordado hace N días / efectividad). No
+  // bloquea ni interrumpe al usuario si falla.
+  const registrar = (tipo, canal) => {
+    api.post('/admin/planificador/recordatorios', { idPantalla: row.idPantalla, tipo, canal })
+      .then(() => onRegistrado?.())
+      .catch(() => {})
+  }
+
   const toggleOculta = (id) => {
     setCopiado(false)
     setOcultas(prev => {
@@ -211,7 +119,7 @@ export function ComprobanteModal({ row, onClose }) {
     let vivo = true
     if (!row.nickname) { setCargando(false); return }
     api.get(`/admin/planificador/comprobante/${encodeURIComponent(row.nickname)}`, {
-      params: row.customerId ? { customerId: row.customerId } : {},
+      params: { idPantalla: row.idPantalla, ...(row.customerId ? { customerId: row.customerId } : {}) },
     })
       .then(r => {
         if (!vivo) return
@@ -224,7 +132,8 @@ export function ComprobanteModal({ row, onClose }) {
       .catch(() => { if (vivo) showToast('No se pudo consultar el último pago del nickname.', 'error') })
       .finally(() => { if (vivo) setCargando(false) })
     return () => { vivo = false }
-  }, [row, showToast])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.nickname, row.idPantalla, row.customerId])
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -264,6 +173,7 @@ export function ComprobanteModal({ row, onClose }) {
       setCopiado(true)
       setTimeout(() => setCopiado(false), 2200)
       showToast('Comprobante copiado como imagen — pégalo donde lo necesites.', 'success')
+      registrar('comprobante', 'copiado')
     } catch (e) {
       showToast(`No se pudo copiar la imagen: ${e.message || e}`, 'error')
     } finally {
@@ -286,6 +196,7 @@ export function ComprobanteModal({ row, onClose }) {
       // Móvil / navegadores con Web Share: hoja nativa con WhatsApp como destino
       if (puedeCompartir) {
         await navigator.share({ files: [file], title: 'Comprobante de renovación' })
+        registrar('comprobante', 'whatsapp')
         return
       }
       // Escritorio sin share: imagen al portapapeles + chat del cliente para pegarla
@@ -295,6 +206,7 @@ export function ComprobanteModal({ row, onClose }) {
       if (ventana && !ventana.closed) ventana.location.href = url
       else window.open(url, '_blank')
       showToast('Imagen copiada — pégala en el chat de WhatsApp con Ctrl+V.', 'success')
+      registrar('comprobante', 'whatsapp')
     } catch (e) {
       if (ventana && !ventana.closed) ventana.close()
       if (e?.name !== 'AbortError') showToast(`No se pudo preparar el envío: ${e.message || e}`, 'error')
@@ -310,6 +222,7 @@ export function ComprobanteModal({ row, onClose }) {
       setCopiado(true)
       setTimeout(() => setCopiado(false), 2200)
       showToast('Mensaje de renovación copiado.', 'success')
+      registrar('renovacion', 'copiado')
     } catch (e) {
       showToast(`No se pudo copiar el mensaje: ${e.message || e}`, 'error')
     }
@@ -325,6 +238,7 @@ export function ComprobanteModal({ row, onClose }) {
       ? `https://api.whatsapp.com/send/?phone=${numero}&text=${texto}`
       : `https://api.whatsapp.com/send/?text=${texto}`
     window.open(url, '_blank')
+    registrar('renovacion', 'whatsapp')
     showToast(numero
       ? 'WhatsApp abierto con el mensaje listo — solo dale enviar.'
       : 'WhatsApp abierto — elige el chat del cliente; el mensaje va prellenado.', 'success')
@@ -394,6 +308,11 @@ export function ComprobanteModal({ row, onClose }) {
             <div className="flex flex-wrap items-center gap-1.5 mb-2">
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: estadoCss.bg, color: estadoCss.text }}>{estado}</span>
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{diasLabel(dias)}</span>
+              {ultimoRecordatorio?.fecha && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700" title={`${ultimoRecordatorio.total || 1} recordatorio(s) en los últimos 30 días`}>
+                  Recordado {haceTexto(ultimoRecordatorio.fecha)}
+                </span>
+              )}
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
                 Cuenta {row.nickname || row.idPantalla} · {pantallasCuenta} pantalla{pantallasCuenta === 1 ? '' : 's'}
               </span>
@@ -465,7 +384,7 @@ export function ComprobanteModal({ row, onClose }) {
                 <Interruptor activo={mostrarCuenta} onClick={() => { setMostrarCuenta(v => !v); setCopiado(false) }} icon={Building2}>
                   Cuenta padre
                 </Interruptor>
-                <Interruptor activo={mostrarPassword} onClick={() => { setMostrarPassword(v => !v); setCopiado(false) }} icon={KeyRound}>
+                <Interruptor activo={mostrarPassword} onClick={togglePassword} icon={KeyRound}>
                   Contraseña
                 </Interruptor>
               </div>
@@ -552,7 +471,7 @@ export function ComprobanteModal({ row, onClose }) {
                 )}
                 {mostrarPassword && (
                   <FilaCampo label="Contraseña">
-                    <span className="text-xs font-semibold text-slate-700" style={{ fontFamily: 'ui-monospace,monospace' }}>{row.password || '—'}</span>
+                    <span className="text-xs font-semibold text-slate-700" style={{ fontFamily: 'ui-monospace,monospace' }}>{passwords[row.idPantalla] || '—'}</span>
                   </FilaCampo>
                 )}
                 <FilaCampo label="Tipo Plan">
@@ -588,7 +507,7 @@ export function ComprobanteModal({ row, onClose }) {
                         <span className="text-[10px] text-slate-400 whitespace-nowrap">vence {formatDate(p.finPlan)}</span>
                         <span className="text-[11px] font-bold text-slate-800 whitespace-nowrap">{formatCurrency(p.pago?.precioVenta)}</span>
                       </div>
-                      <CredencialesLinea cuenta={p.cuenta || p.cuentaId} password={p.password} mostrarCuenta={mostrarCuenta} mostrarPassword={mostrarPassword} />
+                      <CredencialesLinea cuenta={p.cuenta || p.cuentaId} password={passwords[p.idPantalla]} mostrarCuenta={mostrarCuenta} mostrarPassword={mostrarPassword} />
                     </div>
                   ))}
                 </div>
@@ -607,7 +526,7 @@ export function ComprobanteModal({ row, onClose }) {
                           <span className="text-[10px] text-slate-400 whitespace-nowrap">{p.finPlan ? `${p.dias != null && p.dias <= 0 ? 'venció' : 'vence'} ${formatDate(p.finPlan)}` : 'sin fecha'}</span>
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: m.bg, color: m.text }}>{m.label}</span>
                         </div>
-                        <CredencialesLinea cuenta={p.cuenta || p.cuentaId} password={p.password} mostrarCuenta={mostrarCuenta} mostrarPassword={mostrarPassword} />
+                        <CredencialesLinea cuenta={p.cuenta || p.cuentaId} password={passwords[p.idPantalla]} mostrarCuenta={mostrarCuenta} mostrarPassword={mostrarPassword} />
                       </div>
                     )
                   })}
