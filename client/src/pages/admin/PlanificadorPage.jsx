@@ -828,6 +828,7 @@ export default function PlanificadorPage() {
           onClose={() => setActivePanel(null)}
           onGenerate={handleGenerateVenta}
           onEdit={(screen) => { setActivePanel(null); snapshotBeforeChange(); setEditRow(screen) }}
+          onStatus={(screen) => setComprobanteRow(screen)}
         />
       )}
 
@@ -1088,7 +1089,9 @@ export default function PlanificadorPage() {
         </div>
       </div>
 
-      {/* Comprobante de renovación (desde Estatus Cliente) */}
+      {/* Comprobante / recordatorio de renovación (desde Estatus Cliente y desde
+          el botón "Status cliente" de Vencidas / Próx. a vencer). z-[80]: queda
+          sobre el CategoryPanel (z-50), que permanece abierto debajo. */}
       {comprobanteRow && (
         <ComprobanteModal row={comprobanteRow} onClose={() => setComprobanteRow(null)} />
       )}
