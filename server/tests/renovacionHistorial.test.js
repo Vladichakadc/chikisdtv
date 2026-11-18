@@ -15,6 +15,7 @@ const { Planificador, Venta, PlanificadorCambio, CuentaPadre } = require('../mod
 const { registrarRenovacion, sumarMeses, inicioSugerido } = require('../services/renovacionService');
 const { registrarCambio, deshacerCambio, deshacerLote, nuevoLote, ConflictoDeshacer } = require('../services/historialPlanificador');
 const { todayStr, daysFromNow } = require('../utils/dateUtils');
+const { conCuentaPadre } = require('../services/cuentaPadreDatos');
 
 const fila = (id, extra = {}) => ({
   idPantalla: id, cuentaId: id.split('-')[0], cuenta: 'usuario_iptv', password: 'secreta',
@@ -124,30 +125,30 @@ describe('historial y deshacer', () => {
     assert.equal(await registrarCambio({ accion: 'editar', idPantalla: 'M001-2', antes: f, despues: f }), null);
   });
 
-  test('deshacer una eliminación recrea la pantalla con la contraseña de su cuenta', async () => {
+  test('deshacer una eliminación recrea la pantalla; la contraseña sigue saliendo de su cuenta padre', async () => {
     const f = await Planificador.findByPk('M001-3');
     await Planificador.destroy({ where: { idPantalla: 'M001-3' } });
     const c = await registrarCambio({ accion: 'eliminar', idPantalla: 'M001-3', antes: f, despues: null });
     await deshacerCambio(c.id, 'x');
     const r = await Planificador.findByPk('M001-3');
     assert.equal(r.nickname, 'Libre');
-    assert.equal(r.password, 'secreta');
+    assert.equal((await conCuentaPadre(r.toJSON())).password, 'secreta');
   });
 
   test('deshacer un lote es todo o nada', async () => {
     const lote = nuevoLote();
     for (const id of ['M001-1', 'M001-2']) {
       const a = await Planificador.findByPk(id);
-      await Planificador.update({ credito: 99 }, { where: { idPantalla: id } });
+      await Planificador.update({ tipoPlan: 'Promo X' }, { where: { idPantalla: id } });
       await registrarCambio({ accion: 'sincronizar', idPantalla: id, antes: a, despues: await Planificador.findByPk(id), lote });
     }
     // Un cambio posterior en una de las dos bloquea el lote completo
-    await Planificador.update({ credito: 5 }, { where: { idPantalla: 'M001-1' } });
+    await Planificador.update({ tipoPlan: 'Otra' }, { where: { idPantalla: 'M001-1' } });
     await assert.rejects(deshacerLote(lote, 'x'), ConflictoDeshacer);
-    assert.equal((await Planificador.findByPk('M001-2')).credito, 99, 'no se aplicó nada');
-    await Planificador.update({ credito: 99 }, { where: { idPantalla: 'M001-1' } });
+    assert.equal((await Planificador.findByPk('M001-2')).tipoPlan, 'Promo X', 'no se aplicó nada');
+    await Planificador.update({ tipoPlan: 'Promo X' }, { where: { idPantalla: 'M001-1' } });
     const r = await deshacerLote(lote, 'x');
     assert.equal(r.deshechos, 2);
-    assert.notEqual((await Planificador.findByPk('M001-2')).credito, 99);
+    assert.notEqual((await Planificador.findByPk('M001-2')).tipoPlan, 'Promo X');
   });
 });

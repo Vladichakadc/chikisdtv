@@ -36,17 +36,8 @@ async function autoFixCuentaIdMismatches() {
     const cp = cuentaMap[prefix];
     if (!cp) { unfixable.push({ idPantalla: row.idPantalla, cuentaIdActual: row.cuentaId, cuentaIdEsperado: prefix }); continue; }
 
-    await Planificador.update(
-      {
-        cuentaId:     cp.cuentaId,
-        cuenta:       cp.nombreUsuario || null,
-        password:     cp.contrasena    || null,
-        credito:      cp.credito       ?? null,
-        inicio:       cp.fechaInicio   || null,
-        finalizacion: cp.fechaFin      || null,
-      },
-      { where: { idPantalla: row.idPantalla } }
-    );
+    // Solo se realinea cuentaId: los datos de cuenta se leen de Cuentas Padre
+    await Planificador.update({ cuentaId: cp.cuentaId }, { where: { idPantalla: row.idPantalla } });
     console.log(`[AUTOFIX] ${row.idPantalla}: cuentaId ${row.cuentaId} → ${prefix}`);
     fixed++;
   }
@@ -88,12 +79,7 @@ async function ensurePantallasCuentasPadre() {
     const cuentaId = String(cp.cuentaId).trim();
     return Array.from({ length: PANTALLAS_POR_CUENTA }, (_, i) => ({
       idPantalla:   `${cuentaId}-${i + 1}`,
-      cuentaId,
-      cuenta:       cp.nombreUsuario || null,
-      password:     cp.contrasena    || null,
-      credito:      cp.credito       ?? null,
-      inicio:       cp.fechaInicio   || null,
-      finalizacion: cp.fechaFin      || null,
+      cuentaId,     // usuario, contraseña, crédito y fechas: de Cuentas Padre
       nickname:     'Libre',
       pantallas:    1,
     }));

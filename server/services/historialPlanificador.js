@@ -9,8 +9,9 @@ const { Planificador, PlanificadorCambio, Venta, CuentaPadre } = require('../mod
 const sequelize = require('../config/database');
 
 // Campos de una pantalla que se versionan (la contraseña queda fuera a propósito)
+// Los datos de la cuenta (usuario, crédito, fechas) viven en Cuentas Padre.
 const CAMPOS = [
-  'idPantalla', 'cuentaId', 'cuenta', 'credito', 'inicio', 'finalizacion',
+  'idPantalla', 'cuentaId',
   'nombre', 'apellido', 'customerId', 'nickname', 'pantallas', 'duracionPlan',
   'inicioReal', 'duracionReal', 'alertaReal', 'cortesia', 'porcentaje', 'tipoPlan',
   'debe', 'montoDebe', 'montoDebeUSD',
@@ -109,10 +110,12 @@ async function revertir(cambio, usuarioEmail, transaction) {
     if (actual || await Planificador.findByPk(cambio.idPantalla, { transaction })) {
       throw new ConflictoDeshacer(`Ya existe otra pantalla ${cambio.idPantalla}; no se puede recrear.`);
     }
-    // La contraseña no se guarda en el historial: se toma de una hermana o de la cuenta padre
-    const hermana = await Planificador.findOne({ where: { cuentaId: antes.cuentaId }, attributes: ['password'], transaction });
-    const cp = hermana ? null : await CuentaPadre.findByPk(antes.cuentaId, { transaction });
-    await Planificador.create({ ...antes, password: hermana?.password ?? cp?.contrasena ?? null }, { transaction });
+    // Los datos de cuenta (incluida la contraseña) salen de Cuentas Padre; solo si
+    // la cuenta no existe allí se toman de una pantalla hermana (respaldo legado)
+    const cp = await CuentaPadre.findByPk(antes.cuentaId, { transaction });
+    const hermana = cp ? null : await Planificador.findOne({ where: { cuentaId: antes.cuentaId }, raw: true, transaction });
+    const legado = hermana ? { cuenta: hermana.cuenta, password: hermana.password, credito: hermana.credito, inicio: hermana.inicio, finalizacion: hermana.finalizacion } : {};
+    await Planificador.create({ ...antes, ...legado }, { transaction });
     resultado = { idPantalla: cambio.idPantalla, accion: 'recreada' };
   } else if (cambio.accion === 'crear') {
     if (!actual) throw new ConflictoDeshacer(`La pantalla ${idActual} ya no existe.`);

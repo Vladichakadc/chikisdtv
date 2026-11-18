@@ -480,9 +480,10 @@ export default function DashboardHome() {
   const handleSync = async () => {
     setSyncing(true)
     try {
-      const r = await api.post('/admin/planificador/sync-cuentas-padre')
+      // Los datos de cuenta ya se leen directo de Cuentas Padre: no hay nada que
+      // copiar, solo recargar las cifras.
       await load()
-      showToast(r.data.message, 'success')
+      showToast('Datos actualizados.', 'success')
     } catch (e) {
       showToast(e.response?.data?.error || e.message, 'error')
     } finally {

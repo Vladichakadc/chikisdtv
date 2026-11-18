@@ -10,6 +10,7 @@ const { Planificador, Venta } = require('../models');
 const { sanitizeVentaBody, siguienteIdVenta } = require('./ventasService');
 const { registrarCambio } = require('./historialPlanificador');
 const { calcDias } = require('../utils/planificadorAlerta');
+const { conCuentaPadre } = require('./cuentaPadreDatos');
 const { todayStr } = require('../utils/dateUtils');
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -46,7 +47,7 @@ async function registrarRenovacion(idPantalla, datos, usuarioEmail) {
   return sequelize.transaction(async (transaction) => {
     const pantalla = await Planificador.findByPk(idPantalla, { transaction });
     if (!pantalla) throw new ErrorRenovacion('Pantalla no encontrada', 404);
-    const p = pantalla.toJSON();
+    const p = await conCuentaPadre(pantalla.toJSON()); // usuario IPTV desde Cuentas Padre
     const nickname = String(p.nickname || '').trim();
     if (!nickname || /libre/i.test(nickname)) throw new ErrorRenovacion('La pantalla no tiene titular: asígnala antes de renovar.');
 

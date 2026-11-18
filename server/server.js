@@ -16,6 +16,7 @@ const { autoFixCuentaIdMismatches, normalizeDuracionPlan, ensurePantallasCuentas
 const { ensureVentasEquiposSchema } = require('./utils/ensureVentasEquiposSchema');
 const { ensureModelColumns, dropStaleBackupTables } = require('./utils/ensureModelColumns');
 const { ensureIndexes } = require('./utils/ensureIndexes');
+const { migrarCredenciales } = require('./services/migrarCredenciales');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -173,6 +174,9 @@ async function seedDevicesFromVentas() {
     // Cortesía pasó de texto en alertaReal a columna propia: migración idempotente
     await sequelize.query("UPDATE planificador SET cortesia = 1 WHERE UPPER(TRIM(alertaReal)) = 'CORTESIA' AND (cortesia IS NULL OR cortesia = 0)");
     await sequelize.query('UPDATE planificador SET cortesia = 0 WHERE cortesia IS NULL');
+    // Cuentas Padre es la única fuente de la contraseña: se cifran las que estén
+    // en texto plano y se borran las copias que tenía cada pantalla.
+    await migrarCredenciales();
     // recordatorios ganó `etapa` (secuencia de cobro antes / día / +3 días)
     await ensureModelColumns(Recordatorio);
     // ventas_equipos también ganó columnas tarde (costo, serial, garantia):
