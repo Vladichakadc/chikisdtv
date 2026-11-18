@@ -3,7 +3,7 @@ import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
 import { STAT_TONES } from './StatCard'
 import { cn } from '../../../utils/cn'
-import { diasLabel, diasLabelClass, estadoBadgeVariant } from './rowHelpers'
+import { diasLabel, diasLabelClass, estadoBadgeVariant, haceTexto } from './rowHelpers'
 
 // ─── Tarjetas inteligentes: configuración de cada categoría accionable ──────
 // Cada entrada describe cómo abrir su panel de detalle (título, tono visual,
@@ -93,7 +93,7 @@ export function screenToVentaPrefill(screen, catKey) {
 // en VENCIDO/ALERTA arranca en la vista "Renovación" con el mensaje listo).
 const CATEGORIAS_RECORDATORIO = new Set(['vencido', 'alerta'])
 
-export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus }) {
+export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus, recordatorios }) {
   const config = CATEGORY_CONFIG[catKey]
   const conRecordatorio = CATEGORIAS_RECORDATORIO.has(catKey) && !!onStatus
   if (!config) return null
@@ -102,7 +102,9 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-8">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4">
-        <div className={`bg-gradient-to-r ${t.solid} rounded-t-2xl px-6 py-4 flex items-center justify-between`}>
+        {/* STAT_TONES solo trae colores (from/to): el degradado va en style;
+            con clases inexistentes la cabecera quedaba blanca y el título invisible */}
+        <div className="rounded-t-2xl px-6 py-4 flex items-center justify-between" style={{ background: `linear-gradient(90deg, ${t.from}, ${t.to})` }}>
           <div className="flex items-center gap-3">
             <div className="bg-white/20 rounded-lg p-2.5"><Icon size={22} className="text-white" /></div>
             <div>
@@ -115,8 +117,13 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
           </button>
         </div>
 
-        <div className={`px-6 py-3 text-xs border-b ${t.outline} border-x-0 border-t-0`}>
+        <div className="px-6 py-3 text-xs border-b text-slate-700" style={{ background: `${t.from}14`, borderColor: `${t.from}33` }}>
           💡 {config.hint}
+          {conRecordatorio && recordatorios?.efectividad?.pantallas > 0 && (
+            <p className="mt-1 font-semibold">
+              📊 Últimos {recordatorios.dias} días: {recordatorios.efectividad.pantallas} pantalla{recordatorios.efectividad.pantallas === 1 ? '' : 's'} recordada{recordatorios.efectividad.pantallas === 1 ? '' : 's'} · {recordatorios.efectividad.renovaron} renovaron ({recordatorios.efectividad.tasa}%)
+            </p>
+          )}
         </div>
 
         {screens.length === 0 ? (
@@ -144,6 +151,20 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
                       <td className="px-4 py-2.5">
                         <p className="font-medium text-gray-800">{cliente}</p>
                         {p.nickname && p.nickname !== cliente && <p className="text-xs text-gray-400">{p.nickname}</p>}
+                        {conRecordatorio && recordatorios?.ultimos?.[p.idPantalla] && (() => {
+                          const u = recordatorios.ultimos[p.idPantalla]
+                          return (
+                            <span
+                              className={cn(
+                                'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                                u.renovo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                              )}
+                              title={`${u.total} recordatorio(s) en los últimos ${recordatorios.dias} días · último por ${u.canal === 'whatsapp' ? 'WhatsApp' : 'mensaje copiado'}`}
+                            >
+                              <MessageCircle size={10} /> Recordado {haceTexto(u.fecha)}{u.total > 1 ? ` · ${u.total}×` : ''}{u.renovo ? ' · renovó' : ''}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{p.idPantalla}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-600">{p.cuenta || p.cuentaId || '—'}</td>

@@ -10,8 +10,9 @@
  *  stats       — { diasAlerta } para calcular colores de fila
  *  sortConfig  — { key, dir }
  *  onSort      — (key) => void
- *  hidePwd     — { [cuentaId]: bool }
- *  onTogglePwd — (cuentaId) => void
+ *  pwdVisible  — { [cuentaId]: bool } — contraseñas ocultas por defecto
+ *  passwords   — { [idPantalla]: string } — las ya reveladas (useCredenciales)
+ *  onTogglePwd — (cuentaId) => void — la página pide las contraseñas al revelar
  *  onEdit      — (row) => void
  *  onDelete    — (row) => void
  *  readOnly    — si true, oculta columna de acciones (default false)
@@ -30,7 +31,8 @@ export function PlanificadorTable({
   stats = {},
   sortConfig,
   onSort,
-  hidePwd = {},
+  pwdVisible = {},
+  passwords = {},
   onTogglePwd,
   onEdit,
   onDelete,
@@ -124,15 +126,19 @@ export function PlanificadorTable({
                     <td className="px-2 py-1.5 font-mono text-gray-900 whitespace-nowrap">{row.cuenta}</td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-1 whitespace-nowrap">
-                        {!hidePwd[row.cuentaId]
-                          ? <span className="font-mono text-gray-700">{row.password}</span>
-                          : <span className="text-gray-300 tracking-widest">••••••</span>}
-                        {onTogglePwd && (
+                        {row.tienePassword === false
+                          ? <span className="text-gray-300">—</span>
+                          : pwdVisible[row.cuentaId]
+                            ? <span className="font-mono text-gray-700">{passwords[row.idPantalla] ?? '…'}</span>
+                            : <span className="text-gray-300 tracking-widest">••••••</span>}
+                        {onTogglePwd && row.tienePassword !== false && (
                           <button
                             onClick={() => onTogglePwd(row.cuentaId)}
                             className="text-gray-300 hover:text-gray-600 flex-shrink-0"
+                            aria-label={pwdVisible[row.cuentaId] ? 'Ocultar contraseña' : 'Ver contraseña (queda registrado)'}
+                            title={pwdVisible[row.cuentaId] ? 'Ocultar contraseña' : 'Ver contraseña — el acceso queda registrado'}
                           >
-                            {!hidePwd[row.cuentaId] ? <EyeOff size={11} /> : <Eye size={11} />}
+                            {pwdVisible[row.cuentaId] ? <EyeOff size={11} /> : <Eye size={11} />}
                           </button>
                         )}
                       </div>

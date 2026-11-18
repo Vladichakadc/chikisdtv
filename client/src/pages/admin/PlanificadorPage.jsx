@@ -20,6 +20,7 @@ import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { PlanificadorTable } from '../../components/ui/PlanificadorTable'
+import { useCredenciales } from '../../hooks/useCredenciales'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 
 import { StatCard } from './planificador/StatCard'
@@ -451,7 +452,8 @@ export default function PlanificadorPage() {
   const [error, setError]                 = useState(null)
   const [search, setSearch]               = useState('')
   const [filterStatus, setFilterStatus]   = useState('ALL')
-  const [hidePwd, setHidePwd]             = useState({})
+  const [pwdVisible, setPwdVisible]       = useState({})
+  const { passwords, revelar, olvidar }   = useCredenciales()
   const [editRow, setEditRow]             = useState(null)
   const [sortConfig, setSortConfig]       = useState({ key: 'cuentaId', dir: 'asc' })
   const [prevPantallas, setPrevPantallas] = useState(null)
@@ -580,7 +582,17 @@ export default function PlanificadorPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  // Recordatorios de renovación enviados (últimos 30 días): alimentan
+  // "Recordado hace N días" y la efectividad en Vencidas / Próx. a vencer.
+  const [recordatorios, setRecordatorios] = useState(null)
+  const loadRecordatorios = async () => {
+    try {
+      const r = await api.get('/admin/planificador/recordatorios/resumen', { params: { dias: 30 } })
+      setRecordatorios(r.data)
+    } catch { /* no bloquea el Planificador */ }
+  }
+
+  useEffect(() => { load(); loadRecordatorios() }, [])
 
   // Auto-abrir panel Estatus Cliente si venimos del Dashboard con esa indicación
   useEffect(() => {
@@ -741,7 +753,23 @@ export default function PlanificadorPage() {
     }
   }
 
-  const togglePwd = (id) => setHidePwd(p => ({ ...p, [id]: !p[id] }))
+  // Contraseñas ocultas por defecto: al revelar una cuenta se piden al backend
+  // y queda registrado quién las vio (motivo "tabla").
+  const togglePwd = async (cuentaId) => {
+    if (pwdVisible[cuentaId]) { setPwdVisible(p => ({ ...p, [cuentaId]: false })); return }
+    const ids = (data?.pantallas || []).filter(p => p.cuentaId === cuentaId).map(p => p.idPantalla)
+    if (await revelar(ids, 'tabla')) setPwdVisible(p => ({ ...p, [cuentaId]: true }))
+  }
+
+  // "Mostrar claves" del Estatus Cliente: pide las contraseñas de las filas visibles
+  const toggleEstatusPwd = async () => {
+    if (showEstatusPwd) { setShowEstatusPwd(false); return }
+    if (await revelar(rows.map(r => r.idPantalla), 'estatus')) setShowEstatusPwd(true)
+  }
+
+  // Cada recarga del Planificador vuelve a ocultar las contraseñas (pudieron
+  // cambiar al editar o sincronizar con Cuentas Padre).
+  useEffect(() => { olvidar(); setPwdVisible({}); setShowEstatusPwd(false) }, [data, olvidar])
 
   const handleDelete = async (row) => {
     const cliente = [row.nombre, row.apellido].filter(Boolean).join(' ') || 'sin asignar'
@@ -829,6 +857,7 @@ export default function PlanificadorPage() {
           onGenerate={handleGenerateVenta}
           onEdit={(screen) => { setActivePanel(null); snapshotBeforeChange(); setEditRow(screen) }}
           onStatus={(screen) => setComprobanteRow(screen)}
+          recordatorios={recordatorios}
         />
       )}
 
@@ -1093,7 +1122,12 @@ export default function PlanificadorPage() {
           el botón "Status cliente" de Vencidas / Próx. a vencer). z-[80]: queda
           sobre el CategoryPanel (z-50), que permanece abierto debajo. */}
       {comprobanteRow && (
-        <ComprobanteModal row={comprobanteRow} onClose={() => setComprobanteRow(null)} />
+        <ComprobanteModal
+          row={comprobanteRow}
+          onClose={() => setComprobanteRow(null)}
+          onRegistrado={loadRecordatorios}
+          ultimoRecordatorio={recordatorios?.ultimos?.[comprobanteRow.idPantalla]}
+        />
       )}
 
       {/* Panel Estatus Cliente — overlay flotante */}
@@ -1143,7 +1177,8 @@ export default function PlanificadorPage() {
               </button>
               {showCuentaData && (
                 <button
-                  onClick={() => setShowEstatusPwd(p => !p)}
+                  onClick={toggleEstatusPwd}
+                  title={showEstatusPwd ? 'Ocultar claves' : 'Mostrar claves — el acceso queda registrado'}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-white/80 hover:bg-white/20 border border-white/20 transition-colors"
                 >
                   {showEstatusPwd ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -1213,7 +1248,7 @@ export default function PlanificadorPage() {
                         <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap border-b border-gray-100">{row.cuenta}</td>
                         <td className="px-3 py-2 whitespace-nowrap border-b border-gray-100">
                           {showEstatusPwd
-                            ? <span className="font-mono text-gray-700">{row.password}</span>
+                            ? <span className="font-mono text-gray-700">{passwords[row.idPantalla] ?? '—'}</span>
                             : <span className="text-gray-400 tracking-widest select-none">••••••</span>}
                         </td>
                       </>)}
@@ -1293,7 +1328,8 @@ export default function PlanificadorPage() {
           stats={stats}
           sortConfig={sortConfig}
           onSort={onSort}
-          hidePwd={hidePwd}
+          pwdVisible={pwdVisible}
+          passwords={passwords}
           onTogglePwd={togglePwd}
           onEdit={(row) => { snapshotBeforeChange(); setEditRow(row) }}
           onDelete={handleDelete}

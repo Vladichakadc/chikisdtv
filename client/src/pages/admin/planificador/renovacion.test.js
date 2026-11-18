@@ -1,0 +1,129 @@
+// Pruebas de la lógica de precios del mensaje de renovación (casos reales del
+// negocio). Correr con: cd client && npm test
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { ofertasDe, construirMensaje, esRenovable, mesesGratisDe, mesesDePlan } from './renovacion'
+import { haceTexto } from './rowHelpers'
+
+// Catálogo de venta como el de producción: combos de 1, 2 y 3 pantallas.
+// Semestral 210 días (7 meses) y Anual 426 días (14 meses).
+const CATALOGO = [
+  { nombre: 'Plan Mensual 1 Pantalla',    precio: 15000,  duracionDias: 30,  numeroPantallas: 1 },
+  { nombre: 'Plan Semestral 1 Pantalla',  precio: 80000,  duracionDias: 210, numeroPantallas: 1 },
+  { nombre: 'Plan Anual 1 Pantalla',      precio: 150000, duracionDias: 426, numeroPantallas: 1 },
+  { nombre: 'Plan Mensual 2 Pantallas',   precio: 25000,  duracionDias: 30,  numeroPantallas: 2 },
+  { nombre: 'Plan Semestral 2 Pantallas', precio: 140000, duracionDias: 210, numeroPantallas: 2 },
+  { nombre: 'Plan Anual 2 Pantallas',     precio: 260000, duracionDias: 426, numeroPantallas: 2 },
+  { nombre: 'Plan Mensual 3 Pantallas',   precio: 33000,  duracionDias: 30,  numeroPantallas: 3 },
+]
+
+// Hoy fijo: 18-11-2026 (mediodía local, para no depender de la zona horaria)
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 10, 18, 12, 0, 0)) })
+afterEach(() => { vi.useRealTimers() })
+
+const fila = (extra = {}) => ({
+  idPantalla: 'M004-2', nickname: 'Xiomy 2', nombre: 'Xiomara', customerId: '173',
+  pantallas: 1, duracionReal: '2026-11-10', estadoReal: 'VENCIDO', alertaReal: '', ...extra,
+})
+
+function mensajePara(row, catalogo = CATALOGO, { identificarCuenta = false } = {}) {
+  const pantallas = Math.max(1, Math.floor(Number(row.pantallas)) || 1)
+  const oferta = ofertasDe(catalogo, pantallas)
+  return { ...oferta, texto: construirMensaje({ row, pantallas, ...oferta, identificarCuenta }) }
+}
+
+describe('meses de regalo salen del catálogo', () => {
+  it('convierte duracionDias a meses', () => {
+    expect(mesesDePlan(30)).toBe(1)
+    expect(mesesDePlan(210)).toBe(7)
+    expect(mesesDePlan(426)).toBe(14)
+    expect(mesesDePlan(365)).toBe(12)
+    expect(mesesDePlan(null)).toBe(0)
+  })
+  it('regalo = meses del plan − meses pagados, nunca negativo', () => {
+    expect(mesesGratisDe(210, 6)).toBe(1)
+    expect(mesesGratisDe(426, 12)).toBe(2)
+    expect(mesesGratisDe(365, 12)).toBe(0)
+    expect(mesesGratisDe(30, 1)).toBe(0)
+    expect(mesesGratisDe(undefined, 6)).toBe(0)
+  })
+  it('si el catálogo quita el regalo del Anual, el mensaje deja de prometerlo', () => {
+    const sinRegalo = CATALOGO.map(p => (p.nombre === 'Plan Anual 1 Pantalla' ? { ...p, duracionDias: 365 } : p))
+    const { texto } = mensajePara(fila(), sinRegalo)
+    expect(texto).toContain('*Plan Anual 1 Pantalla*: $150.000 · 12 meses')
+    expect(texto).not.toMatch(/Anual 1 Pantalla.*REGALAMOS/)
+    expect(texto).toMatch(/Semestral 1 Pantalla.*REGALAMOS 1 mes/)
+  })
+})
+
+describe('1 cuenta de 1 pantalla', () => {
+  it('oferta los precios de 1 pantalla con los regalos del catálogo', () => {
+    const { texto, combo, porPantalla, ofertas } = mensajePara(fila())
+    expect(combo).toBe(false)
+    expect(porPantalla).toBe(false)
+    expect(ofertas.map(o => o.precio)).toEqual([15000, 80000, 150000])
+    expect(texto).toContain('*Plan Mensual 1 Pantalla*: $15.000 · 1 mes — ideal para ir mes a mes')
+    expect(texto).toContain('pagas 6 meses ¡y te REGALAMOS 1 mes! Son 7 meses corridos')
+    expect(texto).toContain('pagas 12 meses ¡y te REGALAMOS 2 meses! Son 14 meses corridos')
+    expect(texto).toContain('se venció el 10-11-2026')
+    expect(texto).toContain('¡Hola, Xiomara!')
+  })
+  it('próxima a vencer usa el texto de "vence en N días"', () => {
+    const { texto } = mensajePara(fila({ duracionReal: '2026-11-23', estadoReal: 'ALERTA' }))
+    expect(texto).toContain('vence en 5 días (el 23-11-2026)')
+    expect(texto).toContain('sin que se te corte la señal')
+  })
+})
+
+describe('cliente con varias cuentas', () => {
+  it('nombra la cuenta que vence y cobra solo esa (precio de 1 pantalla)', () => {
+    const { texto, ofertas } = mensajePara(fila(), CATALOGO, { identificarCuenta: true })
+    expect(texto).toContain('el plan de tu cuenta *Xiomy 2* de')
+    expect(ofertas[0].precio).toBe(15000)
+  })
+  it('sin varias cuentas no menciona el nickname', () => {
+    const { texto } = mensajePara(fila())
+    expect(texto).not.toContain('*Xiomy 2*')
+  })
+})
+
+describe('combo y sin combo', () => {
+  it('cuenta de 2 pantallas con combo en el catálogo → precios del combo', () => {
+    const { texto, combo, ofertas } = mensajePara(fila({ pantallas: 2 }))
+    expect(combo).toBe(true)
+    expect(ofertas.map(o => o.precio)).toEqual([25000, 140000, 260000])
+    expect(texto).toContain('Como esta cuenta tiene 2 pantallas')
+    expect(texto).toContain('*Plan Mensual 2 Pantallas* (2 pantallas): $25.000')
+  })
+  it('cuenta de 3 pantallas solo con Mensual en el catálogo → oferta solo lo catalogado', () => {
+    const { ofertas, combo } = mensajePara(fila({ pantallas: 3 }))
+    expect(combo).toBe(true)
+    expect(ofertas.map(o => o.nombre)).toEqual(['Plan Mensual 3 Pantallas'])
+  })
+  it('cuenta de 4 pantallas sin combo → precios por pantalla', () => {
+    const { texto, combo, porPantalla, ofertas } = mensajePara(fila({ pantallas: 4 }))
+    expect(combo).toBe(false)
+    expect(porPantalla).toBe(true)
+    expect(ofertas.map(o => o.precio)).toEqual([15000, 80000, 150000])
+    expect(texto).toContain('Esta cuenta tiene 4 pantallas — estos son los precios por cada pantalla')
+  })
+})
+
+describe('cortesía y estados', () => {
+  it('una cortesía nunca es renovable (no se le cobra)', () => {
+    expect(esRenovable(fila({ alertaReal: 'CORTESIA' }))).toBe(false)
+  })
+  it('vencida y próxima a vencer sí son renovables; vigente no', () => {
+    expect(esRenovable(fila({ estadoReal: 'VENCIDO' }))).toBe(true)
+    expect(esRenovable(fila({ estadoReal: 'ALERTA' }))).toBe(true)
+    expect(esRenovable(fila({ estadoReal: 'VIGENTE' }))).toBe(false)
+  })
+})
+
+describe('Recordado hace N días', () => {
+  it('interpreta las fechas de SQLite y las ISO', () => {
+    expect(haceTexto('2026-11-18 14:50:55.009 +00:00')).toBe('hoy')
+    expect(haceTexto('2026-11-17T15:00:00.000Z')).toBe('ayer')
+    expect(haceTexto('2026-11-16 15:00:00.000 +00:00')).toBe('hace 2 días')
+    expect(haceTexto(null)).toBe('')
+  })
+})
