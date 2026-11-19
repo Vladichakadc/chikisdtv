@@ -10,7 +10,8 @@ describe('aviso de cambio de credenciales', () => {
 
   test('incluye el usuario y la contraseña de la cuenta', () => {
     const m = mensajeAvisoCredenciales({ nombre: 'Ana', usuario: 'cli3026', contrasena: 'Abc123' })
-    expect(m).toContain('mantenimiento programado')
+    expect(m).toContain('mantenimiento programado* en la aplicación *FlujoTV*')
+    expect(m).toContain('cierra la sesión actual en *FlujoTV*')
     expect(m).toContain('*Usuario:* cli3026')
     expect(m).toContain('*Contraseña:* Abc123')
   })

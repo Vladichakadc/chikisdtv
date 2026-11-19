@@ -109,7 +109,7 @@ export function AvisoCredencialesModal({ cuentaId, onClose }) {
                   <ShieldAlert size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-amber-900 leading-relaxed">
                     <p className="font-semibold mb-1">Credenciales actualizadas por mantenimiento</p>
-                    <p>Debido a labores de mantenimiento en la plataforma, los datos de acceso de esta cuenta cambiaron. Los clientes deben cerrar sesión e ingresar nuevamente con el usuario y la contraseña que aparecen a continuación.</p>
+                    <p>Debido a labores de mantenimiento en la aplicación <strong>FlujoTV</strong>, los datos de acceso de esta cuenta cambiaron. Los clientes deben cerrar sesión e ingresar nuevamente con el usuario y la contraseña que aparecen a continuación.</p>
                   </div>
                 </div>
 
