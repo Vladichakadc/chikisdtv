@@ -20,10 +20,10 @@ Skip for trivial one-file edits — just do them.
 ## Planning steps
 
 1. **Restate the goal in one sentence.** What does the user actually want, and who benefits? Confirm if unclear.
-2. **Map the current state.** Which pages, components, endpoints (`routes/admin.js` etc.), and models are involved? Read them first — don't plan against assumptions.
-3. **Define done.** List the observable outcomes that mean success (what the user sees/can do). Include edge cases: empty data, inactive socios, prepaid months, mora.
+2. **Map the current state.** Which pages, components, endpoints (`server/routes/admin/*.js`, services in `server/services/`), and models are involved? Read them first — don't plan against assumptions.
+3. **Define done.** List the observable outcomes that mean success (what the user sees/can do). Include edge cases: empty data, pantallas libres, cortesías, clientes con varias cuentas/nicknames, cuentas padre vencidas.
 4. **List the changes file-by-file.** For each: path, what changes, and why. Flag any change to shared code (`config/api.js`, `models/`, layouts) since it has wide reach.
-5. **Surface risks & domain gotchas.** Money fields with subtle semantics (gross `amount` vs net `valorAhorrado`), date fields (`monthInt`/`year` = transaction date vs `mesAbonado`/`anioAbonado` = credited period), the `clientEstatus` flat field, the JWT-secret duplication. Note anything irreversible.
+5. **Surface risks & domain gotchas.** Source-of-truth rules: `Venta`/`Planificador`/`Baja` drive revenue and renewals (`Subscription`/`Payment` are frozen legacy); `CuentaPadre` is the single source for usuario/contraseña/fechas (passwords AES-256-GCM via `utils/cifrado.js`, never plaintext, raw queries return ciphertext); Planificador edits must go through the historial (`planificador_cambios`) so they can be undone; dates are Bogotá-local `YYYY-MM-DD` strings. Never commit `database.sqlite`, `Tablas/*.xlsx` or backups. Note anything irreversible.
 6. **Verification strategy.** How will this be checked? (Run `npm run dev`, exercise the golden path + an edge case in the browser; compare a computed total against a known reference.) State explicitly if something can't be verified.
 7. **Review with the user** for anything non-trivial before implementing. Adjust, then build.
 

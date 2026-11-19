@@ -1,11 +1,12 @@
-﻿---
+---
 name: capacity-planner
-description: "Use when an ops leader (Director of CX, Head of Support, VP Ops, Head of BizOps, Head of IT ops, Head of Finance ops) is sizing ops capacity, building a headcount plan, modeling utilization risk, planning Q3 capacity or annual support capacity, or designing CS coverage — and needs Erlang-C queueing math, P90 demand sizing, shrinkage-adjusted FTE, manager-trigger thresholds, and a quarterly hiring sequence with ramp + attrition. Apply when sustained team utilization is above 80% or when the team is growing >50% in 12 months. Run before committing the headcount budget. This is NOT engineering capacity (see vpe-advisor for DORA + cycle time) and NOT strategic 3-year workforce planning (see chro-advisor)."
-version: 2.8.0
-author: claude-code-skills
+description: "Size an ops or support team and plan headcount: Erlang C queue models, utilization risk, hiring order. Use whenever the user asks how many agents or staff they need, if the team is overloaded, or who to hire first."
 license: MIT
-tags: [bizops, capacity, headcount, utilization, queueing-theory, ops-planning, little-law, workforce]
-compatible_tools: [claude-code, codex-cli, cursor, antigravity, opencode, gemini-cli]
+metadata:
+  version: 2.8.0
+  author: claude-code-skills
+  tags: [bizops, capacity, headcount, utilization, queueing-theory, ops-planning, little-law, workforce]
+  compatible_tools: [claude-code, codex-cli, cursor, antigravity, opencode, gemini-cli]
 ---
 
 # capacity-planner
@@ -82,6 +83,13 @@ It produces three artifacts:
 
 All three accept `--input <path>` (JSON), `--output {markdown,json}`,
 `--sample` (built-in example), and `--help`. Stdlib only.
+
+## Quick example
+
+```bash
+# Emits an Erlang-C capacity model (required headcount + P50/P90/P99 breach probabilities) for the built-in example
+cd business-operations/skills/capacity-planner && python3 scripts/capacity_modeler.py --sample
+```
 
 ## References
 
@@ -250,4 +258,3 @@ on capacity-margin discipline.
 **Walk these seven in order. One at a time. Write the answers down. The
 plan you submit is only as defensible as your answers to these seven
 questions.**
-

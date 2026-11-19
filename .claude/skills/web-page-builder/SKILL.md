@@ -6,19 +6,19 @@ metadata:
   ui-language: Spanish (Colombian peso, es-CO formatting)
 ---
 
-# Web Page Builder (Credifuturo stack)
+# Web Page Builder (ChikisdTV stack)
 
 Use this skill to implement or restructure pages and components. It encodes how THIS codebase is wired so new UI is consistent with what already exists. For the aesthetic point-of-view (typography, color, motion, composition), apply the `frontend-design` skill alongside this one.
 
 ## Project conventions (follow these)
 
-- **All API calls go through `src/config/api.js`** — never call `axios`/`fetch` directly. Use the exported `api` instance (auto-attaches the JWT Bearer token) or `apiWithRetry()` for flaky endpoints.
+- **All API calls go through `src/config/api.js`** — never call `axios`/`fetch` directly. Use the exported `api` instance (auto-attaches the JWT Bearer token and redirects to `/login` on 401).
 - **className composition**: use `cn()` from `src/utils/cn.js` (clsx + tailwind-merge) for conditional classes. Never hand-concatenate class strings.
 - **Reuse primitives in `src/components/ui/`** (Button, Card, Input, Badge, DataTable) before introducing new ones. Admin-specific composites live in `src/components/admin/`.
-- **Layouts**: admin pages render inside `DashboardLayout`; member pages inside `UserDashboardLayout`. Routes are declared in `App.jsx` (React Router v6) and split into `/admin` and `/dashboard` trees.
+- **Layouts**: every page renders under `/admin` inside `DashboardLayout` (there is no customer portal). Add new pages both to `App.jsx` and to `navItems` in `DashboardLayout.jsx`. Global UI state (sidebar, toasts) comes from `useUi()`.
 - **Icons**: Lucide React only — keep the icon set consistent.
 - **Money & dates**: format pesos with `Number(v).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })` and prefix `$`. Use the helpers in `src/utils/` (`formatDate`, `excelUtils`) rather than re-implementing.
-- **Spanish UI**: all visible copy is in Spanish; match existing terminology (socio, ahorro, aporte, préstamo, cuota, mora).
+- **Spanish UI**: all visible copy is in Spanish; match existing terminology (cliente, pantalla, nickname, cuenta padre, renovación, venta, baja, vencida, cortesía).
 
 ## Build workflow
 
@@ -36,7 +36,7 @@ Use this skill to implement or restructure pages and components. It encodes how 
 - [ ] Pesos/dates formatted with the shared helpers (`es-CO`)
 - [ ] Reused `ui/` primitives; no duplicate one-off components
 - [ ] Keyboard accessible, labeled inputs, sufficient contrast
-- [ ] Verified in the browser via `npm run dev` (port 5173), not just type-check
+- [ ] Verified in the browser via `npm run dev` (port 5174) — including a 390px mobile viewport: action buttons must stay visible (sticky right columns / cards), not just type-check
 
 ## Print/PDF gotcha (this repo)
 
