@@ -160,7 +160,7 @@ export function EstatusClientePanel({ rows, stats, filterStatus, passwords, reve
               <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Estado R.</th>
               <th className="sticky top-0 z-10 bg-purple-700 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Alerta R.</th>
               <th className="sticky top-0 z-10 bg-slate-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Debe</th>
-              <th data-nocapture className="sticky top-0 z-10 bg-orange-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Comprobante</th>
+              <th data-nocapture className="sticky top-0 right-0 z-20 bg-orange-600 px-3 py-2.5 font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">Comprobante</th>
             </tr>
           </thead>
           <tbody>
@@ -214,7 +214,7 @@ export function EstatusClientePanel({ rows, stats, filterStatus, passwords, reve
                       )
                       : <span className="text-gray-300">—</span>}
                   </td>
-                  <td data-nocapture className="px-3 py-2 whitespace-nowrap border-b border-gray-100 text-center">
+                  <td data-nocapture className="px-3 py-2 whitespace-nowrap border-b border-gray-100 text-center sticky right-0 z-[5] bg-white shadow-[-8px_0_10px_-8px_rgba(15,23,42,0.25)]">
                     <button
                       onClick={() => onComprobante(row)}
                       disabled={!row.nickname}

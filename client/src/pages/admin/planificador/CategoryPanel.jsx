@@ -105,6 +105,94 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
     : null)
   const totalPendientes = conRecordatorio ? screens.filter(pendienteDe).length : 0
   if (!config) return null
+  // Bloques compartidos por la tabla (escritorio) y las tarjetas (móvil)
+  const nombreCliente = (p) => [p.nombre, p.apellido].filter(Boolean).join(' ').trim() || p.nickname || '— Sin asignar —'
+  const infoCliente = (p) => {
+    const cliente = nombreCliente(p)
+    return (
+      <>
+    <p className="font-medium text-gray-800">{cliente}</p>
+    {p.nickname && p.nickname !== cliente && <p className="text-xs text-gray-400">{p.nickname}</p>}
+    {conRecordatorio && p.nickname && (() => {
+      const pend = pendienteDe(p)
+      return pend
+        ? <span className="mt-0.5 mr-1 inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800" title={`Secuencia de cobro: toca enviar "${ETAPAS_COBRO[pend].label}"`}>Toca: {ETAPAS_COBRO[pend].orden}. {ETAPAS_COBRO[pend].corto}</span>
+        : <span className="mt-0.5 mr-1 inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700" title="La etapa de cobro de hoy ya se envió">Secuencia al día</span>
+    })()}
+    {conRecordatorio && recordatorios?.ultimos?.[p.idPantalla] && (() => {
+      const u = recordatorios.ultimos[p.idPantalla]
+      return (
+        <span
+          className={cn(
+            'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+            u.renovo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+          )}
+          title={`${u.total} recordatorio(s) en los últimos ${recordatorios.dias} días · último por ${u.canal === 'whatsapp' ? 'WhatsApp' : 'mensaje copiado'}`}
+        >
+          <MessageCircle size={10} /> Recordado {haceTexto(u.fecha)}{u.total > 1 ? ` · ${u.total}×` : ''}{u.renovo ? ' · renovó' : ''}
+        </span>
+      )
+    })()}
+      </>
+    )
+  }
+  const acciones = (p, movil = false) => {
+    const cliente = nombreCliente(p)
+    return (
+    <div className={cn("flex items-center gap-1.5", movil ? "flex-wrap [&>button]:min-h-[40px] [&>button]:px-3" : "justify-end")}>
+      {/* "libre" ya usa "Asignar Pantalla" para abrir Editar Pantalla; el resto
+          de categorías (Vencidas, Próx. a vencer, Deben, Cortesías) gana un
+          acceso directo al formulario sin pasar por la tabla principal. */}
+      {catKey !== 'libre' && onEdit && (
+        <button
+          onClick={() => onEdit(p)}
+          className="inline-flex items-center justify-center p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-brand-primary hover:border-brand-primary hover:bg-orange-50 transition-colors"
+          title="Editar pantalla"
+        >
+          <Pencil size={13} />
+        </button>
+      )}
+      {conRecordatorio && (
+        <button
+          onClick={() => onStatus(p)}
+          disabled={!p.nickname}
+          aria-label={`Status cliente — recordatorio de pago por WhatsApp para ${cliente}`}
+          title={p.nickname
+            ? 'Status cliente — enviar recordatorio de pago por WhatsApp'
+            : 'Sin nickname — no se puede generar el recordatorio'}
+          className={cn(
+            'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors',
+            p.nickname
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300'
+              : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+          )}
+        >
+          <MessageCircle size={13} /> Status cliente
+        </button>
+      )}
+      {conRenovar ? (
+        <button
+          onClick={() => onRenovar(p)}
+          disabled={!p.nickname}
+          title={p.nickname ? 'Registra la venta y extiende el plan en un solo paso' : 'Sin titular: asigna la pantalla antes de renovar'}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-40"
+        >
+          <RefreshCcw size={13} /> Renovar
+        </button>
+      ) : (
+        <button
+          onClick={() => onGenerate(p, catKey)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold shadow-sm transition-colors"
+        >
+          {catKey === 'libre'
+            ? <><MonitorCheck size={13} /> Asignar Pantalla</>
+            : <><Receipt size={13} /> Generar venta</>}
+        </button>
+      )}
+    </div>
+    )
+  }
+
   const t = STAT_TONES[config.tone] || STAT_TONES.orange
   const Icon = config.icon
   return (
@@ -112,7 +200,7 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4">
         {/* STAT_TONES solo trae colores (from/to): el degradado va en style;
             con clases inexistentes la cabecera quedaba blanca y el título invisible */}
-        <div className="rounded-t-2xl px-6 py-4 flex items-center justify-between" style={{ background: `linear-gradient(90deg, ${t.from}, ${t.to})` }}>
+        <div className="rounded-t-2xl px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3" style={{ background: `linear-gradient(90deg, ${t.from}, ${t.to})` }}>
           <div className="flex items-center gap-3">
             <div className="bg-white/20 rounded-lg p-2.5"><Icon size={22} className="text-white" /></div>
             <div>
@@ -151,8 +239,9 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
             <p className="text-sm">{config.emptyMsg}</p>
           </div>
         ) : (
-          <div className="max-h-[50vh] overflow-y-auto">
-            <table className="w-full text-sm">
+          <div className="max-h-[62vh] sm:max-h-[50vh] overflow-y-auto">
+            {/* Escritorio / tablet: tabla */}
+            <table className="w-full text-sm hidden sm:table">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">
                   <th className="px-4 py-2.5">Cliente</th>
@@ -163,100 +252,39 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
                 </tr>
               </thead>
               <tbody>
-                {screens.map(p => {
-                  const cliente = [p.nombre, p.apellido].filter(Boolean).join(' ').trim() || p.nickname || '— Sin asignar —'
-                  return (
-                    <tr key={p.idPantalla} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-2.5">
-                        <p className="font-medium text-gray-800">{cliente}</p>
-                        {p.nickname && p.nickname !== cliente && <p className="text-xs text-gray-400">{p.nickname}</p>}
-                        {conRecordatorio && p.nickname && (() => {
-                          const pend = pendienteDe(p)
-                          return pend
-                            ? <span className="mt-0.5 mr-1 inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800" title={`Secuencia de cobro: toca enviar "${ETAPAS_COBRO[pend].label}"`}>Toca: {ETAPAS_COBRO[pend].orden}. {ETAPAS_COBRO[pend].corto}</span>
-                            : <span className="mt-0.5 mr-1 inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700" title="La etapa de cobro de hoy ya se envió">Secuencia al día</span>
-                        })()}
-                        {conRecordatorio && recordatorios?.ultimos?.[p.idPantalla] && (() => {
-                          const u = recordatorios.ultimos[p.idPantalla]
-                          return (
-                            <span
-                              className={cn(
-                                'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-                                u.renovo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                              )}
-                              title={`${u.total} recordatorio(s) en los últimos ${recordatorios.dias} días · último por ${u.canal === 'whatsapp' ? 'WhatsApp' : 'mensaje copiado'}`}
-                            >
-                              <MessageCircle size={10} /> Recordado {haceTexto(u.fecha)}{u.total > 1 ? ` · ${u.total}×` : ''}{u.renovo ? ' · renovó' : ''}
-                            </span>
-                          )
-                        })()}
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{p.idPantalla}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-600">{p.cuenta || p.cuentaId || '—'}</td>
-                      <td className="px-4 py-2.5">{config.badge(p)}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* "libre" ya usa "Asignar Pantalla" para abrir Editar Pantalla; el resto
-                              de categorías (Vencidas, Próx. a vencer, Deben, Cortesías) gana un
-                              acceso directo al formulario sin pasar por la tabla principal. */}
-                          {catKey !== 'libre' && onEdit && (
-                            <button
-                              onClick={() => onEdit(p)}
-                              className="inline-flex items-center justify-center p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-brand-primary hover:border-brand-primary hover:bg-orange-50 transition-colors"
-                              title="Editar pantalla"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                          )}
-                          {conRecordatorio && (
-                            <button
-                              onClick={() => onStatus(p)}
-                              disabled={!p.nickname}
-                              aria-label={`Status cliente — recordatorio de pago por WhatsApp para ${cliente}`}
-                              title={p.nickname
-                                ? 'Status cliente — enviar recordatorio de pago por WhatsApp'
-                                : 'Sin nickname — no se puede generar el recordatorio'}
-                              className={cn(
-                                'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors',
-                                p.nickname
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300'
-                                  : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                              )}
-                            >
-                              <MessageCircle size={13} /> Status cliente
-                            </button>
-                          )}
-                          {conRenovar ? (
-                            <button
-                              onClick={() => onRenovar(p)}
-                              disabled={!p.nickname}
-                              title={p.nickname ? 'Registra la venta y extiende el plan en un solo paso' : 'Sin titular: asigna la pantalla antes de renovar'}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors disabled:opacity-40"
-                            >
-                              <RefreshCcw size={13} /> Renovar
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => onGenerate(p, catKey)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold shadow-sm transition-colors"
-                            >
-                              {catKey === 'libre'
-                                ? <><MonitorCheck size={13} /> Asignar Pantalla</>
-                                : <><Receipt size={13} /> Generar venta</>}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {screens.map(p => (
+                  <tr key={p.idPantalla} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2.5">{infoCliente(p)}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{p.idPantalla}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-600">{p.cuenta || p.cuentaId || '—'}</td>
+                    <td className="px-4 py-2.5">{config.badge(p)}</td>
+                    <td className="px-4 py-2.5 text-right">{acciones(p)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
+
+            {/* Móvil: tarjetas con las acciones a la vista (en la tabla quedaban
+                fuera de la pantalla, a la derecha) */}
+            <ul className="sm:hidden divide-y divide-gray-100">
+              {screens.map(p => (
+                <li key={p.idPantalla} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">{infoCliente(p)}</div>
+                    <div className="shrink-0 text-right">{config.badge(p)}</div>
+                  </div>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    <span className="font-mono">{p.idPantalla}</span> · {p.cuenta || p.cuentaId || '—'}
+                  </p>
+                  <div className="mt-2">{acciones(p, true)}</div>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
-        <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between gap-3">
-          <p className="text-xs text-gray-400">
+        <div className="px-4 sm:px-6 py-3 border-t border-gray-100 flex items-center justify-end sm:justify-between gap-3">
+          <p className="hidden sm:block text-xs text-gray-400">
             {catKey === 'libre'
               ? '"Asignar Pantalla" abre el formulario de edición de la pantalla para asignarle un nuevo titular.'
               : conRecordatorio

@@ -516,7 +516,7 @@ export default function CostoPantallaPage() {
                             <th key={col.key} onClick={() => handleSort(col.key)}
                                 className={`sticky top-0 z-10 bg-slate-50 px-4 py-3 font-semibold whitespace-nowrap
                                           border-b border-slate-200 backdrop-blur-sm
-                                          ${col.key !== 'acciones' ? 'cursor-pointer iv-th-sort' : ''}`}>
+                                          ${col.key !== 'acciones' ? 'cursor-pointer iv-th-sort' : 'right-0 z-20'}`}>
                               {col.key !== 'acciones' ? (
                                 <div className="flex items-center gap-1.5">
                                   {col.label}
@@ -534,7 +534,7 @@ export default function CostoPantallaPage() {
                           filtered.map(row => (
                             <tr key={row.id} className="iv-row bg-white hover:bg-slate-50/50">
                               {COLS.map(col => (
-                                <td key={col.key} className="px-4 py-2.5 whitespace-nowrap">
+                                <td key={col.key} className={`px-4 py-2.5 whitespace-nowrap ${col.key === 'acciones' ? 'sticky right-0 z-[5] bg-white shadow-[-8px_0_10px_-8px_rgba(15,23,42,0.25)]' : ''}`}>
                                   {renderCell(row, col.key, openEdit, handleDelete)}
                                 </td>
                               ))}

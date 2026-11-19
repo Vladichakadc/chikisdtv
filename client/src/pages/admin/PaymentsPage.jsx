@@ -773,7 +773,7 @@ export default function PaymentsPage() {
                           key={col.key}
                           scope="col"
                           onClick={() => handleSort(col.key)}
-                          className={`sticky top-0 z-10 bg-emerald-600 px-3 py-3 font-semibold whitespace-nowrap transition-colors select-none shadow-[0_1px_0_0_rgba(0,0,0,0.08)] ${col.key !== 'acciones' ? 'cursor-pointer hover:bg-emerald-700' : ''}`}
+                          className={`sticky top-0 z-10 bg-emerald-600 px-3 py-3 font-semibold whitespace-nowrap transition-colors select-none shadow-[0_1px_0_0_rgba(0,0,0,0.08)] ${col.key !== 'acciones' ? 'cursor-pointer hover:bg-emerald-700' : 'right-0 z-20'}`}
                         >
                           {col.key !== 'acciones' ? (
                             <div className="flex items-center gap-1">
@@ -792,7 +792,7 @@ export default function PaymentsPage() {
                         className={`border-b border-emerald-50 hover:bg-emerald-50/70 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30'}`}
                       >
                       {COLS.map(col => (
-                        <td key={col.key} className="px-3 py-2 whitespace-nowrap">
+                        <td key={col.key} className={`px-3 py-2 whitespace-nowrap ${col.key === 'acciones' ? 'sticky right-0 z-[5] bg-white shadow-[-8px_0_10px_-8px_rgba(15,23,42,0.25)]' : ''}`}>
                           {renderCell(row, col.key, openEdit, handleDelete)}
                         </td>
                       ))}
@@ -800,8 +800,11 @@ export default function PaymentsPage() {
                   ))}
                   {filtered.length > visibleCount && (
                     <tr>
-                      <td colSpan={COLS.length} className="px-4 py-3 text-center bg-emerald-50/40">
+                      {/* La tabla es muy ancha: el botón se fija al borde izquierdo visible
+                          (centrado quedaba a mitad de la tabla, fuera de la pantalla) */}
+                      <td colSpan={COLS.length} className="px-4 py-3 text-left bg-emerald-50/40">
                         <button
+                          style={{ position: 'sticky', left: '1rem' }}
                           onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
                           className="px-4 py-2 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-100 text-sm font-semibold transition-colors"
                         >
@@ -813,8 +816,8 @@ export default function PaymentsPage() {
                   )}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={COLS.length} className="px-4 py-12 text-center text-gray-400">
-                        No se encontraron registros con los filtros aplicados.
+                      <td colSpan={COLS.length} className="px-4 py-12 text-gray-400">
+                        <span className="sticky left-4">No se encontraron registros con los filtros aplicados.</span>
                       </td>
                     </tr>
                   )}
