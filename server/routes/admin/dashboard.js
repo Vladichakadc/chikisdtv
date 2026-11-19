@@ -1,16 +1,28 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { Client, Plan, Device, Baja, Venta, VentaEquipo, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
-const { calcDias, alertaFromDias } = require('../../utils/planificadorAlerta');
+const { Client, Plan, Baja, Venta, VentaEquipo, CostoPantalla, Planificador, TablaCliente, CuentaPadre } = require('../../models');
+const { calcDias, alertaFromDias, varianteDe } = require('../../utils/planificadorAlerta');
 const { getPeriodoActual, esMesParcial, esAnioParcial } = require('../../utils/dateUtils');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { enCache } = require('../../utils/cacheDashboard');
+const { indicadoresOperacion } = require('../../services/dashboardOperacion');
+
+const operacionEnCache = () => enCache('operacion', () => indicadoresOperacion());
+
+// ============ OPERACIÓN (vencidas, por vencer, deuda, capacidad, equipos) ============
+// Fuente única de los indicadores operativos del Dashboard. Reemplaza la
+// descarga del Planificador completo: devuelve solo conteos + las filas de
+// los paneles de vencidas / por vencer (sin datos de acceso).
+router.get('/dashboard/operacion', asyncHandler(async (_req, res) => {
+  res.json(await operacionEnCache());
+}));
 
 // ============ DASHBOARD STATS ============
 router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   const totalClients = await Client.count({ where: { role: 'user', estatus: 'Activo' } });
   const totalPlans = await Plan.count({ where: { activo: true } });
-  const totalDevices = await Device.count({ where: { activo: true } });
+  const operacion = await operacionEnCache();
 
   // Fuente de verdad para ingresos = Venta (licencias) + VentaEquipo (hardware).
   // La tabla Payment es un sistema CRM paralelo que NO refleja la actividad real del negocio
@@ -27,11 +39,10 @@ router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   // 2026-06-06, nunca actualizadas desde entonces) — NO se usan para KPIs del
   // Dashboard. La deuda/cartera vigente vive en Planificador.debe/montoDebe
   // (misma fuente que usa /plans/performance para "conDeuda"/"montoDeuda").
-  const [clientesConDeuda, montoDeudaTotalRaw] = await Promise.all([
-    Planificador.count({ where: { debe: true } }),
-    Planificador.sum('montoDebe', { where: { debe: true } }),
-  ]);
-  const montoDeudaTotal = Math.round(montoDeudaTotalRaw || 0);
+  // Clientes únicos con deuda (no filas), separada en COP y USD
+  const clientesConDeuda = operacion.deuda.clientes;
+  const montoDeudaTotal = operacion.deuda.cop;
+  const montoDeudaUSD = operacion.deuda.usd;
 
   // ─── Cruce con Clientes (TablaCliente): mezcla de canal y alcance geográfico
   const [clientesFinal, clientesRevendedor, paisesRows] = await Promise.all([
@@ -84,10 +95,13 @@ router.get('/dashboard-stats', asyncHandler(async (_req, res) => {
   res.json({
     totalClients,
     totalPlans,
-    totalDevices,
+    // Equipos: Inventario de Equipos (la tabla Device es legado y está vacía)
+    totalDevices: operacion.equipos.disponibles,
+    equipos: operacion.equipos,
     totalIngresos,
     clientesConDeuda,
     montoDeudaTotal,
+    montoDeudaUSD,
     // ── Cruces con otros módulos: dan contexto de negocio a las tarjetas ──
     clientesFinal,
     clientesRevendedor,
@@ -110,16 +124,14 @@ const MES_NUM = {
 };
 const mesNum = (m) => MES_NUM[(m || '').toString().trim().toUpperCase()] || 0;
 
-// Caché en memoria: /dashboard-bi recalcula MRR/LTV/cohortes/Pareto sobre
-// 5 tablas en cada request; los datos solo cambian con imports/ediciones
-// puntuales, así que un TTL corto evita recomputar en cada carga del dashboard.
-const DASHBOARD_BI_CACHE_TTL_MS = 90 * 1000;
-let dashboardBiCache = { data: null, expiresAt: 0 };
-
+// /dashboard-bi recalcula MRR/LTV/cohortes/Pareto sobre 5 tablas: se guarda en
+// la caché del Dashboard (utils/cacheDashboard.js), que se borra sola con cada
+// escritura — una venta o renovación nueva se ve de inmediato.
 router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
-  if (dashboardBiCache.data && Date.now() < dashboardBiCache.expiresAt) {
-    return res.json(dashboardBiCache.data);
-  }
+  res.json(await enCache('bi', calcularDashboardBi));
+}));
+
+async function calcularDashboardBi() {
 
   // Referencia única para marcar qué mes/año de las series de abajo está EN CURSO
   // (parcial, incompleto) — ver utils/dateUtils.js para el porqué.
@@ -512,7 +524,7 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   // Valor en riesgo: LTV histórico de clientes con pantallas vencidas / próximas
   const clientesRiesgoSet = new Set(
     alertaRows
-      .filter(a => a.alertaReal === 'VENCIDO' || a.alertaReal === 'PROXIMO A VENCER')
+      .filter(a => ['vencido', 'alerta'].includes(varianteDe(a)))
       .map(a => a.customerId)
       .filter(Boolean)
   );
@@ -568,11 +580,13 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
   const ltvByCid = {};
   for (const c of ltvRows) ltvByCid[c.cid] = c.ingresos;
   const riesgoAcc = {};
-  for (const a of alertaRows) {
-    if (!a.customerId) continue;
-    if (a.alertaReal !== 'VENCIDO' && a.alertaReal !== 'PROXIMO A VENCER') continue;
-    const nick = (a.nickname || '').toLowerCase();
-    if (nick.includes('libre') || (!a.nombre && !a.apellido && !a.nickname)) continue;
+  // Misma regla que el resto del Dashboard (services/dashboardOperacion.js)
+  const ALERTA_DE_VARIANTE = { vencido: 'VENCIDO', alerta: 'PROXIMO A VENCER' };
+  for (const fila of alertaRows) {
+    if (!fila.customerId) continue;
+    const alertaVariante = ALERTA_DE_VARIANTE[varianteDe(fila)];
+    if (!alertaVariante) continue;
+    const a = { ...fila, alertaReal: alertaVariante };
     if (!riesgoAcc[a.customerId]) {
       riesgoAcc[a.customerId] = {
         customerId:   a.customerId,
@@ -593,7 +607,14 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
       acc.venceEl = a.duracionReal || null;
     }
   }
-  const clientesEnRiesgo = Object.values(riesgoAcc)
+  const riesgoTodos = Object.values(riesgoAcc);
+  // Totales reales (la lista de abajo es solo el top 20 por LTV)
+  const clientesEnRiesgoResumen = {
+    total: riesgoTodos.length,
+    vencidos: riesgoTodos.filter(c => c.alerta === 'VENCIDO').length,
+    porVencer: riesgoTodos.filter(c => c.alerta !== 'VENCIDO').length,
+  };
+  const clientesEnRiesgo = riesgoTodos
     .sort((a, b) => b.ltvHistorico - a.ltvHistorico)
     .slice(0, 20);
 
@@ -629,6 +650,7 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     },
     comparativoYTD,
     clientesEnRiesgo,
+    clientesEnRiesgoResumen,
     ltv: {
       ltvPromedio,
       vidaPromedioMeses: vidaMeses,
@@ -674,9 +696,8 @@ router.get('/dashboard-bi', asyncHandler(async (_req, res) => {
     },
   };
 
-  dashboardBiCache = { data: payload, expiresAt: Date.now() + DASHBOARD_BI_CACHE_TTL_MS };
-  res.json(payload);
-}));
+  return payload;
+}
 
 // ============ ANÁLISIS FINANCIERO (EBITDA / OPEX / CAPEX / TIR) ============
 // Lectura financiera del negocio con la información realmente registrada:
