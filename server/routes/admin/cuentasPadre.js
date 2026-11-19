@@ -5,7 +5,8 @@ const XLSX = require('xlsx');
 const ExcelJS = require('exceljs');
 const { Op } = require('sequelize');
 const multer = require('multer');
-const { CuentaPadre, Planificador, Client, TablaCliente, AccesoCredencial } = require('../../models');
+const { CuentaPadre, AccesoCredencial } = require('../../models');
+const { datosAvisoCredenciales } = require('../../services/avisoCredenciales');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
 const { ensurePantallasCuentasPadre } = require('../../services/planificadorImportService');
@@ -352,59 +353,20 @@ router.post('/cuentas-padre/import', asyncHandler(async (_req, res) => {
 
 // GET /cuentas-padre/:cuentaId/aviso-credenciales — datos para avisar a los
 // clientes de una cuenta padre que sus credenciales cambiaron por mantenimiento:
-// usuario y contraseña vigentes + cada pantalla ocupada (nickname) con el
-// teléfono del cliente para WhatsApp. El acceso queda en la bitácora.
+// usuario y contraseña vigentes + clientes de la cuenta (agrupados, con sus
+// nicknames y teléfono para WhatsApp). El acceso queda en la bitácora.
 router.get('/cuentas-padre/:cuentaId/aviso-credenciales', asyncHandler(async (req, res) => {
-  const cp = await CuentaPadre.findByPk(req.params.cuentaId);
-  if (!cp) return res.status(404).json({ error: 'Cuenta padre no encontrada' });
-
-  const filas = await Planificador.findAll({
-    where: { cuentaId: cp.cuentaId },
-    attributes: ['idPantalla', 'nombre', 'apellido', 'customerId', 'nickname', 'duracionReal'],
-    order: [['idPantalla', 'ASC']], raw: true,
-  });
-  const ocupadas = filas.filter(f => {
-    const nick = String(f.nickname || '').trim();
-    return (nick || f.nombre) && !nick.toLowerCase().includes('libre');
-  });
-
-  const ids = [...new Set(ocupadas.map(f => String(f.customerId || '').trim()).filter(Boolean))];
-  const [clientes, fichas] = ids.length ? await Promise.all([
-    Client.findAll({ where: { customerId: ids }, attributes: ['customerId', 'phone'], raw: true }),
-    TablaCliente.findAll({ where: { customerId: ids }, attributes: ['customerId', 'movil', 'pais'], raw: true }),
-  ]) : [[], []];
-  const tel = new Map(clientes.map(c => [String(c.customerId), (c.phone || '').trim()]));
-  const ficha = new Map(fichas.map(f => [String(f.customerId), f]));
-
-  const pantallas = ocupadas.map(f => {
-    const id = String(f.customerId || '').trim();
-    const fi = ficha.get(id);
-    return {
-      idPantalla: f.idPantalla,
-      nickname: f.nickname || null,
-      nombre: [f.nombre, f.apellido].filter(Boolean).join(' ').trim() || null,
-      customerId: id || null,
-      vence: f.duracionReal || null,
-      telefono: tel.get(id) || (fi?.movil || '').trim() || null,
-      pais: (fi?.pais || '').trim() || null,
-    };
-  });
-
+  const datos = await datosAvisoCredenciales(req.params.cuentaId);
+  if (!datos) return res.status(404).json({ error: 'Cuenta padre no encontrada' });
+  const { idPantallas, ...respuesta } = datos;
   try {
     await AccesoCredencial.create({
       usuarioId: req.user?.id ?? null, usuarioEmail: req.user?.email ?? null,
-      motivo: 'aviso_mantenimiento', cantidad: pantallas.length,
-      idPantallas: JSON.stringify(pantallas.map(p => p.idPantalla)), ip: req.ip || null,
+      motivo: 'aviso_mantenimiento', cantidad: idPantallas.length,
+      idPantallas: JSON.stringify(idPantallas), ip: req.ip || null,
     });
   } catch (e) { console.warn('[CREDENCIALES] No se pudo registrar el acceso:', e.message); }
-
-  res.json({
-    cuentaId: cp.cuentaId,
-    usuario: cp.nombreUsuario || null,
-    contrasena: cp.contrasena || null,
-    fechaFin: cp.fechaFin || null,
-    pantallas,
-  });
+  res.json(respuesta);
 }));
 
 router.post('/cuentas-padre', asyncHandler(async (req, res) => {
