@@ -164,11 +164,14 @@ export default function PlanificadorPage() {
 
   // Auto-abrir panel Estatus Cliente si venimos del Dashboard con esa indicación
   useEffect(() => {
-    if (location.state?.openEstatusPanel && !loading) {
-      setShowEstatusPanel(true)
-      // Limpiar el state para que no se reabra al recargar
-      window.history.replaceState({}, '')
-    }
+    if (loading || !location.state) return
+    const { openEstatusPanel, abrirCategoria, buscar } = location.state
+    if (openEstatusPanel) setShowEstatusPanel(true)
+    // Desde el Dashboard ("Hoy al aire" / "Guía de renovaciones")
+    if (abrirCategoria) setActivePanel(abrirCategoria)
+    if (buscar) setSearch(buscar)
+    // Limpiar el state para que no se reabra al recargar
+    if (openEstatusPanel || abrirCategoria || buscar) window.history.replaceState({}, '')
   }, [location.state, loading])
 
   const { rows, stats, categoryLists, cpVencidas, cpAlerta } = usePlanificadorVista(data, { search, filterStatus, sortConfig })

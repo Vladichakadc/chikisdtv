@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Users, Package, FileText, Tv, DollarSign, AlertCircle, Clock, TrendingUp,
+  Tv, DollarSign, AlertCircle, Clock, TrendingUp,
   Wallet, PiggyBank, Percent, BarChart3, Lightbulb, Activity,
   Trophy, Hourglass, RefreshCw, Calendar, Receipt, Download, Upload, ShieldAlert,
-  CheckCircle2, ChevronRight, Filter, GitCompareArrows, Minus,
+  Filter, GitCompareArrows, Minus,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -15,11 +15,12 @@ import { useUi } from '../../context/UiContext'
 import { Card, CardHeader, CardBody, CardTitle } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
-import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
 import { diasLabel } from './planificador/rowHelpers'
-import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
+import { AlAire, BotonAire, DASH_TIPOS } from './dashboard/AlAire'
+import { GuiaRenovaciones } from './dashboard/GuiaRenovaciones'
+import { IndicadoresClave } from './dashboard/IndicadoresClave'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
 import {
   BiCard, GrowthBadge, SmartTag, ChartTooltip, ChartInsight,
@@ -111,61 +112,6 @@ const CSS = `
   }
 `
 
-// ─── Stat card (KPIs operativos) ─────────────────────────────────────────────
-// Al hacer clic abre el modal explicativo del cálculo (con acceso al módulo fuente).
-
-// StatCard → KpiCard global (dark Huashu)
-// El Dashboard usa `color` (clase Tailwind) — lo mapeamos a tone
-const COLOR_MAP = {
-  'brand-primary': 'orange', orange: 'orange',
-  blue: 'sky', green: 'emerald',
-  purple: 'purple', amber: 'amber', red: 'red',
-}
-// ─── Centro de alertas operativas ────────────────────────────────────────────
-// Patrón de dashboard ejecutivo: lo que requiere acción hoy va primero, con
-// severidad semántica (rojo = urgente, ámbar = atención, verde = oportunidad).
-
-const ALERT_TONES = {
-  error:   { iconBg: 'bg-red-50',     iconText: 'text-red-600' },
-  warning: { iconBg: 'bg-amber-50',   iconText: 'text-amber-600' },
-  info:    { iconBg: 'bg-emerald-50', iconText: 'text-emerald-600' },
-}
-const ALERT_ORDER = { error: 0, warning: 1, info: 2 }
-
-function AlertRow({ alerta }) {
-  const t = ALERT_TONES[alerta.tone]
-  const Icon = alerta.icon
-  const clickable = Boolean(alerta.onClick)
-  return (
-    <button
-      onClick={alerta.onClick}
-      disabled={!clickable}
-      className={cn(
-        'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
-        clickable ? 'hover:bg-orange-50/40 cursor-pointer' : 'cursor-default'
-      )}
-    >
-      <span className={cn('p-2 rounded-lg flex-shrink-0', t.iconBg)}>
-        <Icon size={16} className={t.iconText} />
-      </span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-sm font-semibold text-brand-accent">{alerta.titulo}</span>
-        <span className="block text-xs text-gray-500">{alerta.detalle}</span>
-      </span>
-      {clickable && <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />}
-    </button>
-  )
-}
-
-function StatCard({ icon, title, value, color, subtitle, onClick }) {
-  const tone = Object.entries(COLOR_MAP).find(([k]) => color?.includes(k))?.[1] || 'indigo'
-  return (
-    <div className="dash-kpi" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      <KpiCard icon={icon} label={title} value={value} sub={subtitle} tone={tone} />
-    </div>
-  )
-}
-
 // ─── Narrativas de las gráficas que permanecen en el Dashboard ───────────────
 
 function narrarIngresosCostosAnio(porAnio) {
@@ -189,30 +135,6 @@ function narrarIngresosCostosAnio(porAnio) {
   return `Leyendo barra por barra, año a año: ${relatos.join('; ')}.${pareceParcial
     ? ` La barra de **${ultimo.anio}** se ve más baja porque el año está en curso${penultimo ? ` (${ultimo.numVentas} ventas registradas frente a ${penultimo.numVentas} del ${penultimo.anio} ya cerrado)` : ''} — no es una contracción real, es un corte parcial; para comparar de forma justa usa el comparativo "año corrido" (YTD) de arriba.`
     : ` La línea morada (margen %) se mantiene en un rango alto y estable, lo que confirma que el crecimiento del negocio no ha sacrificado eficiencia de costos.`}`
-}
-
-function narrarEvolucionAnual(porAnio) {
-  if (!porAnio?.length) return null
-  const primero = porAnio[0]
-  // El "hasta hoy" de esta lectura histórica debe ser el último año CERRADO:
-  // usar el año en curso (parcial) subestimaría el crecimiento desde el primer
-  // año registrado sin ninguna advertencia.
-  const enCurso = porAnio[porAnio.length - 1]?.parcial ? porAnio[porAnio.length - 1] : null
-  const cerrados = enCurso ? porAnio.slice(0, -1) : porAnio
-  const ultimo = cerrados[cerrados.length - 1]
-  if (!ultimo || primero === ultimo) return null
-  const variacion = (ini, fin) => (ini > 0 ? ((fin - ini) / ini) * 100 : null)
-  const crecIngresos = variacion(primero.ingresos, ultimo.ingresos)
-  const crecCostos = variacion(primero.costos, ultimo.costos)
-  const crecMargen = variacion(primero.margen, ultimo.margen)
-  const signo = (v) => (v >= 0 ? '+' : '')
-  const lecturaFinal = crecIngresos != null && crecCostos != null
-    ? (crecIngresos > crecCostos
-      ? ' La curva verde (ganancia) se separa cada vez más de la gris (costos): el negocio gana eficiencia a medida que crece — cada peso adicional de ingreso deja más ganancia que el anterior.'
-      : ' La curva gris (costos) crece más rápido que la naranja (ingresos): vale la pena vigilar el costo unitario, porque está erosionando la ganancia a medida que el negocio escala.')
-    : ''
-  const notaEnCurso = enCurso ? ` (**${enCurso.anio}** sigue en curso y no se cuenta en esta lectura hasta que cierre.)` : ''
-  return `Entre **${primero.anio}** y **${ultimo.anio}**: los ingresos pasaron de ${formatCurrency(primero.ingresos)} a ${formatCurrency(ultimo.ingresos)}${crecIngresos != null ? ` (${signo(crecIngresos)}${crecIngresos.toFixed(0)}%)` : ''}, los costos de ${formatCurrency(primero.costos)} a ${formatCurrency(ultimo.costos)}${crecCostos != null ? ` (${signo(crecCostos)}${crecCostos.toFixed(0)}%)` : ''}, y la ganancia (margen bruto en pesos) de ${formatCurrency(primero.margen)} a ${formatCurrency(ultimo.margen)}${crecMargen != null ? ` (${signo(crecMargen)}${crecMargen.toFixed(0)}%)` : ''}.${lecturaFinal}${notaEnCurso}`
 }
 
 function narrarTendenciaMensual(porMes) {
@@ -451,8 +373,6 @@ export default function DashboardHome() {
   const [mesVentasLicencia, setMesVentasLicencia] = useState(null)
   const [modoVistaVentas, setModoVistaVentas] = useState('mensual') // 'mensual' | 'comparar'
   const [mostrarPromedioVentas, setMostrarPromedioVentas] = useState(false)
-  const [showVencidasPanel, setShowVencidasPanel] = useState(false)
-  const [showProximasPanel, setShowProximasPanel] = useState(false)
   const [showArpuPanel, setShowArpuPanel] = useState(false)
   const [explain, setExplain] = useState(null)
 
@@ -537,92 +457,15 @@ export default function DashboardHome() {
     return bi.tipoPago.map(t => ({ name: t.tipo, value: t.total, pct: t.pctTotal }))
   }, [bi])
 
-  // Pantallas con cliente asignado (las libres no cuentan como activas)
-  const pantallasActivasTotal = operacion?.pantallas.ocupadas ?? 0
   const diasAlerta = operacion?.diasAlerta ?? 8
-  const conDias = (lista = []) => lista.map(p => ({ ...p, _dias: p.diasRestantes }))
-  const cuentasVencidas = useMemo(() => conDias(operacion?.listas.vencidas), [operacion])
-  const proximasAVencer = useMemo(() => conDias(operacion?.listas.porVencer), [operacion])
-  const venc = operacion?.vencidas ?? { pantallas: 0, clientes: 0, venceHoy: 0 }
-  const porV = operacion?.porVencer ?? { pantallas: 0, clientes: 0 }
-  const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
-  // Deuda en COP y, si existe, en USD (carteras independientes)
-  const textoDeuda = (cop, usd) => [
-    cop > 0 || !usd ? formatCurrency(cop) : null,
-    usd > 0 ? `US$${Number(usd).toLocaleString('en-US')}` : null,
-  ].filter(Boolean).join(' + ')
 
-  // Alertas operativas: se derivan de datos ya cargados (sin peticiones extra).
-  const alertas = useMemo(() => {
-    if (!stats) return []
-    const list = []
-    if (venc.pantallas > 0) {
-      list.push({
-        tone: 'error', icon: AlertCircle,
-        titulo: `${plural(venc.clientes, 'cliente', 'clientes')} con pantallas vencidas sin renovar`,
-        detalle: `${plural(venc.pantallas, 'pantalla vencida', 'pantallas vencidas')}${venc.venceHoy ? ` (${venc.venceHoy} vence${venc.venceHoy === 1 ? '' : 'n'} hoy)` : ''} — abre la lista para renovar o enviar el recordatorio`,
-        onClick: () => setShowVencidasPanel(true),
-      })
-    }
-    if (porV.pantallas > 0) {
-      list.push({
-        tone: 'warning', icon: Clock,
-        titulo: `${plural(porV.clientes, 'cliente vence', 'clientes vencen')} en los próximos ${diasAlerta} días`,
-        detalle: `${plural(porV.pantallas, 'pantalla', 'pantallas')} — buen momento para asegurar la renovación antes del corte`,
-        onClick: () => setShowProximasPanel(true),
-      })
-    }
-    if (stats.clientesConDeuda > 0) {
-      list.push({
-        tone: 'warning', icon: Hourglass,
-        titulo: `${stats.clientesConDeuda} cliente${stats.clientesConDeuda === 1 ? '' : 's'} con deuda pendiente`,
-        detalle: `${textoDeuda(stats.montoDeudaTotal, stats.montoDeudaUSD)} marcados como "debe" en el Planificador`,
-        onClick: () => navigate('/admin/planificador'),
-      })
-    }
-    const oc = bi?.ocupacion
-    if (oc) {
-      if (oc.pctOcupacionGlobal >= 90) {
-        list.push({
-          tone: 'error', icon: Tv,
-          titulo: `Capacidad instalada al ${oc.pctOcupacionGlobal}%`,
-          detalle: oc.totalLibres === 0
-            ? 'Sin pantallas libres — la próxima venta requiere comprar una cuenta padre nueva'
-            : `Solo ${oc.totalLibres} pantalla${oc.totalLibres === 1 ? '' : 's'} libre${oc.totalLibres === 1 ? '' : 's'} — planear compra de cuentas padre antes de la próxima venta`,
-          onClick: () => navigate('/admin/planificador'),
-        })
-      } else if (oc.pctOcupacionGlobal >= 75) {
-        list.push({
-          tone: 'warning', icon: Tv,
-          titulo: `Capacidad instalada al ${oc.pctOcupacionGlobal}%`,
-          detalle: `${oc.totalLibres} pantalla${oc.totalLibres === 1 ? '' : 's'} libre${oc.totalLibres === 1 ? '' : 's'} — vigilar antes de que se agote el cupo`,
-          onClick: () => navigate('/admin/planificador'),
-        })
-      } else if (oc.totalLibres > 0) {
-        list.push({
-          tone: 'info', icon: TrendingUp,
-          titulo: `${oc.totalLibres} pantalla${oc.totalLibres === 1 ? '' : 's'} libre${oc.totalLibres === 1 ? '' : 's'} para vender`,
-          detalle: 'La capacidad ya está pagada — cada venta sobre estos cupos es ingreso sin costo adicional',
-          onClick: () => navigate('/admin/planificador'),
-        })
-      }
-    }
-    return list.sort((a, b) => ALERT_ORDER[a.tone] - ALERT_ORDER[b.tone])
-  }, [stats, bi, operacion]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const alertasUrgentes = alertas.filter(a => a.tone !== 'info').length
   const valorEnRiesgo = bi?.ltv?.valorEnRiesgo || 0
 
-  const handleGenerateVentaPlanificador = (screen, catKey) => {
-    setShowVencidasPanel(false)
-    setShowProximasPanel(false)
-    navigate('/admin/payments', {
-      state: {
-        prefillVenta: screenToVentaPrefill(screen, catKey),
-        prefillSource: CATEGORY_CONFIG[catKey]?.title || 'Planificador',
-      },
-    })
-  }
+  // "Hoy al aire": cada segmento abre su lista en el Planificador, donde están
+  // las acciones completas (WhatsApp, Renovar, Editar)
+  const CATEGORIA_AIRE = { vencido: 'vencido', alerta: 'alerta', deuda: 'debe', libres: 'libre' }
+  const abrirEnPlanificador = (clave) => navigate('/admin/planificador', { state: { abrirCategoria: CATEGORIA_AIRE[clave] } })
+  const verClienteEnPlanificador = (c) => navigate('/admin/planificador', { state: { buscar: c.nicknames[0] || c.nombre } })
 
   const crecimientoMargenUltimo = useMemo(() => {
     if (!bi?.porAnio?.length) return null
@@ -739,211 +582,37 @@ export default function DashboardHome() {
     <div className="space-y-8">
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
-      {showVencidasPanel && (
-        <CategoryPanel
-          catKey="vencido"
-          screens={cuentasVencidas}
-          onClose={() => setShowVencidasPanel(false)}
-          onGenerate={handleGenerateVentaPlanificador}
-        />
-      )}
-
-      {showProximasPanel && (
-        <CategoryPanel
-          catKey="alerta"
-          screens={proximasAVencer}
-          onClose={() => setShowProximasPanel(false)}
-          onGenerate={handleGenerateVentaPlanificador}
-        />
-      )}
-
       {showArpuPanel && (
         <IngresoPorClientePanel onClose={() => setShowArpuPanel(false)} />
       )}
 
       <style>{CSS}</style>
 
-      {/* ── HERO HEADER ── */}
-      <div className="dash-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)' }}>
-        <div className="dash-orb-1 absolute -top-12 -left-12 w-64 h-64 rounded-full opacity-[.25] pointer-events-none" style={{ background: 'radial-gradient(circle,#a855f7,transparent 70%)' }} />
-        <div className="dash-orb-2 absolute -bottom-16 right-0 w-72 h-72 rounded-full opacity-[.20] pointer-events-none" style={{ background: 'radial-gradient(circle,#6366f1,transparent 70%)' }} />
-        <div className="absolute inset-0 opacity-[.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
+      <style>{DASH_TIPOS}</style>
 
-        <div className="relative px-7 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/25 mb-4">
-              <Activity size={12} className="text-indigo-300" />
-              <span className="text-indigo-300 text-xs font-semibold tracking-widest uppercase">Operaciones</span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: '-0.02em' }}>
-              Dashboard
-            </h1>
-            <p className="text-indigo-100/70 text-sm mt-2 max-w-xl">
-              Pulso diario de ChikidsTV — el análisis financiero profundo vive en <button onClick={() => navigate('/admin/analisis-financiero')} className="text-indigo-400 font-bold hover:text-white transition-colors">Análisis Financiero</button>
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {import.meta.env.DEV && (
-              <>
-                <input
-                  type="file" accept=".sqlite" id="restore-db-input" className="hidden"
-                  onChange={handleRestoreLocalBackup}
-                />
-                <button
-                  onClick={() => document.getElementById('restore-db-input').click()}
-                  disabled={restoringBackup}
-                  className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2"
-                >
-                  <Upload size={15} /> {restoringBackup ? 'Cargando…' : 'BD Local'}
-                </button>
-              </>
-            )}
-            <button
-              onClick={handleDownloadBackup} disabled={downloadingBackup}
-              className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-bold text-white transition-all flex items-center gap-2"
-            >
-              <Download size={15} /> {downloadingBackup ? 'Descargando…' : 'Respaldo'}
-            </button>
-            <button
-              onClick={handleSync} disabled={syncing}
-              className="dash-cta px-5 py-2.5 rounded-2xl text-sm font-bold flex items-center gap-2"
-            >
-              <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando…' : 'Sincronizar'}
-            </button>
-          </div>
-        </div>
-      </div>
+      <AlAire
+        operacion={operacion} stats={stats} valorEnRiesgo={valorEnRiesgo} onAbrir={abrirEnPlanificador}
+        acciones={<>
+          {import.meta.env.DEV && (
+            <>
+              <input type="file" accept=".sqlite" id="restore-db-input" className="hidden" onChange={handleRestoreLocalBackup} />
+              <BotonAire icon={Upload} onClick={() => document.getElementById('restore-db-input').click()} disabled={restoringBackup}>
+                {restoringBackup ? 'Cargando…' : 'BD Local'}
+              </BotonAire>
+            </>
+          )}
+          <BotonAire icon={Download} onClick={handleDownloadBackup} disabled={downloadingBackup}>
+            {downloadingBackup ? 'Descargando…' : 'Respaldo'}
+          </BotonAire>
+          <BotonAire icon={RefreshCw} primario onClick={handleSync} disabled={syncing} className={syncing ? '[&>svg]:animate-spin' : ''}>
+            {syncing ? 'Sincronizando…' : 'Sincronizar'}
+          </BotonAire>
+        </>}
+      />
 
-      {/* ─── Centro de alertas: lo que requiere acción hoy ───────────────── */}
-      <div className="dash-a2">
-        <Card className={cn(
-          alertas.some(a => a.tone === 'error') ? 'border-red-200' :
-          alertas.some(a => a.tone === 'warning') ? 'border-amber-200' : 'border-emerald-100'
-        )}>
-          <CardHeader className="border-gray-50 py-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <ShieldAlert size={16} className={alertasUrgentes > 0 ? 'text-red-500' : 'text-emerald-500'} />
-                <CardTitle className="text-base">Centro de alertas</CardTitle>
-                {alertasUrgentes > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold tabular-nums">
-                    {alertasUrgentes} {alertasUrgentes === 1 ? 'asunto requiere' : 'asuntos requieren'} acción
-                  </span>
-                )}
-              </div>
-              {valorEnRiesgo > 0 && alertasUrgentes > 0 && (
-                <span className="text-xs text-gray-500">
-                  Valor en riesgo (vencidas + por vencer): <span className="font-bold text-red-600">{formatCurrency(valorEnRiesgo)}</span>
-                </span>
-              )}
-            </div>
-          </CardHeader>
-          <CardBody className="p-0 divide-y divide-gray-50">
-            {alertas.length > 0 ? (
-              alertas.map((a, i) => <AlertRow key={i} alerta={a} />)
-            ) : (
-              <div className="flex items-center gap-3 px-4 py-3">
-                <span className="p-2 rounded-lg bg-emerald-50 flex-shrink-0">
-                  <CheckCircle2 size={16} className="text-emerald-600" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-brand-accent">Sin alertas operativas</p>
-                  <p className="text-xs text-gray-500">Cartera al día y capacidad bajo control</p>
-                </div>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      </div>
+      <GuiaRenovaciones guia={operacion?.guia} onCliente={verClienteEnPlanificador} />
 
-      {/* ─── KPIs operativos: clientes, catálogo y capacidad ─────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 dash-a2">
-        <StatCard
-          icon={Users} title="Clientes Activos" value={stats.totalClients} color="bg-brand-primary"
-          subtitle={`${stats.clientesFinal} finales · ${stats.clientesRevendedor} revendedores — presencia en ${stats.paisesCount} países`}
-          onClick={() => setExplain({
-            title: 'Clientes Activos', value: stats.totalClients, icon: Users,
-            queEs: 'La cantidad de clientes que hoy tienen su cuenta habilitada en el sistema — la base viva del negocio.',
-            comoSeCalcula: 'Se cuentan todos los clientes registrados cuyo estado sea **Activo**. Los clientes dados de baja o suspendidos no entran en este número.',
-            origen: `Módulo de **Clientes**. De esa misma tabla salen los ${stats.clientesFinal} clientes finales, ${stats.clientesRevendedor} revendedores y la presencia en ${stats.paisesCount} países.`,
-            action: { label: 'Ver Clientes', onClick: () => navigate('/admin/clients') },
-          })}
-        />
-        <StatCard
-          icon={Package} title="Planes" value={stats.totalPlans} color="bg-blue-500"
-          subtitle={`Catálogo vigente que respalda ${pantallasActivasTotal.toLocaleString()} pantallas activas hoy`}
-          onClick={() => setExplain({
-            title: 'Planes', value: stats.totalPlans, icon: Package,
-            queEs: 'Cuántos planes de venta (mensual, semestral, anual…) están disponibles hoy en el catálogo para ofrecer a los clientes.',
-            comoSeCalcula: 'Se cuentan los planes marcados como **activos** en el catálogo. Los planes desactivados quedan por fuera aunque tengan historial.',
-            origen: `Módulo de **Planes**. El Planificador registra ${pantallasActivasTotal.toLocaleString()} pantallas activas actuales.`,
-            action: { label: 'Ver Planes', onClick: () => navigate('/admin/plans') },
-          })}
-        />
-        <StatCard
-          icon={FileText} title="Pantallas activas" value={pantallasActivasTotal} color="bg-green-500"
-          subtitle={`Con cliente asignado — de ${operacion?.capacidad.total ?? 0} configuradas, ${operacion?.capacidad.libres ?? 0} libres`}
-          onClick={() => setExplain({
-            title: 'Pantallas activas', value: pantallasActivasTotal, icon: FileText,
-            queEs: 'El total de pantallas de streaming que están configuradas para clientes en el Planificador — la "base instalada" que genera el ingreso recurrente.',
-            comoSeCalcula: 'Se **suma la columna #** (cantidad de pantallas) de las filas del Planificador que tienen cliente asignado. Las pantallas libres no cuentan. No es un conteo de filas: un cliente con 2 pantallas bajo el mismo registro aporta 2 a este total.',
-            origen: 'Módulo **Planificador** — cada fila representa un slot de pantalla dentro de una cuenta padre.',
-            action: { label: 'Ver Planificador', onClick: () => navigate('/admin/planificador', { state: { openEstatusPanel: true } }) },
-          })}
-        />
-        <StatCard
-          icon={Tv} title="Equipos en bodega" value={stats.equipos?.disponibles ?? stats.totalDevices} color="bg-purple-500"
-          subtitle={`Listos para vender — ${stats.equipos?.total ?? 0} en el inventario, ${stats.equipos?.vendidos ?? 0} vendidos`}
-          onClick={() => setExplain({
-            title: 'Equipos en bodega', value: stats.equipos?.disponibles ?? stats.totalDevices, icon: Tv,
-            queEs: 'Cuántos equipos físicos (Fire TV, ONN…) del inventario siguen disponibles para la venta.',
-            comoSeCalcula: 'Se cuentan las unidades del **Inventario de Equipos** con número de serie que no tienen una venta asociada (serie ↔ serial de Venta Dispositivos) ni están marcadas como vendidas.',
-            origen: `Módulo **Inventario Equipos**: ${stats.equipos?.total ?? 0} unidades registradas, ${stats.equipos?.vendidos ?? 0} vendidas.`,
-            action: { label: 'Ver Inventario', onClick: () => navigate('/admin/devices') },
-          })}
-        />
-      </div>
-
-      {/* ─── KPIs operativos: cartera y vencimientos ─────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 dash-a2 mt-4">
-        <StatCard
-          icon={Clock} title="Clientes con Deuda" value={stats.clientesConDeuda} color="bg-amber-500"
-          subtitle={`${textoDeuda(stats.montoDeudaTotal, stats.montoDeudaUSD)} marcados como "debe" en el Planificador`}
-          onClick={() => setExplain({
-            title: 'Clientes con Deuda', value: stats.clientesConDeuda, icon: Clock,
-            queEs: 'Cuentas del Planificador marcadas como "debe" — clientes que tienen un saldo pendiente por cobrar hoy.',
-            comoSeCalcula: 'Se cuentan los **clientes distintos** con alguna pantalla marcada **debe = sí** (un cliente con varias pantallas cuenta una vez) y se suma el **monto que debe**, separado en pesos (COP) y dólares (USD).',
-            origen: 'Módulo **Planificador** (campos debe / monto que debe de cada pantalla).',
-            action: { label: 'Ver Planificador', onClick: () => navigate('/admin/planificador') },
-          })}
-        />
-        <StatCard
-          icon={AlertCircle} title="Pantallas vencidas" value={venc.pantallas} color="bg-red-500"
-          subtitle={venc.pantallas > 0
-            ? `${plural(venc.clientes, 'cliente', 'clientes')} sin renovar${venc.venceHoy ? ` · ${venc.venceHoy} vence${venc.venceHoy === 1 ? '' : 'n'} hoy` : ''} — requieren contacto`
-            : 'Sin pantallas vencidas en el Planificador'}
-          onClick={() => setExplain({
-            title: 'Pantallas vencidas', value: venc.pantallas, icon: AlertCircle,
-            queEs: 'Pantallas de clientes cuya fecha de vencimiento **ya pasó** y siguen sin renovar — cada día que pasa aumenta el riesgo de perder al cliente.',
-            comoSeCalcula: 'Para cada pantalla con cliente se compara la **fecha de fin** contra hoy. Si es hoy o ya pasó, la pantalla está vencida (las libres no cuentan). Un cliente con varias pantallas vencidas cuenta una vez en "clientes". Es la misma regla de la tarjeta "Vencidas" del Planificador.',
-            origen: 'Módulo **Planificador** — campos de fecha de finalización y fin real de cada pantalla.',
-            action: { label: 'Ver detalle de vencidas', onClick: () => setShowVencidasPanel(true) },
-          })}
-        />
-        <StatCard
-          icon={TrendingUp} title="Próximas a vencer" value={porV.pantallas} color="bg-orange-500"
-          subtitle={porV.pantallas > 0
-            ? `${plural(porV.clientes, 'cliente', 'clientes')} vencen en ≤ ${diasAlerta} días — oportunidad de renovación`
-            : 'Sin pantallas próximas a vencer'}
-          onClick={() => setExplain({
-            title: 'Próximas a vencer', value: porV.pantallas, icon: TrendingUp,
-            queEs: 'Pantallas que vencen dentro de los próximos días — la ventana ideal para contactar al cliente y asegurar la renovación **antes** del corte del servicio.',
-            comoSeCalcula: `Se calculan los días que faltan entre hoy y la fecha de vencimiento de cada pantalla. Si faltan **${diasAlerta} días o menos** (y aún no venció), entra en esta lista. Las cortesías no entran, y un cliente que ya tiene otra pantalla vencida se cuenta como vencido.`,
-            origen: 'Módulo **Planificador** — el umbral de alerta es configurable en el servidor.',
-            action: { label: 'Ver detalle', onClick: () => setShowProximasPanel(true) },
-          })}
-        />
-      </div>
+      <IndicadoresClave bi={bi} stats={stats} operacion={operacion} onExplicar={setExplain} onIr={navigate} />
 
       {bi && (
         <>
@@ -1036,74 +705,38 @@ export default function DashboardHome() {
             </Card>
           )}
 
-          {/* ─── Gráficos: evolución anual (línea) + comparativo por año (barras) ─── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="border-orange-100">
-              <CardHeader className="border-orange-50">
-                <CardTitle>Evolución anual: ingresos, costos y ganancia</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">
-                  Tendencia desde {bi.porAnio[0]?.anio} hasta {bi.porAnio[bi.porAnio.length - 1]?.anio} — la brecha entre la curva naranja (ingresos) y la gris (costos) es la curva verde (ganancia); el % morado sobre cada punto verde es el margen bruto de ese año
-                </p>
-              </CardHeader>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={240}>
-                  <ComposedChart data={bi.porAnio} margin={{ top: 28, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                    <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="costos" name="Costos" stroke="#94a3b8" strokeWidth={2.5} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="margen" name="Ganancia" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4 }} />
-                    <Bar dataKey="ingresos" fill="transparent" legendType="none" barSize={2} isAnimationActive={false}>
-                      <LabelList dataKey="ingresos" position="top" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#f97316' }} />
+          {/* ─── Gráfico anual: ingresos, costos, ganancia y margen (el año en curso, atenuado) ─── */}
+          <Card className="border-orange-100">
+            <CardHeader className="border-orange-50">
+              <CardTitle>Ingresos, costos y ganancia por año</CardTitle>
+              <p className="text-sm text-gray-400 mt-0.5">
+                Pesos (COP) por año, con el margen bruto en morado.
+                {bi.porAnio.some(a => a.parcial) && ` ${bi.porAnio.find(a => a.parcial).anio} va en curso: sus barras se ven más claras porque el año no ha terminado.`}
+              </p>
+            </CardHeader>
+            <CardBody>
+              <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart data={bi.porAnio} margin={{ top: 28, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => (bi.porAnio.find(a => a.anio === v)?.parcial ? `${v} (en curso)` : v)} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} width={44} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[0, 100]} width={36} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {[['ingresos', 'Ingresos', '#f97316'], ['costos', 'Costos', '#94a3b8'], ['margen', 'Ganancia', '#16a34a']].map(([key, nombre, color]) => (
+                    <Bar key={key} yAxisId="left" dataKey={key} name={nombre} fill={color} radius={[6, 6, 0, 0]} maxBarSize={34}>
+                      {bi.porAnio.map(a => <Cell key={a.anio} fillOpacity={a.parcial ? 0.4 : 1} />)}
+                      <LabelList dataKey={key} position="top" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#475569' }} />
                     </Bar>
-                    <Bar dataKey="costos" fill="transparent" legendType="none" barSize={2} isAnimationActive={false}>
-                      <LabelList dataKey="costos" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#94a3b8' }} />
-                    </Bar>
-                    <Bar dataKey="margen" fill="transparent" legendType="none" barSize={2} isAnimationActive={false}>
-                      <LabelList dataKey="margen" position="top" offset={4} formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#16a34a' }} />
-                      <LabelList dataKey="margenPct" position="top" offset={17} formatter={(v) => `${v.toFixed(0)}%`} style={{ ...LABEL_STYLE, fontSize: 10, fill: '#7c3aed' }} />
-                    </Bar>
-                  </ComposedChart>
-                </ResponsiveContainer>
-                <ChartInsight text={narrarEvolucionAnual(bi.porAnio)} />
-              </CardBody>
-            </Card>
-
-            <Card className="border-orange-100">
-              <CardHeader className="border-orange-50">
-                <CardTitle>Ingresos, costos y ganancia por año</CardTitle>
-                <p className="text-sm text-gray-400 mt-0.5">Comparativo histórico con margen bruto (%)</p>
-              </CardHeader>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={340}>
-                  <ComposedChart data={bi.porAnio} margin={{ top: 28, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" opacity={0.4} />
-                    <XAxis dataKey="anio" tick={{ fontSize: 12, fill: '#78716c' }} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#78716c' }} tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[0, 100]} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar yAxisId="left" dataKey="ingresos" name="Ingresos" fill="#f97316" radius={[6, 6, 0, 0]} barSize={28}>
-                      <LabelList dataKey="ingresos" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10 }} />
-                    </Bar>
-                    <Bar yAxisId="left" dataKey="costos" name="Costos" fill="#94a3b8" radius={[6, 6, 0, 0]} barSize={28}>
-                      <LabelList dataKey="costos" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10 }} />
-                    </Bar>
-                    <Bar yAxisId="left" dataKey="margen" name="Ganancia" fill="#16a34a" radius={[6, 6, 0, 0]} barSize={28}>
-                      <LabelList dataKey="margen" position="insideTop" formatter={(v) => `${(v / 1e6).toFixed(1)}M`} style={{ ...LABEL_STYLE, fontSize: 10 }} />
-                    </Bar>
-                    <Line yAxisId="right" type="monotone" dataKey="margenPct" name="Margen %" stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 4 }}>
-                      <LabelList dataKey="margenPct" position="top" formatter={(v) => `${v.toFixed(0)}%`} style={{ ...LABEL_STYLE, fontSize: 11 }} />
-                    </Line>
-                  </ComposedChart>
-                </ResponsiveContainer>
-                <ChartInsight text={narrarIngresosCostosAnio(bi.porAnio)} />
-              </CardBody>
-            </Card>
-          </div>
+                  ))}
+                  <Line yAxisId="right" type="linear" dataKey="margenPct" name="Margen %" stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 4 }}>
+                    <LabelList dataKey="margenPct" position="top" offset={10} formatter={(v) => `${v.toFixed(0)}%`} style={{ ...LABEL_STYLE, fontSize: 11, fill: '#7c3aed' }} />
+                  </Line>
+                </ComposedChart>
+              </ResponsiveContainer>
+              <ChartInsight text={narrarIngresosCostosAnio(bi.porAnio)} />
+            </CardBody>
+          </Card>
 
           {/* ─── Gráfico: tendencia mensual + MRR normalizado ─────────────── */}
           <Card className="border-orange-100">
