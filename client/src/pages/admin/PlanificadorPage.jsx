@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { todayStr } from '../../utils/dateUtils'
 import {
-  Monitor, Clock, AlertTriangle, CheckCircle2, Search, RefreshCw, Tv, FileSpreadsheet, Undo2, History, XCircle, Wallet, Gift, DollarSign, Percent, Package, Users, Building2, ChevronDown, Pencil, Trash2,
+  Monitor, Clock, AlertTriangle, CheckCircle2, Search, RefreshCw, Tv, FileSpreadsheet, Undo2, History, XCircle, Wallet, Gift, DollarSign, Percent, Package, Users, Building2, ChevronDown, Pencil, Trash2, Link2,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import api from '../../config/api'
@@ -25,6 +25,7 @@ import { CSS } from './planificador/planificadorStyles'
 import { CuentasPadreAlertPanel } from './planificador/CuentasPadreAlertPanel'
 import { EstatusClientePanel } from './planificador/EstatusClientePanel'
 import { usePlanificadorVista } from './planificador/usePlanificadorVista'
+import { SyncDiffModal } from './planificador/SyncDiffModal'
 
 const DIAS_ALERTA_CP = 30
 
@@ -45,6 +46,11 @@ export default function PlanificadorPage() {
   const [editRow, setEditRow]             = useState(null)
   const [sortConfig, setSortConfig]       = useState({ key: 'cuentaId', dir: 'asc' })
   const [undoing, setUndoing]             = useState(false)
+  // Sincronizar CP: trae del módulo Cuentas Padre fechas, usuario, crédito y
+  // contraseñas (estas siguen cifradas allí) y muestra el informe por cuenta.
+  const [syncing, setSyncing]             = useState(false)
+  const [syncDiff, setSyncDiff]           = useState(null)
+  const [syncLote, setSyncLote]           = useState(null)
   // Historial en el servidor: último cambio deshacible y lote de la última sincronización
   const [ultimoCambio, setUltimoCambio]   = useState(null)
   const [showHistorial, setShowHistorial] = useState(false)
@@ -77,6 +83,29 @@ export default function PlanificadorPage() {
     const ok = await deshacerCambioApi(c, showToast)
     setUndoing(false)
     if (ok) { await load(); loadRecordatorios() }
+  }
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      const r = await api.post('/admin/planificador/sync-cuentas-padre')
+      setSyncLote(r.data.lote || null)
+      await load()
+      if (r.data.diff?.length > 0) setSyncDiff(r.data.diff)
+      showToast(r.data.message, 'success')
+    } catch (e) {
+      showToast(e.response?.data?.error || e.message, 'error')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleSyncUndo = async () => {
+    if (!syncLote) return
+    setUndoing(true)
+    const ok = await deshacerCambioApi({ accion: 'sincronizar', lote: syncLote }, showToast)
+    setUndoing(false)
+    if (ok) { setSyncLote(null); setSyncDiff(null); await load() }
   }
 
   const onSort = (key) => setSortConfig(prev =>
@@ -239,6 +268,17 @@ export default function PlanificadorPage() {
         />
       )}
 
+      {/* Informe de la sincronización con Cuentas Padre */}
+      {syncDiff && (
+        <SyncDiffModal
+          diff={syncDiff}
+          canUndo={!!syncLote}
+          onUndo={handleSyncUndo}
+          onClose={() => setSyncDiff(null)}
+          undoing={undoing}
+        />
+      )}
+
       {/* Panel de detalle de tarjeta inteligente */}
       {activePanel && (
         <CategoryPanel
@@ -283,6 +323,12 @@ export default function PlanificadorPage() {
             )}
             <button onClick={() => setShowHistorial(true)} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
               <History size={15} /> Historial
+            </button>
+            <button onClick={handleSync} disabled={syncing} className="pl-btn-ghost relative px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
+              <Link2 size={15} /> {syncing ? 'Sincronizando…' : 'Sincronizar CP'}
+              {data?.syncPendiente && !syncing && (
+                <span title="Hay cambios en Cuentas Padre por sincronizar" className="absolute -top-1.5 -right-1.5 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" /><span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500" /></span>
+              )}
             </button>
             <button onClick={handleExport} disabled={exporting} className="pl-btn-ghost px-4 py-2.5 rounded-2xl text-sm font-semibold text-white/80 flex items-center gap-2">
               <FileSpreadsheet size={15} /> Exportar Excel

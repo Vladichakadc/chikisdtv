@@ -78,7 +78,7 @@ describe('GET /planificador', () => {
     assert.equal(p.tienePassword, true);
     assert.ok(!('password' in p));
     assert.ok(!JSON.stringify(body).includes('ClaveReal1'));
-    assert.ok(!('syncPendiente' in body));
+    assert.equal(typeof body.syncPendiente, 'boolean');
     const [despues] = await raw('SELECT MAX(updatedAt) m, COUNT(*) n FROM planificador');
     assert.deepEqual(despues, antes);
   });
@@ -185,9 +185,35 @@ describe('comprobante y endpoints retirados', () => {
     assert.equal(r.status, 200);
     assert.ok(r.body.pantallasDetalle.every(p => p.cuenta === 'usuario_real' && !('password' in p)));
   });
-  test('sincronizar y restaurar ya no existen', async () => {
-    assert.equal((await fetch(base + '/planificador/sync-cuentas-padre', { method: 'POST' })).status, 404);
+  test('restaurar ya no existe', async () => {
     assert.equal((await fetch(base + '/planificador/sync-preview')).status, 404);
     assert.equal((await fetch(base + '/planificador/restore', { method: 'POST' })).status, 404);
+  });
+});
+
+describe('POST /planificador/sync-cuentas-padre', () => {
+  test('trae fechas y usuario de Cuentas Padre, crea pantallas de cuentas nuevas y nunca copia contraseñas', async () => {
+    await CuentaPadre.update({ fechaFin: daysFromNow(90) }, { where: { cuentaId: 'M001' } });
+    await CuentaPadre.create({ cuentaId: 'M777', nombreUsuario: 'nueva_cp', contrasena: 'ClaveNueva7', fechaFin: daysFromNow(30) });
+    assert.equal((await api('GET', '/planificador')).body.syncPendiente, true);
+
+    const { status, body } = await api('POST', '/planificador/sync-cuentas-padre');
+    assert.equal(status, 200);
+    const m001 = body.diff.find(d => d.cuentaId === 'M001');
+    assert.equal(m001.status, 'actualizada');
+    assert.ok(m001.cambios.some(c => c.campo === 'finalizacion' && c.despues === daysFromNow(90)));
+    assert.equal(m001.tienePassword, true);
+    assert.equal(body.diff.find(d => d.cuentaId === 'M777').status, 'creada');
+    assert.ok(body.lote);
+    assert.ok(!JSON.stringify(body).includes('ClaveReal1') && !JSON.stringify(body).includes('ClaveNueva7'));
+    const copias = await raw("SELECT password FROM planificador WHERE password IS NOT NULL");
+    assert.equal(copias.length, 0);
+    assert.equal((await api('GET', '/planificador')).body.syncPendiente, false);
+
+    // Deshacer la sincronización elimina las pantallas creadas
+    const u = await api('POST', `/planificador/historial/lote/${body.lote}/deshacer`);
+    assert.equal(u.status, 200);
+    assert.equal((await raw("SELECT COUNT(*) n FROM planificador WHERE cuentaId='M777'"))[0].n, 0);
+    await CuentaPadre.destroy({ where: { cuentaId: 'M777' } });
   });
 });

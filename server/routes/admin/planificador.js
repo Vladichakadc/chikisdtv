@@ -10,6 +10,7 @@ const { buscarUltimosPagos } = require('../../utils/ultimosPagos');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { importFromExcel, autoFixCuentaIdMismatches } = require('../../services/planificadorImportService');
 const { autoImportarSiDisponible } = require('../../utils/excelOrigen');
+const { sincronizarCuentasPadre, syncPendiente } = require('../../services/sincronizarCuentasPadre');
 // Reglas únicas de estado (ver utils/planificadorAlerta.js): la alerta se
 // recalcula según la fecha vigente y la cortesía es la columna `cortesia`.
 const { DIAS_ALERTA, calcDias: calcDiasDB, alertaFromDias, estadoFromDias, varianteDe, esCortesia } = require('../../utils/planificadorAlerta');
@@ -309,7 +310,18 @@ router.get('/planificador', asyncHandler(async (_req, res) => {
     inconsistencias:     findCuentaIdMismatches(pantallas),
     cuentasPadreStatus,
     capacidadPorCuenta,
+    syncPendiente: await syncPendiente(cuentas),
   });
+}));
+
+// POST /planificador/sync-cuentas-padre — "Sincronizar CP": agrega pantallas de
+// cuentas padre nuevas y devuelve el informe por cuenta (usuario, crédito,
+// fechas y estado de la contraseña) de lo que cambió desde la última vez.
+router.post('/planificador/sync-cuentas-padre', asyncHandler(async (req, res) => {
+  const r = await sincronizarCuentasPadre({ usuarioEmail: req.user?.email });
+  if (!r) return res.status(404).json({ error: 'No hay cuentas padre en la base de datos' });
+  if (r.creadas) await autoFixCuentaIdMismatches();
+  res.json({ ...r, diasAlerta: DIAS_ALERTA });
 }));
 
 // Comprobante de renovación: último pago de la pantalla en la tabla de ventas
