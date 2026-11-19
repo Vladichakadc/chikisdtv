@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock, ChevronDown } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 import { parseFechaLocal } from '../planificador/rowHelpers'
 
@@ -64,22 +64,43 @@ function CeldaDia({ dia, onCliente, compacta }) {
   )
 }
 
+// La guía arranca oculta; la preferencia se recuerda en este navegador
+const CLAVE_ABIERTA = 'dashboard.guiaRenovaciones.abierta'
+function leerAbierta() {
+  try { return localStorage.getItem(CLAVE_ABIERTA) === '1' } catch { return false }
+}
+
 export function GuiaRenovaciones({ guia = [], onCliente }) {
+  const [abierta, setAbierta] = useState(leerAbierta)
   const total = guia.reduce((s, d) => s + d.clientes.length, 0)
+  const hoy = guia[0]?.clientes.length || 0
   const semanas = [guia.slice(0, 7), guia.slice(7, 14)]
+  const alternar = () => setAbierta(a => {
+    try { localStorage.setItem(CLAVE_ABIERTA, a ? '0' : '1') } catch { /* sin almacenamiento */ }
+    return !a
+  })
   return (
-    <section aria-labelledby="guia-titulo" className="rounded-[28px] bg-slate-50 ring-1 ring-slate-200/70 p-4 sm:p-6 mb-6">
-      <div className="flex flex-wrap items-end justify-between gap-2 mb-4">
-        <div>
-          <h2 id="guia-titulo" className="dash-num text-[26px] font-bold text-slate-900 leading-none flex items-center gap-2">
-            <CalendarClock size={22} className="text-brand-primary" /> Guía de renovaciones
-          </h2>
-          <p className="dash-txt text-sm text-slate-500 mt-1.5">
+    <section aria-labelledby="guia-titulo" className={cn('rounded-[28px] bg-slate-50 ring-1 ring-slate-200/70 mb-6', abierta ? 'p-4 sm:p-6' : 'px-4 sm:px-6 py-3')}>
+      <button type="button" onClick={alternar} aria-expanded={abierta} aria-controls="guia-contenido"
+        className={cn('w-full min-h-[48px] flex items-center justify-between gap-3 text-left', abierta && 'mb-3')}>
+        <span className="min-w-0">
+          <span id="guia-titulo" className="dash-num text-[24px] sm:text-[26px] font-bold text-slate-900 leading-none flex items-center gap-2">
+            <CalendarClock size={22} className="text-brand-primary flex-shrink-0" /> Guía de renovaciones
+          </span>
+          <span className="dash-txt block text-sm text-slate-500 mt-1">
             {total
-              ? `${total} ${total === 1 ? 'cliente termina' : 'clientes terminan'} su plan en los próximos 14 días. Toca un nombre para verlo en el Planificador.`
+              ? `${total} ${total === 1 ? 'cliente termina' : 'clientes terminan'} su plan en los próximos 14 días${hoy ? ` (${hoy} hoy)` : ''}.`
               : 'Ningún plan termina en los próximos 14 días.'}
-          </p>
-        </div>
+          </span>
+        </span>
+        <span className="dash-txt flex items-center gap-1.5 text-sm font-semibold text-brand-primary flex-shrink-0">
+          <span className="hidden sm:inline">{abierta ? 'Ocultar' : 'Ver guía'}</span>
+          <ChevronDown size={20} className={cn('transition-transform', abierta && 'rotate-180')} />
+        </span>
+      </button>
+
+      {abierta && <div id="guia-contenido">
+      <div className="flex flex-wrap items-end justify-end gap-2 mb-4">
         <p className="dash-txt text-xs text-slate-400 flex items-center gap-3">
           <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-orange-500" /> tiene saldo pendiente</span>
           <span><span className="dash-num font-semibold text-slate-500">×2</span> pantallas del mismo cliente</span>
@@ -106,6 +127,8 @@ export function GuiaRenovaciones({ guia = [], onCliente }) {
           </p>
         )}
       </div>
+      <p className="dash-txt text-xs text-slate-400 mt-3">Toca un nombre para verlo en el Planificador.</p>
+      </div>}
     </section>
   )
 }

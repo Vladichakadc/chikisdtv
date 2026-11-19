@@ -22,6 +22,7 @@ import { diasLabel } from './planificador/rowHelpers'
 import { AlAire, BotonAire, DASH_TIPOS } from './dashboard/AlAire'
 import { GuiaRenovaciones } from './dashboard/GuiaRenovaciones'
 import { IndicadoresClave } from './dashboard/IndicadoresClave'
+import { PulsoNegocio } from './dashboard/PulsoNegocio'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
 import {
   narrarIngresosCostosAnio, narrarTendenciaMensual, narrarVentasLicenciaAnio, narrarVentasLicenciaMes,
@@ -133,6 +134,8 @@ export default function DashboardHome() {
   // Indicadores operativos (vencidas, por vencer, deuda, capacidad, equipos):
   // GET /dashboard/operacion — reemplaza la descarga del Planificador completo
   const [operacion, setOperacion] = useState(null)
+  // Movimiento de clientes para el Pulso del negocio (crecimiento neto, abandono)
+  const [retencion, setRetencion] = useState(null)
   // Celular: gráficos más bajos, sin etiquetas que se montan y análisis plegado
   const esMovil = useEsMovil()
   const [verAnalisis, setVerAnalisis] = useState(null) // null = según pantalla
@@ -155,6 +158,7 @@ export default function DashboardHome() {
     api.get('/admin/dashboard-stats', { silent }).then((r) => setStats(r.data)),
     api.get('/admin/dashboard-bi', { silent }).then((r) => setBi(r.data)),
     api.get('/admin/dashboard/operacion', { silent }).then((r) => setOperacion(r.data)),
+    api.get('/admin/dashboard-bi/retencion', { silent }).then((r) => setRetencion(r.data)).catch(() => {}),
   ])
 
   useEffect(() => {
@@ -384,6 +388,8 @@ export default function DashboardHome() {
       <GuiaRenovaciones guia={operacion?.guia} onCliente={verClienteEnPlanificador} />
 
       <IndicadoresClave bi={bi} stats={stats} operacion={operacion} onExplicar={setExplain} onIr={navigate} />
+
+      {bi && <PulsoNegocio bi={bi} operacion={operacion} retencion={retencion} stats={stats} onExplicar={setExplain} onIr={navigate} />}
 
       {bi && (
         <>
