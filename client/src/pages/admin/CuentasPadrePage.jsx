@@ -20,7 +20,7 @@ import {
   ChevronUp, ChevronDown, ChevronsUpDown,
   Eye, EyeOff, RefreshCw, Upload, Download,
   FileSpreadsheet, CheckCircle2, AlertCircle, Undo2,
-  Layers, TrendingUp, Percent, Lightbulb, Sparkles, AlertTriangle
+  Layers, TrendingUp, Percent, Lightbulb, Sparkles, AlertTriangle, Megaphone
 } from 'lucide-react'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
@@ -28,6 +28,7 @@ import { useUi } from '../../context/UiContext'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { formatDate } from '../../utils/excelUtils'
+import { AvisoCredencialesModal } from './cuentasPadre/AvisoCredencialesModal'
 
 /* ══════════════════════════════════════════════════════════════
    DESIGN TOKENS (Huashu — brand Indigo/Blue para Cuentas)
@@ -95,6 +96,7 @@ const CSS = `
 
   .cp-action-btn { transition: all .18s ease; opacity: 0 }
   tr:hover .cp-action-btn { opacity: 1 }
+  @media (hover: none) { .cp-action-btn { opacity: 1 } }
   .cp-action-btn:hover { transform: scale(1.15) }
 
   @media (prefers-reduced-motion: reduce) {
@@ -438,6 +440,7 @@ export default function CuentasPadrePage() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [avisoCuenta, setAvisoCuenta] = useState(null) // cuentaId del aviso de cambio de credenciales
   const [explain, setExplain] = useState(null)
 
   // Upload state
@@ -685,7 +688,7 @@ export default function CuentasPadrePage() {
                               </div>
                             </th>
                           ))}
-                          <th className="px-4 py-3.5 w-16 text-center sticky right-0 bg-slate-50 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]"></th>
+                          <th className="px-4 py-3.5 w-24 text-center sticky right-0 bg-slate-50 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -694,6 +697,7 @@ export default function CuentasPadrePage() {
                             {COLS.map(col => <td key={col.key} className="px-4 py-3 whitespace-nowrap">{renderCell(row, col.key)}</td>)}
                             <td className="px-2 py-3 whitespace-nowrap text-center sticky right-0 bg-white shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)] z-10 group-hover:bg-slate-50/50 transition-colors">
                               <div className="flex items-center justify-center gap-1">
+                                <button onClick={() => setAvisoCuenta(row.cuentaId)} className="cp-action-btn w-7 h-7 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-50" title="Avisar cambio de credenciales (WhatsApp)" aria-label={`Avisar cambio de credenciales de ${row.cuentaId}`}><Megaphone size={13} /></button>
                                 <button onClick={() => openEdit(row)} className="cp-action-btn w-7 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-50" title="Editar"><Pencil size={13} /></button>
                                 <button onClick={() => setDeleteTarget(row.cuentaId)} className="cp-action-btn w-7 h-7 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50" title="Eliminar"><Trash2 size={13} /></button>
                               </div>
@@ -784,6 +788,7 @@ export default function CuentasPadrePage() {
 
       </div>
 
+      {avisoCuenta && <AvisoCredencialesModal cuentaId={avisoCuenta} onClose={() => setAvisoCuenta(null)} />}
       {showForm && <CuentaDrawer editing={editing} form={form} f={f} onSubmit={handleSubmit} onClose={closeForm} />}
       {deleteTarget && <ConfirmDialog id={deleteTarget} onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)} />}
       {showDiff && diffData.length > 0 && <ImportDiffModal diff={diffData} canUndo={canUndo} onUndo={executeUndo} onClose={() => setShowDiff(false)} undoing={uploading} />}
