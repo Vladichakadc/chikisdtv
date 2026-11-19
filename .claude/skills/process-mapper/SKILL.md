@@ -1,11 +1,12 @@
-﻿---
+---
 name: process-mapper
-description: Use when a BizOps lead, COO, or process-improvement owner needs to document an end-to-end business process (procurement, employee onboarding, incident handoff, customer-onboarding, claims adjudication) in BPMN-style notation, measure cycle times by stage, surface where work spends most of its time waiting vs. being worked, and quantify the gap between processing time and total elapsed time. Pairs Lean / Six Sigma / Theory-of-Constraints canon with deterministic stdlib-only Python tools to produce a process map, a ranked bottleneck list (with severity + root-cause hypothesis), and a cycle-time analysis (P50, P90, value-add ratio, Little's-Law throughput). Distinct from sales-pipeline, system-reliability (SLO), and strategic-OKR work — this is tactical process documentation for internal operations.
-version: 2.8.0
-author: claude-code-skills
+description: "Use when documenting an end-to-end business process (procurement, onboarding, handoffs) and finding where work waits. Maps it with process_documenter.py, measures stages with cycle_time_analyzer.py and finds bottlenecks with bottleneck_detector.py."
 license: MIT
-tags: [bizops, process, bpmn, bottleneck, cycle-time, lean, six-sigma, value-stream]
-compatible_tools: [claude-code, codex-cli, cursor, antigravity, opencode, gemini-cli]
+metadata:
+  version: 2.8.0
+  author: claude-code-skills
+  tags: [bizops, process, bpmn, bottleneck, cycle-time, lean, six-sigma, value-stream]
+  compatible_tools: [claude-code, codex-cli, cursor, antigravity, opencode, gemini-cli]
 ---
 
 # process-mapper
@@ -47,6 +48,13 @@ Five-step deterministic flow:
 
 **`scripts/cycle_time_analyzer.py`** — Computes total P50 and P90 cycle time, value-add ratio (VA%), wait %, rework %, and a Little's-Law throughput estimate (WIP / cycle time). Per Lean canon: VA% > 25% = HEALTHY, 10–25% = TYPICAL (most non-manufacturing processes land here), < 10% = WASTE-HEAVY.
 
+## Quick example
+
+```bash
+# Renders a BPMN-style swim-lane diagram + normalized JSON for the built-in 6-stage procurement-intake example
+cd business-operations/skills/process-mapper && python3 scripts/process_documenter.py --sample
+```
+
 ## References
 
 - `references/lean_six_sigma_canon.md` — TIMWOOD wastes, value-stream mapping, Theory of Constraints, Kanban WIP, Little's Law. Cites Womack & Jones, Rother & Shook, Goldratt, Ohno, Liker, Pyzdek, Anderson.
@@ -77,7 +85,7 @@ Five-step deterministic flow:
 
 ## Forcing-question library (Matt Pocock grill discipline)
 
-Before invoking the tools, the orchestrator (or `/cs:grill-bizops`) walks the user through these questions **one at a time, with a recommended answer + canon citation**. Never bundled.
+Before invoking the tools, the orchestrator (or `/cs-grill-bizops`) walks the user through these questions **one at a time, with a recommended answer + canon citation**. Never bundled.
 
 1. **"Do you have measured cycle times for the top-3 longest stages, or only estimates?"**
    Recommended: insist on measured data.
@@ -100,4 +108,3 @@ Before invoking the tools, the orchestrator (or `/cs:grill-bizops`) walks the us
    Canon: Pyzdek (*Six Sigma Handbook*) — hidden rework drives 30-50% of total cycle time in service processes.
 
 Walk depth-first. Don't open question 4 before 1-3 are answered. After all 5 are locked, invoke `process_documenter.py` → `bottleneck_detector.py` → `cycle_time_analyzer.py` in sequence.
-

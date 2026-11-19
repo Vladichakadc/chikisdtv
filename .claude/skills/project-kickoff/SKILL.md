@@ -18,7 +18,7 @@ Use this skill at the very start of a new piece of work to align on intent befor
 ## Discovery questions (ask the ones that matter, skip the obvious)
 
 1. **Problem** — What problem are we solving, and what happens today without it?
-2. **Users** — Who uses this? Admin (gestor de la cooperativa) or socio (member)? Their goal in one sentence.
+2. **Users** — Who uses this? Admin (dueño del negocio / staff) — the only role that logs in? Their goal in one sentence.
 3. **Success** — How will we know it worked? A concrete, observable outcome.
 4. **Scope** — What's explicitly IN and OUT for this round? Name the smallest version that delivers value.
 5. **Data** — What data drives it, and where does it live (which endpoints/models)? Any money-math definitions to pin down up front (gross vs net, which period)?
@@ -32,7 +32,7 @@ Use `AskUserQuestion` to offer concrete options when a decision has a few clear 
 ```markdown
 ## Feature: <name>
 **Problem**: <what & why now>
-**Primary user**: <admin | socio> — <their goal>
+**Primary user**: <admin / staff> — <their goal>
 **Success looks like**: <observable outcome>
 **In scope**: <smallest valuable slice>
 **Out of scope (this round)**: <deferred items>
