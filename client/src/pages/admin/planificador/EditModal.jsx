@@ -2,14 +2,14 @@ import { useEffect, useState, useMemo } from 'react'
 import {
   X, UserPlus, Undo2, KeyRound, User, CalendarRange, Tv,
   Wallet, DollarSign, BadgePercent, Plus, Loader2, MonitorPlay,
-  Eye, EyeOff, PencilLine, List, Pencil, Trash2,
+  Eye, EyeOff, PencilLine, List, Pencil, Trash2, UserMinus,
 } from 'lucide-react'
 import api from '../../../config/api'
 import { useUi } from '../../../context/UiContext'
 import { Button } from '../../../components/ui/Button'
 import { cn } from '../../../utils/cn'
 import { formatDate } from '../../../utils/excelUtils'
-import { calcDias, diasLabel, diasLabelClass } from './rowHelpers'
+import { calcDias, diasLabel, diasLabelClass, getRowVariant } from './rowHelpers'
 
 const CSS = `
   @keyframes em-reveal { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:translateY(0) } }
@@ -110,7 +110,7 @@ function Section({ icon: Icon, title, tone, aside, children }) {
 
 // ─── Modal de edición ────────────────────────────────────────────────────────
 
-export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSwitchPantalla, onDeleteSibling }) {
+export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSwitchPantalla, onDeleteSibling, onBaja }) {
   const { showToast } = useUi()
 
   const [cuentasPadre, setCuentasPadre]   = useState([])
@@ -754,7 +754,18 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-white flex-shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-white flex-shrink-0">
+          {onBaja && row?.idPantalla && getRowVariant(row) !== 'libre' && (
+            <button
+              type="button"
+              onClick={() => onBaja(row)}
+              disabled={saving}
+              className="mr-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-sm font-semibold transition-colors"
+              title="Registra la baja con su motivo y deja la pantalla Libre para asignarla a otro cliente"
+            >
+              <UserMinus size={15} /> Dar de baja
+            </button>
+          )}
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Guardando…' : 'Guardar cambios'}

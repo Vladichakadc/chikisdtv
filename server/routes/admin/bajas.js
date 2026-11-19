@@ -5,21 +5,34 @@ const asyncHandler = require('../../middleware/asyncHandler');
 const { conCuentaPadre } = require('../../services/cuentaPadreDatos');
 const { importFromExcel } = require('../../services/planificadorImportService');
 const { Op } = require('sequelize');
+const { siguienteIdBaja } = require('../../services/bajaPlanificador');
+const { analisisBajas } = require('../../services/analisisBajas');
+const { enCache } = require('../../utils/cacheDashboard');
+const { MOTIVOS_BAJA } = require('../../utils/motivosBaja');
+const nombresMotivos = MOTIVOS_BAJA.map(m => m.nombre);
 
 // ============ BAJAS CRUD ============
 
 // Generar siguiente ID de baja automáticamente
 router.get('/bajas/next-id', asyncHandler(async (_req, res) => {
-  const bajas = await Baja.findAll({ attributes: ['idBaja'], raw: true });
-  let maxNum = 0;
-  bajas.forEach(b => {
-    if (b.idBaja) {
-      const num = parseInt(b.idBaja.replace(/\D/g, ''), 10);
-      if (!isNaN(num) && num > maxNum) maxNum = num;
-    }
-  });
-  const nextId = `BAJA${String(maxNum + 1).padStart(2, '0')}`;
-  res.json({ nextId });
+  res.json({ nextId: await siguienteIdBaja() });
+}));
+
+// Análisis de Bajas (services/analisisBajas.js): motivos, ingreso perdido,
+// vida antes de la baja, recuperados y bajas sin motivo para clasificar
+router.get('/bajas/analisis', asyncHandler(async (_req, res) => {
+  res.json(await enCache('bajas-analisis', () => analisisBajas()));
+}));
+
+// Clasificar el motivo de una baja ya registrada
+router.patch('/bajas/:id/motivo', asyncHandler(async (req, res) => {
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!nombresMotivos.includes(motivo)) return res.status(400).json({ error: 'Elige un motivo del catálogo.' });
+  const baja = await Baja.findByPk(req.params.id);
+  if (!baja) return res.status(404).json({ error: 'Baja no encontrada' });
+  const observaciones = req.body?.observaciones != null ? String(req.body.observaciones).trim() || null : baja.observaciones;
+  await baja.update({ motivo, observaciones });
+  res.json(baja);
 }));
 
 // Obtener nicknames de clientes activos del Planificador

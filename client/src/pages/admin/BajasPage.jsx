@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { MOTIVOS_BAJA, nombresMotivos } from '../../config/motivosBaja'
 import { useUi } from '../../context/UiContext'
 import { Plus, Pencil, Trash2, X, Search, UserX, Tv, ArrowDownCircle, BarChart3, Calendar, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
@@ -563,22 +564,12 @@ export default function BajasPage() {
                   <div className="sm:col-span-2">
                     <Select label="Motivo de la baja" value={form.motivo || ''} onChange={(e) => setForm({ ...form, motivo: e.target.value })}>
                       <option value="">-- Seleccionar motivo --</option>
-                      <option value="Precio elevado">Precio elevado / No puede pagar</option>
-                      <option value="Problemas de señal">Problemas de señal / Buffering</option>
-                      <option value="Cambio de proveedor">Cambio a otro proveedor IPTV</option>
-                      <option value="No usa el servicio">No usa el servicio / Poco interés</option>
-                      <option value="Problemas con el dispositivo">Problemas con el dispositivo Fire TV</option>
-                      <option value="Mala calidad de contenido">Mala calidad de contenido / Canales caídos</option>
-                      <option value="Viaje o mudanza">Viaje, mudanza o cambio de residencia</option>
-                      <option value="Problemas económicos">Problemas económicos del cliente</option>
-                      <option value="Insatisfacción con el soporte">Insatisfacción con el soporte técnico</option>
-                      <option value="Prefiere streaming legal">Prefiere plataformas de streaming legales</option>
-                      <option value="Dispositivo dañado o perdido">Dispositivo dañado o perdido</option>
-                      <option value="Problemas de compatibilidad">Problemas de compatibilidad con su TV/Internet</option>
-                      <option value="Cliente moroso">Cliente moroso / No paga a tiempo</option>
-                      <option value="Cancelación temporal">Cancelación temporal (planea volver)</option>
-                      <option value="Fallecimiento">Fallecimiento del titular</option>
-                      <option value="Otro">Otro motivo</option>
+                      {form.motivo && !nombresMotivos.includes(form.motivo) && (
+                        <option value={form.motivo}>{form.motivo} (anterior)</option>
+                      )}
+                      {MOTIVOS_BAJA.map(m => (
+                        <option key={m.clave} value={m.nombre}>{m.nombre}{m.ayuda ? ` — ${m.ayuda}` : ''}</option>
+                      ))}
                     </Select>
                   </div>
                   <div className="sm:col-span-2">

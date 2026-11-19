@@ -15,10 +15,11 @@
  *  onTogglePwd — (cuentaId) => void — la página pide las contraseñas al revelar
  *  onEdit      — (row) => void
  *  onDelete    — (row) => void
+ *  onBaja      — (row) => void — dar de baja (solo pantallas con cliente)
  *  readOnly    — si true, oculta columna de acciones (default false)
  */
 
-import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Pencil, Trash2, UserMinus } from 'lucide-react'
 import { Badge } from './Badge'
 import { SortTh, DaysChip, MonthsChip } from '../../pages/admin/planificador/TableBits'
 import {
@@ -36,6 +37,7 @@ export function PlanificadorTable({
   onTogglePwd,
   onEdit,
   onDelete,
+  onBaja,
   readOnly = false,
 }) {
   const diasAlerta = stats.diasAlerta ?? DIAS_ALERTA_DEFAULT
@@ -218,6 +220,17 @@ export function PlanificadorTable({
                           data-testid={`plan-edit-${row.idPantalla}`}
                         >
                           <Pencil size={18} />
+                        </button>
+                      )}
+                      {onBaja && rv !== 'libre' && (
+                        <button
+                          onClick={() => onBaja(row)}
+                          className="p-1.5 rounded text-rose-500 hover:bg-rose-600 hover:text-white transition-colors"
+                          title="Dar de baja — registra la baja y deja la pantalla Libre"
+                          aria-label={`Dar de baja ${row.nickname || row.idPantalla}`}
+                          data-testid={`plan-baja-${row.idPantalla}`}
+                        >
+                          <UserMinus size={18} />
                         </button>
                       )}
                       {onDelete && (

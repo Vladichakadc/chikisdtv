@@ -20,6 +20,7 @@ import { EditModal } from './planificador/EditModal'
 import { ComprobanteModal } from './planificador/ComprobanteModal'
 import { RecordatorioLote } from './planificador/RecordatorioLote'
 import { RenovarModal } from './planificador/RenovarModal'
+import { BajaModal } from './planificador/BajaModal'
 import { HistorialPanel, ACCIONES, puedeDeshacer, deshacerCambioApi } from './planificador/HistorialPanel'
 import { CSS } from './planificador/planificadorStyles'
 import { CuentasPadreAlertPanel } from './planificador/CuentasPadreAlertPanel'
@@ -55,6 +56,7 @@ export default function PlanificadorPage() {
   const [ultimoCambio, setUltimoCambio]   = useState(null)
   const [showHistorial, setShowHistorial] = useState(false)
   const [renovarRow, setRenovarRow]       = useState(null)
+  const [bajaRow, setBajaRow]             = useState(null)
   const [activePanel, setActivePanel]     = useState(null)
   const [explain, setExplain]             = useState(null)
   const [showEstatusPanel, setShowEstatusPanel] = useState(false)
@@ -77,7 +79,8 @@ export default function PlanificadorPage() {
     const c = ultimoCambio
     if (!c) return
     const que = `${ACCIONES[c.accion]?.label || c.accion} de ${c.accion === 'sincronizar' ? 'la sincronización' : c.idPantalla}`
-    const extra = c.accion === 'renovar' && c.ventaId ? `\nTambién se eliminará la venta ${c.ventaId} de Pagos.` : ''
+    const extra = c.accion === 'renovar' && c.ventaId ? `\nTambién se eliminará la venta ${c.ventaId} de Pagos.`
+      : c.accion === 'baja' && c.ventaId ? `\nLa pantalla vuelve a su cliente y se elimina la baja ${c.ventaId}.` : ''
     if (!confirm(`¿Deshacer el último cambio? (${que})${extra}`)) return
     setUndoing(true)
     const ok = await deshacerCambioApi(c, showToast)
@@ -268,6 +271,7 @@ export default function PlanificadorPage() {
           onCreated={(nueva) => { setEditRow(nueva); load() }}
           onSwitchPantalla={(sibling) => { setEditRow(sibling) }}
           onDeleteSibling={handleDelete}
+          onBaja={(r) => { setEditRow(null); setBajaRow(r) }}
         />
       )}
 
@@ -294,6 +298,7 @@ export default function PlanificadorPage() {
           recordatorios={recordatorios}
           onRecordarTodos={(screens) => setLote({ catKey: activePanel, screens })}
           onRenovar={(screen) => setRenovarRow(screen)}
+          onBaja={(screen) => setBajaRow(screen)}
         />
       )}
 
@@ -557,6 +562,14 @@ export default function PlanificadorPage() {
       </div>
 
       {/* Registrar renovación en un paso (venta + plan) — z-[80], sobre el panel */}
+      {bajaRow && (
+        <BajaModal
+          row={bajaRow}
+          onClose={() => setBajaRow(null)}
+          onRegistrada={async () => { setBajaRow(null); await load() }}
+        />
+      )}
+
       {renovarRow && (
         <RenovarModal
           row={renovarRow}
@@ -620,6 +633,7 @@ export default function PlanificadorPage() {
           onTogglePwd={togglePwd}
           onEdit={(row) => { setEditRow(row) }}
           onDelete={handleDelete}
+          onBaja={(row) => setBajaRow(row)}
         />
       </Card>
     </div>
