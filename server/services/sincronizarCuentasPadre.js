@@ -7,9 +7,12 @@
 //   2. refresca la copia de referencia del Planificador (cuenta, crédito,
 //      inicio, finalización) para que el informe muestre qué cambió desde la
 //      última sincronización;
-//   3. informa por cuenta el estado de la contraseña SIN copiarla: las
-//      contraseñas siguen cifradas solo en Cuentas Padre.
+//   3. actualiza la contraseña de cada pantalla con la de su cuenta padre,
+//      guardada CIFRADA (AES-256-GCM, utils/cifrado.js) — nunca en texto plano.
+//      El informe solo indica QUE cambió, sin mostrar valores.
+const sequelize = require('../config/database');
 const { Planificador, PlanificadorCambio } = require('../models');
+const { cifrar, descifrar } = require('../utils/cifrado');
 const { registrarCambio, nuevoLote } = require('./historialPlanificador');
 const { mapaCuentas } = require('./cuentaPadreDatos');
 const { ensurePantallasCuentasPadre } = require('./planificadorImportService');
@@ -34,7 +37,7 @@ function valoresDe(cp) {
 
 // Una fila representativa por cuenta (todas sus pantallas comparten estos datos)
 async function referenciaPorCuenta() {
-  const filas = await Planificador.findAll({ attributes: ['cuentaId', ...Object.keys(CAMPOS_SYNC)], raw: true });
+  const filas = await Planificador.findAll({ attributes: ['cuentaId', 'password', ...Object.keys(CAMPOS_SYNC)], raw: true });
   const ref = new Map();
   const conteo = new Map();
   for (const f of filas) {
@@ -45,11 +48,28 @@ async function referenciaPorCuenta() {
   return { ref, conteo };
 }
 
+const MASCARA = '••••••';
+
 function cambiosDe(cp, antes) {
   const nuevos = valoresDe(cp);
-  return Object.keys(CAMPOS_SYNC)
+  const cambios = Object.keys(CAMPOS_SYNC)
     .filter(campo => distinto(nuevos[campo], antes?.[campo], campo === 'credito'))
     .map(campo => ({ campo, antes: antes?.[campo] ?? null, despues: nuevos[campo] }));
+  // Contraseña: se compara descifrada y se informa enmascarada
+  const pwdAntes = antes ? descifrar(antes.password) : null;
+  const pwdNueva = cp.contrasena || null;
+  if (distinto(pwdNueva, pwdAntes, false)) {
+    cambios.push({ campo: 'password', antes: pwdAntes ? MASCARA : null, despues: pwdNueva ? MASCARA : null });
+  }
+  return cambios;
+}
+
+// Copia cifrada de la contraseña de la cuenta padre en sus pantallas (SQL
+// directo: el valor ya va cifrado y no debe pasar por getters del modelo)
+async function copiarContrasena(cuentaId, contrasena, transaction) {
+  await sequelize.query('UPDATE planificador SET password = ? WHERE cuentaId = ?', {
+    replacements: [contrasena ? cifrar(contrasena) : null, cuentaId], transaction,
+  });
 }
 
 // ¿Hay algo que sincronizar? (cuentas sin pantallas o datos que cambiaron)
@@ -96,6 +116,9 @@ async function sincronizarCuentasPadre({ usuarioEmail } = {}) {
     const cambios = creadas.has(cuentaId) ? [] : cambiosDe(cp, ref.get(cuentaId));
     if (cambios.length || creadas.has(cuentaId)) {
       const [n] = await Planificador.update(valoresDe(cp), { where: { cuentaId } });
+      if (creadas.has(cuentaId) || cambios.some(c => c.campo === 'password')) {
+        await copiarContrasena(cuentaId, cp.contrasena);
+      }
       pantallasActualizadas += n;
     }
     diff.push({
@@ -126,4 +149,4 @@ async function sincronizarCuentasPadre({ usuarioEmail } = {}) {
   };
 }
 
-module.exports = { sincronizarCuentasPadre, syncPendiente, CAMPOS_SYNC };
+module.exports = { sincronizarCuentasPadre, syncPendiente, copiarContrasena, CAMPOS_SYNC };

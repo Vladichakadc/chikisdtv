@@ -1,8 +1,9 @@
 // Migración idempotente al arrancar:
 //  1. Cifra las contraseñas de Cuentas Padre que sigan en texto plano (si hay
 //     CREDENCIALES_KEY).
-//  2. Borra las copias de la contraseña en el Planificador para pantallas cuya
-//     cuenta padre ya la tiene (Cuentas Padre es la única fuente).
+//  2. Borra las copias EN TEXTO PLANO de la contraseña en el Planificador para
+//     pantallas cuya cuenta padre ya la tiene. Las copias cifradas que deja
+//     "Sincronizar CP" se conservan.
 const sequelize = require('../config/database');
 const { CuentaPadre } = require('../models');
 const { estaCifrado, cifradoActivo } = require('../utils/cifrado');
@@ -18,7 +19,7 @@ async function migrarCredenciales() {
       cifradas++;
     }
   }
-  const CONDICION = `password IS NOT NULL
+  const CONDICION = `password IS NOT NULL AND password NOT LIKE 'enc:v1:%'
       AND cuentaId IN (SELECT cuentaId FROM cuentas_padre WHERE contrasena IS NOT NULL AND contrasena <> '')`;
   // (SQLite + sequelize.query no informa filas afectadas: se cuentan antes)
   const [{ n: borradas }] = await sequelize.query(`SELECT COUNT(*) AS n FROM planificador WHERE ${CONDICION}`, { type: 'SELECT' });
