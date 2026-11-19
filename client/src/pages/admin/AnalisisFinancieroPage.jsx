@@ -24,6 +24,7 @@ import {
 } from './dashboard/biShared'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
 import { MomentumAnalysisChart } from './dashboard/MomentumAnalysisChart'
+import { SegmentosLtv } from './dashboard/SegmentosLtv'
 
 // ─── Formateadores ───────────────────────────────────────────────────────────
 
@@ -726,68 +727,6 @@ function MixPlanesChart({ data }) {
         })}
       </div>
     </div>
-  )
-}
-
-// ─── Distribución del LTV por quintil ────────────────────────────────────────
-const QUINTIL_GRAD_PAIRS = [
-  { id:'q1', from:'#94a3b8', to:'#cbd5e1' },
-  { id:'q2', from:'#60a5fa', to:'#93c5fd' },
-  { id:'q3', from:'#34d399', to:'#6ee7b7' },
-  { id:'q4', from:'#f97316', to:'#fdba74' },
-  { id:'q5', from:'#a855f7', to:'#d8b4fe' },
-]
-const QUINTIL_COLORS = QUINTIL_GRAD_PAIRS.map(g => g.from)
-const QUINTIL_LABELS = ['Segmento base', 'Clientes emergentes', 'Clientes consolidados', 'Clientes premium', 'Top clientes']
-function LtvQuintilTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null
-  const d = payload[0]?.payload
-  const idx = ['Q1','Q2','Q3','Q4','Q5'].indexOf(label)
-  const grad = QUINTIL_GRAD_PAIRS[idx] || QUINTIL_GRAD_PAIRS[0]
-  const segLabel = QUINTIL_LABELS[idx] || label
-  return (
-    <div style={{ background:'rgba(255,255,255,0.97)', border:`1px solid ${grad.from}40`, borderLeft:`3px solid ${grad.from}`, borderRadius:10, padding:'10px 14px', fontSize:12, boxShadow:'0 4px 20px rgba(0,0,0,0.10)', minWidth:230 }}>
-      <p style={{ fontWeight:700, color:'#1e293b', marginBottom:4 }}>{label} · {segLabel}</p>
-      <p style={{ color:grad.from, fontWeight:800, fontSize:15 }}>{d?.cantidad ?? 0} clientes</p>
-      <p style={{ color:'#475569', marginTop:3 }}>LTV hasta <strong>{formatCurrency(d?.maxLtv ?? 0)}</strong></p>
-      <p style={{ color:'#9ca3af', marginTop:5 }}>Clientes cuyo ingreso total histórico cae en el {label} inferior de la distribución.</p>
-    </div>
-  )
-}
-function LtvQuintilChart({ data }) {
-  if (!data?.length) return <div style={{ height:240, display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', fontSize:13 }}>Sin datos de distribución</div>
-  const total = data.reduce((s,d) => s + (d.cantidad||0), 0)
-  return (
-    <ResponsiveContainer width="100%" height={240}>
-      <ComposedChart data={data} margin={{ top:28, right:20, left:4, bottom:4 }}>
-        <defs>
-          {QUINTIL_GRAD_PAIRS.map(g => (
-            <linearGradient key={g.id} id={g.id} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={g.from} stopOpacity={0.95}/>
-              <stop offset="100%" stopColor={g.to} stopOpacity={0.75}/>
-            </linearGradient>
-          ))}
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-        <XAxis dataKey="label" tick={{ fontSize:10, fill:'#78716c' }}/>
-        <YAxis allowDecimals={false} tick={{ fontSize:10, fill:'#78716c' }} width={42} label={{ value:'Clientes', angle:-90, position:'insideLeft', offset:8, fontSize:10, fill:'#9ca3af' }}/>
-        <Tooltip content={<LtvQuintilTooltip />}/>
-        <Bar dataKey="cantidad" name="Clientes" radius={[6,6,0,0]} barSize={40}>
-          {(data||[]).map((_, i) => <Cell key={i} fill={`url(#${QUINTIL_GRAD_PAIRS[i % QUINTIL_GRAD_PAIRS.length].id})`} />)}
-          <LabelList dataKey="cantidad" content={({ x, y, width, height, value, index }) => {
-            if (!value) return null
-            const grad = QUINTIL_GRAD_PAIRS[index % QUINTIL_GRAD_PAIRS.length]
-            const pct = total > 0 ? ((value/total)*100).toFixed(0) : 0
-            return (
-              <g>
-                <text x={x+width/2} y={y-14} textAnchor="middle" fontSize={12} fontWeight={700} fill={grad.from} stroke="#fff" strokeWidth={2.5} strokeLinejoin="round" paintOrder="stroke">{value}</text>
-                <text x={x+width/2} y={y-3} textAnchor="middle" fontSize={9} fill="#9ca3af">{pct}%</text>
-              </g>
-            )
-          }} />
-        </Bar>
-      </ComposedChart>
-    </ResponsiveContainer>
   )
 }
 
@@ -1743,28 +1682,27 @@ export default function AnalisisFinancieroPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card className="border-teal-100">
-                  <CardHeader className="border-teal-50">
-                    <CardTitle>Distribución del LTV por quintil</CardTitle>
-                    <p className="text-sm text-gray-400 mt-0.5">Clientes en 5 segmentos · cada barra muestra cantidad + % del total · Q1=base, Q5=top</p>
-                  </CardHeader>
-                  <CardBody>
-                    <LtvQuintilChart data={ltv.distribucion} />
-                  </CardBody>
-                </Card>
+              <Card className="border-teal-100 mb-4">
+                <CardHeader className="border-teal-50">
+                  <CardTitle>Distribución del LTV por segmento de valor</CardTitle>
+                  <p className="text-sm text-gray-400 mt-0.5">Clientes ordenados por lo que han pagado y partidos en cinco grupos del mismo tamaño (20% cada uno)</p>
+                </CardHeader>
+                <CardBody>
+                  <SegmentosLtv datos={ltv.segmentos}
+                    onVerCliente={(c) => navigate('/admin/planificador', { state: { buscar: c.nickname || c.nombre } })} />
+                </CardBody>
+              </Card>
 
-                <Card className="border-teal-100">
-                  <CardHeader className="border-teal-50">
-                    <CardTitle>Percentiles de LTV</CardTitle>
-                    <p className="text-sm text-gray-400 mt-0.5">Badge de asimetría P90/P25 · cada barra escala respecto al máximo · descripción interpretativa por nivel</p>
-                  </CardHeader>
-                  <CardBody>
-                    <LtvPercentilesChart percentiles={ltv.percentiles} />
-                    <ChartInsight text={narrarLtv(ltv)} />
-                  </CardBody>
-                </Card>
-              </div>
+              <Card className="border-teal-100">
+                <CardHeader className="border-teal-50">
+                  <CardTitle>Percentiles de LTV</CardTitle>
+                  <p className="text-sm text-gray-400 mt-0.5">Cuánto ha pagado el cliente del 25%, la mediana, el 75%, el 90% y el máximo</p>
+                </CardHeader>
+                <CardBody>
+                  <LtvPercentilesChart percentiles={ltv.percentiles} />
+                  <ChartInsight text={narrarLtv(ltv)} />
+                </CardBody>
+              </Card>
             </div>
           )}
 

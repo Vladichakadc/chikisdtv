@@ -8,6 +8,7 @@ const asyncHandler = require('../../middleware/asyncHandler');
 const { enCache } = require('../../utils/cacheDashboard');
 const { indicadoresOperacion } = require('../../services/dashboardOperacion');
 const { analisisRetencion } = require('../../services/retencion');
+const { segmentosLtv } = require('../../services/ltvSegmentos');
 
 const operacionEnCache = () => enCache('operacion', () => indicadoresOperacion());
 
@@ -506,23 +507,9 @@ async function calcularDashboardBi() {
   const vidaMeses       = ltvRows.length > 0 ? Number((ltvRows.reduce((s, c) => s + c.meses,   0) / ltvRows.length).toFixed(1)) : 0;
   const arpuMensualLtv  = ltvRows.length > 0 ? Math.round(ltvRows.reduce((s, c) => s + c.arpuMes, 0) / ltvRows.length) : 0;
 
-  // Distribución por quintiles (5 segmentos iguales ordenados por LTV)
-  const ltvDistribucion = (() => {
-    if (!ltvSorted.length) return [];
-    const n = ltvSorted.length;
-    const slices = [
-      { label: 'Q1 · bajo',  idx: [0,           Math.ceil(n * 0.2)] },
-      { label: 'Q2',         idx: [Math.ceil(n * 0.2), Math.ceil(n * 0.4)] },
-      { label: 'Q3 · medio', idx: [Math.ceil(n * 0.4), Math.ceil(n * 0.6)] },
-      { label: 'Q4',         idx: [Math.ceil(n * 0.6), Math.ceil(n * 0.8)] },
-      { label: 'Q5 · alto',  idx: [Math.ceil(n * 0.8), n] },
-    ];
-    return slices.map(s => ({
-      label: s.label,
-      cantidad: s.idx[1] - s.idx[0],
-      maxLtv: Math.round(ltvSorted[s.idx[1] - 1] || 0),
-    }));
-  })();
+  // Segmentos de valor: 5 grupos del 20% de clientes, cuánto del ingreso aporta
+  // cada uno y si siguen con servicio (services/ltvSegmentos.js)
+  const ltvSegmentos = segmentosLtv(ltvRows, alertaRows);
 
   // Valor en riesgo: LTV histórico de clientes con pantallas vencidas / próximas
   const clientesRiesgoSet = new Set(
@@ -662,7 +649,7 @@ async function calcularDashboardBi() {
       clientesEnRiesgoCount: clientesRiesgoSet.size,
       numClientes: ltvRows.length,
       percentiles: { p25: qAt(0.25), p50: qAt(0.5), p75: qAt(0.75), p90: qAt(0.9), max: ltvSorted[ltvSorted.length - 1] || 0 },
-      distribucion: ltvDistribucion,
+      segmentos: ltvSegmentos,
     },
     kpis: {
       ingresosTotales: Math.round(totalIngresos),

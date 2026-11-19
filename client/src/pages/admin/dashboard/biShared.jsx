@@ -77,7 +77,7 @@ export function SmartTag({ tone = 'info', icon: Icon = Sparkles, children }) {
     info: 'bg-sky-100 text-sky-700',
   }
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${styles[tone]}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold max-w-full whitespace-normal sm:whitespace-nowrap ${styles[tone]}`}>
       <Icon size={10} />
       {children}
     </span>
