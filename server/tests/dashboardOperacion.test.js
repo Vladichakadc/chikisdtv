@@ -65,6 +65,19 @@ describe('indicadoresOperacion', () => {
     assert.deepEqual(r.deuda, { clientes: 2, cop: 20000, usd: 12.5 });
   });
 
+  test('guía de renovaciones: 14 días, un cliente por día con sus nicknames', async () => {
+    const r = await indicadoresOperacion();
+    assert.equal(r.guia.length, 14);
+    assert.equal(r.guia[0].fecha, dia(0));
+    assert.deepEqual(r.guia[0].clientes.map(c => c.nicknames), [['Andrea 2']]);
+    assert.deepEqual(r.guia[3].clientes.map(c => c.nombre), ['Andrea']);
+    const d8 = r.guia[8].clientes[0];
+    assert.equal(d8.nombre, 'Luis'); assert.equal(d8.debe, true);
+    // Cortesías y vencidas de días anteriores no aparecen
+    assert.ok(r.guia.every(d => d.clientes.every(c => c.nombre !== 'Prueba')));
+    assert.equal(r.guia.reduce((s, d) => s + d.pantallas, 0), 3);
+  });
+
   test('equipos desde Inventario: disponibles = sin venta y no vendidos', async () => {
     const r = await indicadoresOperacion();
     assert.deepEqual(r.equipos, { total: 3, disponibles: 1, vendidos: 2 });

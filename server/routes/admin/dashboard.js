@@ -12,10 +12,12 @@ const operacionEnCache = () => enCache('operacion', () => indicadoresOperacion()
 
 // ============ OPERACIÓN (vencidas, por vencer, deuda, capacidad, equipos) ============
 // Fuente única de los indicadores operativos del Dashboard. Reemplaza la
-// descarga del Planificador completo: devuelve solo conteos + las filas de
-// los paneles de vencidas / por vencer (sin datos de acceso).
+// descarga del Planificador completo: devuelve conteos y la guía de
+// renovaciones de 14 días (sin datos de acceso). Las listas completas de
+// vencidas / por vencer se abren en el Planificador.
 router.get('/dashboard/operacion', asyncHandler(async (_req, res) => {
-  res.json(await operacionEnCache());
+  const { listas, ...resumen } = await operacionEnCache(); // eslint-disable-line no-unused-vars
+  res.json(resumen);
 }));
 
 // ============ DASHBOARD STATS ============
