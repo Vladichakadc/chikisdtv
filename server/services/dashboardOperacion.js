@@ -51,6 +51,41 @@ async function inventarioEquipos() {
   return { total, disponibles, vendidos: total - disponibles };
 }
 
+// Días que cubre la "Guía de renovaciones" del Dashboard (hoy + 13)
+const DIAS_GUIA = 14;
+
+const fechaLocal = (offset) => {
+  const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + offset);
+  return d.toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local (Bogotá)
+};
+
+// Guía: una columna por día con los clientes cuyo plan termina ese día
+// (un cliente con varias pantallas el mismo día aparece una vez)
+function armarGuia(entradas) {
+  const dias = Array.from({ length: DIAS_GUIA }, (_, i) => ({ fecha: fechaLocal(i), dias: i, pantallas: 0, clientes: [] }));
+  const indice = new Map();
+  for (const { p, dias: d } of entradas) {
+    const dia = dias[d];
+    dia.pantallas += 1;
+    const clave = `${d}|${claveCliente(p)}`;
+    let c = indice.get(clave);
+    if (!c) {
+      c = {
+        nombre: [p.nombre, p.apellido].filter(Boolean).join(' ').trim() || p.nickname || p.idPantalla,
+        customerId: p.customerId || null,
+        nicknames: [],
+        debe: false,
+      };
+      indice.set(clave, c);
+      dia.clientes.push(c);
+    }
+    if (p.nickname && !c.nicknames.includes(p.nickname)) c.nicknames.push(p.nickname);
+    if (p.debe) c.debe = true;
+  }
+  for (const dia of dias) dia.clientes.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  return dias;
+}
+
 async function indicadoresOperacion({ diasAlerta = DIAS_ALERTA } = {}) {
   const [filas, equipos] = await Promise.all([
     Planificador.findAll({ attributes: ATR, raw: true }),
@@ -60,6 +95,7 @@ async function indicadoresOperacion({ diasAlerta = DIAS_ALERTA } = {}) {
   const vencidas = [], porVencer = [];
   const clientesVencidos = new Set(), clientesPorVencer = new Set(), clientesActivos = new Set(), clientesDeuda = new Set();
   let pantallas = 0, ocupadas = 0, libres = 0, cortesias = 0, venceHoy = 0, deudaCOP = 0, deudaUSD = 0;
+  const paraGuia = [];
 
   for (const p of filas) {
     const n = Number(p.pantallas) || 0;
@@ -70,6 +106,7 @@ async function indicadoresOperacion({ diasAlerta = DIAS_ALERTA } = {}) {
     const cliente = claveCliente(p);
     clientesActivos.add(cliente);
     const dias = calcDias(p.duracionReal || p.finalizacion);
+    if (variante !== 'cortesia' && dias != null && dias >= 0 && dias < DIAS_GUIA) paraGuia.push({ p, dias });
     if (variante === 'vencido') {
       vencidas.push(filaPanel(p, dias)); clientesVencidos.add(cliente);
       if (dias === 0) venceHoy += 1;
@@ -100,7 +137,8 @@ async function indicadoresOperacion({ diasAlerta = DIAS_ALERTA } = {}) {
     deuda: { clientes: clientesDeuda.size, cop: Math.round(deudaCOP), usd: Math.round(deudaUSD * 100) / 100 },
     equipos,
     listas: { vencidas, porVencer },
+    guia: armarGuia(paraGuia),
   };
 }
 
-module.exports = { indicadoresOperacion, claveCliente };
+module.exports = { indicadoresOperacion, claveCliente, DIAS_GUIA };
