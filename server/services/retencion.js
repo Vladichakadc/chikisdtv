@@ -95,13 +95,14 @@ function calcularRetencion(ventas, { corte = ultimoMesCerrado() } = {}) {
 
   // Curva de supervivencia (Kaplan-Meier): S(N) = S(N-1) × (1 − abandono del mes N).
   // Combina cohortes de distinta antigüedad sin que la curva "suba" por mezcla.
-  function curva(grupo) {
+  // minBase: en grupos chicos, los meses vividos por pocos clientes no se dibujan
+  function curva(grupo, minBase = 1) {
     const sal = salidasDe(grupo);
     const puntos = [{ mes: 0, base: grupo.length, siguen: grupo.length, pct: grupo.length ? 100 : null }];
     let s = 1;
     for (const x of sal) {
       if (x.base > 0) s *= 1 - x.seVan / x.base;
-      puntos.push({ mes: x.mes, base: x.base, siguen: x.base - x.seVan, pct: x.base > 0 ? Math.round(s * 1000) / 10 : null });
+      puntos.push({ mes: x.mes, base: x.base, siguen: x.base - x.seVan, pct: x.base >= minBase ? Math.round(s * 1000) / 10 : null });
     }
     return puntos;
   }
@@ -113,14 +114,55 @@ function calcularRetencion(ventas, { corte = ultimoMesCerrado() } = {}) {
   // Por plan inicial
   const porPlan = PLANES_PRINCIPALES.map(plan => {
     const grupo = medibles.filter(c => c.plan === plan);
-    const cv = curva(grupo);
+    const cv = curva(grupo, 5);
     return {
       plan, clientes: grupo.length,
       // Con menos de 5 clientes medidos el porcentaje no es confiable
       hitos: Object.fromEntries(HITOS_PLAN.map(h => [h, medidosEn(grupo, h) >= 5 ? cv[h].pct : null])),
       medidos: Object.fromEntries(HITOS_PLAN.map(h => [h, medidosEn(grupo, h)])),
+      curva: cv.map(p => p.pct),
     };
   }).filter(p => p.clientes > 0);
+
+  // Curva por año de activación: ¿los clientes nuevos se quedan más o menos
+  // que los de años anteriores?
+  const anios = [...new Set(medibles.map(c => c.cohorte.slice(0, 4)))].sort();
+  const porAnio = anios.map(anio => {
+    const grupo = medibles.filter(c => c.cohorte.startsWith(anio));
+    return { anio, clientes: grupo.length, curva: curva(grupo, 5).map(p => p.pct) };
+  }).filter(a => a.clientes >= 5);
+
+  // Movimiento mes a mes (calendario): llegan (primera activación), se van
+  // (el mes siguiente al último mes cubierto) y clientes con servicio al cierre
+  const primerMes = medibles.map(c => c.cohorte).sort()[0];
+  const movimientos = [];
+  if (primerMes) {
+    for (let mes = primerMes; mes <= corte; mes = sumarMeses(mes, 1)) {
+      let llegan = 0, seVan = 0, conServicio = 0;
+      for (const c of medibles) {
+        if (c.cohorte === mes) llegan += 1;
+        if (c.hasta < corte && sumarMeses(c.hasta, 1) === mes) seVan += 1;
+        if (c.cohorte <= mes && c.hasta >= mes) conServicio += 1;
+      }
+      movimientos.push({ mes, llegan, seVan, neto: llegan - seVan, conServicio });
+    }
+  }
+
+  // Antigüedad de quienes siguen hoy
+  const TRAMOS = [
+    { tramo: 'Menos de 3 meses', hasta: 2 },
+    { tramo: '3 a 6 meses', hasta: 6 },
+    { tramo: '7 a 12 meses', hasta: 12 },
+    { tramo: '1 a 2 años', hasta: 24 },
+    { tramo: 'Más de 2 años', hasta: Infinity },
+  ];
+  const antiguedad = TRAMOS.map(t => ({ tramo: t.tramo, clientes: 0 }));
+  for (const c of medibles) {
+    if (c.hasta < corte) continue;
+    const meses = mesesEntre(c.cohorte, corte);
+    const i = TRAMOS.findIndex(t => meses <= t.hasta);
+    antiguedad[i].clientes += 1;
+  }
 
   // Cohortes (para la tabla de detalle)
   const porCohorte = new Map();
@@ -154,6 +196,9 @@ function calcularRetencion(ventas, { corte = ultimoMesCerrado() } = {}) {
     curva: general,
     salidas,
     porPlan,
+    porAnio,
+    movimientos,
+    antiguedad,
     cohortes,
     vidaMedianaMeses: mediana ? mediana.mes : null,
     momentoCritico,

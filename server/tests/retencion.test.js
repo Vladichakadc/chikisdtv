@@ -72,6 +72,25 @@ describe('calcularRetencion', () => {
     assert.equal(r.porPlan.find(p => p.plan === 'Plan Anual').clientes, 1);
   });
 
+  test('movimiento mes a mes: llegan, se van y con servicio', () => {
+    const ene = r.movimientos.find(m => m.mes === '2026-01');
+    assert.deepEqual(ene, { mes: '2026-01', llegan: 4, seVan: 0, neto: 4, conServicio: 4 });
+    // A cubre hasta marzo → se va en abril; D cubre hasta mayo → se va en junio
+    assert.equal(r.movimientos.find(m => m.mes === '2026-04').seVan, 1);
+    assert.deepEqual(r.movimientos.find(m => m.mes === '2026-06'), { mes: '2026-06', llegan: 0, seVan: 1, neto: -1, conServicio: 2 });
+    assert.equal(r.movimientos.at(-1).mes, '2026-06');
+  });
+
+  test('antigüedad de quienes siguen hoy', () => {
+    // B y C activaron en enero: 5 meses al corte de junio
+    assert.deepEqual(r.antiguedad.map(a => a.clientes), [0, 2, 0, 0, 0]);
+  });
+
+  test('curvas por año y por plan', () => {
+    assert.equal(r.porAnio.length, 0); // menos de 5 clientes en 2026
+    assert.equal(r.porPlan.find(p => p.plan === 'Plan Mensual').curva[0], 100);
+  });
+
   test('promedio ponderado por clientes, no por cohortes', () => {
     const ventas2 = [
       // Cohorte grande (10 clientes), ninguno renueva
