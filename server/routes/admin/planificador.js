@@ -11,6 +11,7 @@ const asyncHandler = require('../../middleware/asyncHandler');
 const { importFromExcel, autoFixCuentaIdMismatches } = require('../../services/planificadorImportService');
 const { autoImportarSiDisponible } = require('../../utils/excelOrigen');
 const { sincronizarCuentasPadre, syncPendiente } = require('../../services/sincronizarCuentasPadre');
+const { prepararBaja, registrarBaja, ErrorBaja } = require('../../services/bajaPlanificador');
 // Reglas únicas de estado (ver utils/planificadorAlerta.js): la alerta se
 // recalcula según la fecha vigente y la cortesía es la columna `cortesia`.
 const { DIAS_ALERTA, calcDias: calcDiasDB, alertaFromDias, estadoFromDias, varianteDe, esCortesia } = require('../../utils/planificadorAlerta');
@@ -563,6 +564,28 @@ router.post('/planificador/:idPantalla/renovar', asyncHandler(async (req, res) =
     res.status(201).json({ ...r, pantalla: sinPassword(enrichPantalla(r.pantalla)) });
   } catch (e) {
     if (e instanceof ErrorRenovacion) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+}));
+
+// ── Dar de baja ─────────────────────────────────────────────────────────
+// GET  /planificador/:idPantalla/baja → valores sugeridos para el formulario
+// POST /planificador/:idPantalla/baja → registra la baja y deja la pantalla "Libre"
+router.get('/planificador/:idPantalla/baja', asyncHandler(async (req, res) => {
+  try {
+    res.json(await prepararBaja(req.params.idPantalla));
+  } catch (e) {
+    if (e instanceof ErrorBaja) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+}));
+
+router.post('/planificador/:idPantalla/baja', asyncHandler(async (req, res) => {
+  try {
+    const r = await registrarBaja(req.params.idPantalla, req.body || {}, req.user?.email);
+    res.status(201).json({ baja: r.baja, cambioId: r.cambioId, pantalla: sinPassword(enrichPantalla(r.pantalla)) });
+  } catch (e) {
+    if (e instanceof ErrorBaja) return res.status(e.status).json({ error: e.message });
     throw e;
   }
 }));

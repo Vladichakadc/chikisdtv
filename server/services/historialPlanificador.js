@@ -5,7 +5,7 @@
 // el servidor solo los campos que cambiaron, y solo si nadie los volvió a
 // tocar después (si no, responde conflicto en lugar de pisar trabajo ajeno).
 const crypto = require('crypto');
-const { Planificador, PlanificadorCambio, Venta, CuentaPadre } = require('../models');
+const { Planificador, PlanificadorCambio, Venta, CuentaPadre, Baja } = require('../models');
 const sequelize = require('../config/database');
 
 // Campos de una pantalla que se versionan (la contraseña queda fuera a propósito)
@@ -133,6 +133,11 @@ async function revertir(cambio, usuarioEmail, transaction) {
       // La venta que creó la renovación también se elimina
       await Venta.destroy({ where: { idVM: cambio.ventaId }, transaction });
       resultado.ventaEliminada = cambio.ventaId;
+    }
+    if (cambio.accion === 'baja' && cambio.ventaId) {
+      // La baja registrada en el módulo Bajas también se elimina
+      await Baja.destroy({ where: { idBaja: cambio.ventaId }, transaction });
+      resultado.bajaEliminada = cambio.ventaId;
     }
   }
 

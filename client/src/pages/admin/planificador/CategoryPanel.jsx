@@ -1,4 +1,4 @@
-import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil, MessageCircle, ListChecks, RefreshCcw } from 'lucide-react'
+import { X, Receipt, Clock, XCircle, Monitor, Wallet, Gift, DollarSign, MonitorCheck, Package, Pencil, MessageCircle, ListChecks, RefreshCcw, UserMinus } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../utils/excelUtils'
 import { Badge } from '../../../components/ui/Badge'
 import { STAT_TONES } from './StatCard'
@@ -94,7 +94,7 @@ export function screenToVentaPrefill(screen, catKey) {
 // en VENCIDO/ALERTA arranca en la vista "Renovación" con el mensaje listo).
 const CATEGORIAS_RECORDATORIO = new Set(['vencido', 'alerta'])
 
-export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus, recordatorios, onRecordarTodos, onRenovar }) {
+export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, onStatus, recordatorios, onRecordarTodos, onRenovar, onBaja }) {
   const config = CATEGORY_CONFIG[catKey]
   const conRecordatorio = CATEGORIAS_RECORDATORIO.has(catKey) && !!onStatus
   // Vencidas / Próx. a vencer: "Renovar" registra venta + nuevo plan en un paso
@@ -168,6 +168,16 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
           )}
         >
           <MessageCircle size={13} /> Status cliente
+        </button>
+      )}
+      {catKey !== 'libre' && onBaja && p.nickname && (
+        <button
+          onClick={() => onBaja(p)}
+          aria-label={`Dar de baja ${cliente}`}
+          title="Dar de baja — registra la baja y deja la pantalla Libre"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-300 text-xs font-semibold transition-colors"
+        >
+          <UserMinus size={13} /> Dar de baja
         </button>
       )}
       {conRenovar ? (

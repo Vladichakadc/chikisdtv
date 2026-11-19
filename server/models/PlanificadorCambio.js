@@ -8,12 +8,12 @@ const sequelize = require('../config/database');
 const PlanificadorCambio = sequelize.define('PlanificadorCambio', {
   id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   lote:         DataTypes.STRING,                       // agrupa cambios de una misma operación (sincronizar)
-  accion:       { type: DataTypes.STRING, allowNull: false }, // editar | crear | eliminar | renovar | sincronizar | deshacer
+  accion:       { type: DataTypes.STRING, allowNull: false }, // editar | crear | eliminar | renovar | baja | sincronizar | deshacer
   idPantalla:   { type: DataTypes.STRING, allowNull: false },
   campos:       DataTypes.TEXT,                         // JSON: campos que cambiaron
   antes:        DataTypes.TEXT,                         // JSON (sin contraseña)
   despues:      DataTypes.TEXT,                         // JSON (sin contraseña)
-  ventaId:      DataTypes.STRING,                       // renovación: venta creada en Pagos
+  ventaId:      DataTypes.STRING,                       // renovación: venta creada en Pagos · baja: idBaja creada en Bajas
   usuarioEmail: DataTypes.STRING,
   deshecho:     { type: DataTypes.BOOLEAN, defaultValue: false },
   deshechoPor:  DataTypes.STRING,

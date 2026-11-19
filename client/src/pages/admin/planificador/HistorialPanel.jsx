@@ -12,6 +12,7 @@ export const ACCIONES = {
   crear:       { label: 'Alta',           cls: 'bg-emerald-100 text-emerald-700' },
   eliminar:    { label: 'Eliminación',    cls: 'bg-red-100 text-red-700' },
   renovar:     { label: 'Renovación',     cls: 'bg-green-100 text-green-800' },
+  baja:        { label: 'Baja',           cls: 'bg-rose-100 text-rose-700' },
   sincronizar: { label: 'Sincronización', cls: 'bg-violet-100 text-violet-700' },
   deshacer:    { label: 'Deshacer',       cls: 'bg-slate-200 text-slate-700' },
 }
@@ -70,6 +71,8 @@ export function HistorialPanel({ onClose, onCambio }) {
   const deshacer = async (c) => {
     const texto = c.accion === 'renovar'
       ? `¿Deshacer la renovación de ${c.idPantalla}? También se eliminará la venta ${c.ventaId} de Pagos.`
+      : c.accion === 'baja'
+        ? `¿Deshacer la baja de ${c.idPantalla}? La pantalla vuelve a su cliente y se elimina la baja ${c.ventaId} del módulo Bajas.`
       : c.accion === 'sincronizar'
         ? '¿Deshacer toda esta sincronización con Cuentas Padre?'
         : `¿Deshacer este cambio en ${c.idPantalla}?`
