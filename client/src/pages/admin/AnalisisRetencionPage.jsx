@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Tv, ChevronDown, AlertTriangle, TrendingUp, Users, Info } from 'lucide-react'
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis,
-  CartesianGrid, Tooltip, ReferenceLine,
+  CartesianGrid, Tooltip, ReferenceLine, LabelList,
 } from 'recharts'
 import api from '../../config/api'
 import { cn } from '../../utils/cn'
 import { useEsMovil } from '../../hooks/useEsMovil'
 import { DASH_TIPOS } from './dashboard/AlAire'
 import { causaDelMes, recomendaciones, textoDeDiez, textoMes, titular } from './retencion/lecturas'
+import { HALO, etiquetaEnIndices, fmtCorto } from './retencion/etiquetas'
 import { AntiguedadActual, CurvasPorPlan, MovimientoMensual, RetencionPorAnio } from './retencion/GraficasRetencion'
 
 // Análisis de Retención: "de los clientes que activamos, ¿cuántos siguen con
@@ -93,36 +94,53 @@ function TooltipCurva({ active, payload }) {
 
 function CurvaSiguen({ curva, esMovil }) {
   const datos = curva.filter(p => p.pct != null)
+  // Etiquetas justo antes y después de cada vencimiento de plan, y al final
+  const meses = esMovil ? [7, 14] : [1, 6, 7, 13, 14]
+  const indices = [...meses.map(m => datos.findIndex(p => p.mes === m)).filter(i => i >= 0), datos.length - 1]
+  const conPunto = new Set(indices)
   return (
-    <ResponsiveContainer width="100%" height={esMovil ? 230 : 290}>
-      <LineChart data={datos} margin={{ top: 22, right: esMovil ? 8 : 24, left: 0, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height={esMovil ? 240 : 300}>
+      <LineChart data={datos} margin={{ top: 30, right: esMovil ? 22 : 30, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="#eef2f7" vertical={false} />
         <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(n) => (n === 0 ? 'Inicio' : `${n}`)} interval={esMovil ? 2 : 0} />
         <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#64748b' }} width={40} />
         <Tooltip content={<TooltipCurva />} />
         {[7, 14].map(n => (
           <ReferenceLine key={n} x={n} stroke="#cbd5e1" strokeDasharray="4 4"
-            label={{ value: n === 7 ? 'Vence semestral' : 'Vence anual', position: 'top', fontSize: 11, fill: '#64748b' }} />
+            label={{ value: esMovil ? (n === 7 ? 'Semestral' : 'Anual') : (n === 7 ? 'Vence semestral' : 'Vence anual'), position: 'insideBottomLeft', offset: 8, fontSize: esMovil ? 10 : 11, fill: '#64748b' }} />
         ))}
-        <Line type="stepAfter" dataKey="pct" stroke="#059669" strokeWidth={3} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
+        <Line type="stepAfter" dataKey="pct" stroke="#059669" strokeWidth={3} activeDot={{ r: 5 }} isAnimationActive={false}
+          dot={({ cx, cy, index }) => (conPunto.has(index) ? <circle key={index} cx={cx} cy={cy} r={3.5} fill="#059669" stroke="#fff" strokeWidth={1.5} /> : <g key={index} />)}
+          label={etiquetaEnIndices(indices, '#047857', { dy: -10 })} />
       </LineChart>
     </ResponsiveContainer>
   )
 }
 
 function CuandoSeVan({ salidas, momentoCritico, esMovil }) {
-  const datos = salidas.filter(s => s.base >= 10)
-  const picos = new Set([...datos].sort((a, b) => b.pct - a.pct).slice(0, 2).filter(s => s.pct >= 3).map(s => s.mes))
+  const filtradas = salidas.filter(s => s.base >= 10)
+  const picos = new Set([...filtradas].sort((a, b) => b.pct - a.pct).slice(0, 2).filter(s => s.pct >= 3).map(s => s.mes))
+  // El rótulo viaja en el dato ("valor|esPico") para no depender del índice de la etiqueta
+  const datos = filtradas.map(s => ({ ...s, rotulo: `${s.pct ?? ''}|${picos.has(s.mes) ? 1 : 0}` }))
   return (
     <>
       <ResponsiveContainer width="100%" height={esMovil ? 200 : 240}>
-        <BarChart data={datos} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
+        <BarChart data={datos} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="#eef2f7" vertical={false} />
           <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#64748b' }} interval={esMovil ? 1 : 0} />
           <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#64748b' }} width={36} allowDecimals={false} />
           <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v, _n, p) => [`${fmtPct(v)} (${p.payload.seVan} de ${p.payload.base})`, 'Se fueron ese mes']} labelFormatter={(n) => `Mes ${n}`} />
           <Bar dataKey="pct" radius={[5, 5, 0, 0]} maxBarSize={34} isAnimationActive={false}>
             {datos.map(s => <Cell key={s.mes} fill={picos.has(s.mes) ? '#dc2626' : '#cbd5e1'} />)}
+            <LabelList dataKey="rotulo" position="top" content={({ x, y, width, value }) => {
+              const [v, pico] = String(value || '').split('|')
+              const num = v === '' ? null : Number(v)
+              if (num == null || num < (esMovil ? 3 : 1)) return null
+              return (
+                <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={esMovil ? 10 : 11} fontWeight={700}
+                  fill={pico === '1' ? '#b91c1c' : '#64748b'} {...HALO}>{fmtCorto(num)}</text>
+              )
+            }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
