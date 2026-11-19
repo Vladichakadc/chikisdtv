@@ -9,6 +9,7 @@ import { cn } from '../../utils/cn'
 import { useEsMovil } from '../../hooks/useEsMovil'
 import { DASH_TIPOS } from './dashboard/AlAire'
 import { causaDelMes, recomendaciones, textoDeDiez, textoMes, titular } from './retencion/lecturas'
+import { AntiguedadActual, CurvasPorPlan, MovimientoMensual, RetencionPorAnio } from './retencion/GraficasRetencion'
 
 // Análisis de Retención: "de los clientes que activamos, ¿cuántos siguen con
 // nosotros y cuándo se van?". Los datos y las reglas vienen de
@@ -284,6 +285,8 @@ export default function AnalisisRetencionPage() {
             </section>
           )}
 
+          {data.movimientos?.length > 0 && <MovimientoMensual movimientos={data.movimientos} esMovil={esMovil} />}
+
           <div className="grid gap-5 lg:grid-cols-2">
             <Bloque titulo="¿Cuántos siguen con nosotros mes a mes?"
               bajada="Parte del 100% de los clientes al activar y baja cada vez que alguien no renueva. Los escalones grandes coinciden con el fin de los planes semestral y anual.">
@@ -295,10 +298,16 @@ export default function AnalisisRetencionPage() {
             </Bloque>
           </div>
 
+          <div className="grid gap-5 lg:grid-cols-2">
+            <RetencionPorAnio porAnio={data.porAnio} esMovil={esMovil} />
+            {data.antiguedad && <AntiguedadActual antiguedad={data.antiguedad} siguenHoy={data.siguenHoy} />}
+          </div>
+
           {data.porPlan?.length > 0 && (
             <Bloque titulo="Según el plan con el que entran"
               bajada="Cuántos siguen a los 6, 12 y 18 meses según el plan de su primera activación. Los planes largos se pagan por adelantado: el semestral se pone a prueba en el mes 7 y el anual en el mes 14, por eso su 100% al año no significa que nunca se vayan.">
-              <SegunPlan porPlan={data.porPlan} />
+              <CurvasPorPlan porPlan={data.porPlan} esMovil={esMovil} />
+              <div className="mt-4"><SegunPlan porPlan={data.porPlan} /></div>
             </Bloque>
           )}
 
