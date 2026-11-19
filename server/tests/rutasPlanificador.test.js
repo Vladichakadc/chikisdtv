@@ -16,6 +16,7 @@ const express = require('express');
 const sequelize = require('../config/database');
 const { Planificador, CuentaPadre, Venta, AccesoCredencial, PlanificadorCambio, TablaCliente } = require('../models');
 const { migrarCredenciales } = require('../services/migrarCredenciales');
+const { descifrar } = require('../utils/cifrado');
 const { daysFromNow, todayStr } = require('../utils/dateUtils');
 
 let base; let server;
@@ -109,7 +110,8 @@ describe('PUT /planificador/:id', () => {
     assert.match(cp.contrasena, /^enc:v1:/);
     assert.equal(cp.credito, 77);
     const [fila] = await raw("SELECT password FROM planificador WHERE idPantalla='M001-1'");
-    assert.equal(fila.password, null, 'el Planificador no vuelve a guardar copia');
+    assert.match(fila.password, /^enc:v1:/, 'la copia del Planificador también se actualiza, cifrada');
+    assert.equal(descifrar(fila.password), 'NuevaClave9');
     const otra = (await api('GET', '/planificador')).body.pantallas.find(x => x.idPantalla === 'M001-2');
     assert.equal(otra.credito, 77);
     const cred = await api('POST', '/planificador/credenciales', { idPantallas: ['M001-2'], motivo: 'edicion' });
@@ -192,8 +194,8 @@ describe('comprobante y endpoints retirados', () => {
 });
 
 describe('POST /planificador/sync-cuentas-padre', () => {
-  test('trae fechas y usuario de Cuentas Padre, crea pantallas de cuentas nuevas y nunca copia contraseñas', async () => {
-    await CuentaPadre.update({ fechaFin: daysFromNow(90) }, { where: { cuentaId: 'M001' } });
+  test('trae fechas, usuario y contraseña (cifrada) de Cuentas Padre y crea pantallas de cuentas nuevas', async () => {
+    await (await CuentaPadre.findByPk('M001')).update({ fechaFin: daysFromNow(90), contrasena: 'ClaveSync5' });
     await CuentaPadre.create({ cuentaId: 'M777', nombreUsuario: 'nueva_cp', contrasena: 'ClaveNueva7', fechaFin: daysFromNow(30) });
     assert.equal((await api('GET', '/planificador')).body.syncPendiente, true);
 
@@ -205,9 +207,19 @@ describe('POST /planificador/sync-cuentas-padre', () => {
     assert.equal(m001.tienePassword, true);
     assert.equal(body.diff.find(d => d.cuentaId === 'M777').status, 'creada');
     assert.ok(body.lote);
-    assert.ok(!JSON.stringify(body).includes('ClaveReal1') && !JSON.stringify(body).includes('ClaveNueva7'));
-    const copias = await raw("SELECT password FROM planificador WHERE password IS NOT NULL");
-    assert.equal(copias.length, 0);
+    assert.ok(!/ClaveSync5|ClaveNueva7/.test(JSON.stringify(body)));
+    assert.ok(m001.cambios.some(c => c.campo === 'password' && c.despues === '••••••'));
+    const copias = await raw("SELECT password FROM planificador WHERE cuentaId IN ('M001','M777')");
+    assert.ok(copias.length >= 2 && copias.every(c => /^enc:v1:/.test(c.password)), 'copias cifradas');
+    assert.equal(descifrar(copias[0].password), 'ClaveSync5');
+    assert.equal((await api('GET', '/planificador')).body.syncPendiente, false);
+    // Las copias cifradas sobreviven a la migración de arranque
+    await migrarCredenciales();
+    assert.equal((await raw("SELECT COUNT(*) n FROM planificador WHERE cuentaId='M001' AND password IS NOT NULL"))[0].n, 2);
+    // Editar la contraseña desde el Planificador la actualiza en Cuentas Padre y en sus pantallas
+    await api('PUT', '/planificador/M001-1', { password: 'OtraClave3' });
+    const [c2] = await raw("SELECT password FROM planificador WHERE idPantalla='M001-2'");
+    assert.equal(descifrar(c2.password), 'OtraClave3');
     assert.equal((await api('GET', '/planificador')).body.syncPendiente, false);
 
     // Deshacer la sincronización elimina las pantallas creadas

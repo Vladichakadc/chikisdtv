@@ -3,11 +3,12 @@ import { AlertTriangle, CheckCircle2, Clock, KeyRound, Link2, Monitor, Pencil, U
 import { formatDate } from '../../../utils/excelUtils'
 
 // Informe de "Sincronizar CP": qué trajo el Planificador del módulo Cuentas
-// Padre (usuario IPTV, crédito, fechas) y el estado de la contraseña de cada
-// cuenta. Las contraseñas nunca se muestran aquí: viven cifradas en Cuentas Padre.
+// Padre (usuario IPTV, contraseña, crédito, fechas). Las contraseñas se copian
+// cifradas y aquí solo se indica que cambiaron (••••••), nunca su valor.
 
 const SYNC_CAMPO_LABELS = {
   cuenta:       'Usuario',
+  password:     'Contraseña',
   credito:      'Crédito',
   inicio:       'Inicio',
   finalizacion: 'Fin',

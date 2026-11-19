@@ -5,7 +5,9 @@
 // que "Sincronizar CP" para que no se desfasaran. Ahora las columnas del
 // Planificador (cuenta, password, credito, inicio, finalizacion) quedan como
 // respaldo legado: se leen de CuentaPadre y se escriben en CuentaPadre.
+const sequelize = require('../config/database');
 const { CuentaPadre } = require('../models');
+const { cifrar, descifrar } = require('../utils/cifrado');
 
 // Campo del Planificador → campo de CuentaPadre
 const MAPA = {
@@ -32,7 +34,7 @@ async function conCuentaPadre(filas, { cuentas } = {}) {
   const out = lista.map((f) => {
     if (!f) return f;
     const cp = mapa.get(String(f.cuentaId || '').trim());
-    if (!cp) return { ...f };
+    if (!cp) return 'password' in f ? { ...f, password: descifrar(f.password) } : { ...f };
     const r = { ...f };
     for (const [campo, campoCp] of Object.entries(MAPA)) r[campo] = cp[campoCp] ?? null;
     return r;
@@ -57,6 +59,12 @@ async function guardarDatosCuenta(cuentaId, body, transaction) {
   const antes = cp.get({ plain: true });
   const cambiados = Object.keys(update).filter(k => String(antes[k] ?? '') !== String(update[k] ?? ''));
   if (cambiados.length) await cp.update(update, { transaction });
+  // La contraseña también se actualiza (cifrada) en todas las pantallas de la cuenta
+  if (cambiados.includes('contrasena')) {
+    await sequelize.query('UPDATE planificador SET password = ? WHERE cuentaId = ?', {
+      replacements: [update.contrasena ? cifrar(update.contrasena) : null, cuentaId], transaction,
+    });
+  }
   return cambiados;
 }
 
