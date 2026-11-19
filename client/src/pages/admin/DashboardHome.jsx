@@ -18,7 +18,7 @@ import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
-import { calcDias, getRowVariant, diasLabel } from './planificador/rowHelpers'
+import { diasLabel } from './planificador/rowHelpers'
 import { CategoryPanel, screenToVentaPrefill, CATEGORY_CONFIG } from './planificador/CategoryPanel'
 import { IngresoPorClientePanel } from './dashboard/IngresoPorClientePanel'
 import {
@@ -440,7 +440,9 @@ export default function DashboardHome() {
   const { showToast } = useUi()
   const [stats, setStats] = useState(null)
   const [bi, setBi] = useState(null)
-  const [planificador, setPlanificador] = useState(null)
+  // Indicadores operativos (vencidas, por vencer, deuda, capacidad, equipos):
+  // GET /dashboard/operacion — reemplaza la descarga del Planificador completo
+  const [operacion, setOperacion] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [downloadingBackup, setDownloadingBackup] = useState(false)
@@ -461,7 +463,7 @@ export default function DashboardHome() {
   const load = ({ silent = false } = {}) => Promise.all([
     api.get('/admin/dashboard-stats', { silent }).then((r) => setStats(r.data)),
     api.get('/admin/dashboard-bi', { silent }).then((r) => setBi(r.data)),
-    api.get('/admin/planificador', { silent }).then((r) => setPlanificador(r.data)),
+    api.get('/admin/dashboard/operacion', { silent }).then((r) => setOperacion(r.data)),
   ])
 
   useEffect(() => {
@@ -535,52 +537,38 @@ export default function DashboardHome() {
     return bi.tipoPago.map(t => ({ name: t.tipo, value: t.total, pct: t.pctTotal }))
   }, [bi])
 
-  const pantallasEnriquecidas = useMemo(() => {
-    if (!planificador) return []
-    const { pantallas, diasAlerta } = planificador
-    return pantallas.map(p => ({
-      ...p,
-      _variant: getRowVariant(p, diasAlerta),
-      _dias: calcDias(p.duracionReal || p.finalizacion) ?? p.diasVencimientoReal ?? p.diasVencimiento ?? null,
-    }))
-  }, [planificador])
-
-  const pantallasActivasTotal = useMemo(() => {
-    if (!planificador?.pantallas) return 0
-    return planificador.pantallas.reduce((sum, p) => sum + (Number(p.pantallas) || 0), 0)
-  }, [planificador])
-
-  const byDiasAsc = (a, b) => (a._dias ?? Infinity) - (b._dias ?? Infinity)
-
-  const cuentasVencidas = useMemo(
-    () => pantallasEnriquecidas.filter(p => p._variant === 'vencido').sort(byDiasAsc),
-    [pantallasEnriquecidas]
-  )
-
-  const proximasAVencer = useMemo(
-    () => pantallasEnriquecidas.filter(p => p._variant === 'alerta').sort(byDiasAsc),
-    [pantallasEnriquecidas]
-  )
+  // Pantallas con cliente asignado (las libres no cuentan como activas)
+  const pantallasActivasTotal = operacion?.pantallas.ocupadas ?? 0
+  const diasAlerta = operacion?.diasAlerta ?? 8
+  const conDias = (lista = []) => lista.map(p => ({ ...p, _dias: p.diasRestantes }))
+  const cuentasVencidas = useMemo(() => conDias(operacion?.listas.vencidas), [operacion])
+  const proximasAVencer = useMemo(() => conDias(operacion?.listas.porVencer), [operacion])
+  const venc = operacion?.vencidas ?? { pantallas: 0, clientes: 0, venceHoy: 0 }
+  const porV = operacion?.porVencer ?? { pantallas: 0, clientes: 0 }
+  const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
+  // Deuda en COP y, si existe, en USD (carteras independientes)
+  const textoDeuda = (cop, usd) => [
+    cop > 0 || !usd ? formatCurrency(cop) : null,
+    usd > 0 ? `US$${Number(usd).toLocaleString('en-US')}` : null,
+  ].filter(Boolean).join(' + ')
 
   // Alertas operativas: se derivan de datos ya cargados (sin peticiones extra).
   const alertas = useMemo(() => {
     if (!stats) return []
     const list = []
-    const nV = cuentasVencidas.length
-    if (nV > 0) {
+    if (venc.pantallas > 0) {
       list.push({
         tone: 'error', icon: AlertCircle,
-        titulo: `${nV} cuenta${nV === 1 ? '' : 's'} vencida${nV === 1 ? '' : 's'} sin renovar`,
-        detalle: 'Cada día sin contacto aumenta el riesgo de perder al cliente — abrir la lista para gestionar',
+        titulo: `${plural(venc.clientes, 'cliente', 'clientes')} con pantallas vencidas sin renovar`,
+        detalle: `${plural(venc.pantallas, 'pantalla vencida', 'pantallas vencidas')}${venc.venceHoy ? ` (${venc.venceHoy} vence${venc.venceHoy === 1 ? '' : 'n'} hoy)` : ''} — abre la lista para renovar o enviar el recordatorio`,
         onClick: () => setShowVencidasPanel(true),
       })
     }
-    const nP = proximasAVencer.length
-    if (nP > 0) {
+    if (porV.pantallas > 0) {
       list.push({
         tone: 'warning', icon: Clock,
-        titulo: `${nP} cuenta${nP === 1 ? '' : 's'} vence${nP === 1 ? '' : 'n'} en ≤ ${planificador?.diasAlerta ?? 8} días`,
-        detalle: 'Ventana ideal para asegurar la renovación antes del corte del servicio',
+        titulo: `${plural(porV.clientes, 'cliente vence', 'clientes vencen')} en los próximos ${diasAlerta} días`,
+        detalle: `${plural(porV.pantallas, 'pantalla', 'pantallas')} — buen momento para asegurar la renovación antes del corte`,
         onClick: () => setShowProximasPanel(true),
       })
     }
@@ -588,7 +576,7 @@ export default function DashboardHome() {
       list.push({
         tone: 'warning', icon: Hourglass,
         titulo: `${stats.clientesConDeuda} cliente${stats.clientesConDeuda === 1 ? '' : 's'} con deuda pendiente`,
-        detalle: `${formatCurrency(stats.montoDeudaTotal)} marcados como "debe" en el Planificador`,
+        detalle: `${textoDeuda(stats.montoDeudaTotal, stats.montoDeudaUSD)} marcados como "debe" en el Planificador`,
         onClick: () => navigate('/admin/planificador'),
       })
     }
@@ -620,7 +608,7 @@ export default function DashboardHome() {
       }
     }
     return list.sort((a, b) => ALERT_ORDER[a.tone] - ALERT_ORDER[b.tone])
-  }, [stats, bi, planificador, cuentasVencidas, proximasAVencer])
+  }, [stats, bi, operacion]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const alertasUrgentes = alertas.filter(a => a.tone !== 'info').length
   const valorEnRiesgo = bi?.ltv?.valorEnRiesgo || 0
@@ -894,23 +882,23 @@ export default function DashboardHome() {
         />
         <StatCard
           icon={FileText} title="Pantallas activas" value={pantallasActivasTotal} color="bg-green-500"
-          subtitle="Suma de pantallas por plan del Planificador"
+          subtitle={`Con cliente asignado — de ${operacion?.capacidad.total ?? 0} configuradas, ${operacion?.capacidad.libres ?? 0} libres`}
           onClick={() => setExplain({
             title: 'Pantallas activas', value: pantallasActivasTotal, icon: FileText,
             queEs: 'El total de pantallas de streaming que están configuradas para clientes en el Planificador — la "base instalada" que genera el ingreso recurrente.',
-            comoSeCalcula: 'Se **suma la columna #** (cantidad de pantallas) de cada fila del Planificador. No es un conteo de filas: un cliente con 2 pantallas bajo el mismo registro aporta 2 a este total.',
+            comoSeCalcula: 'Se **suma la columna #** (cantidad de pantallas) de las filas del Planificador que tienen cliente asignado. Las pantallas libres no cuentan. No es un conteo de filas: un cliente con 2 pantallas bajo el mismo registro aporta 2 a este total.',
             origen: 'Módulo **Planificador** — cada fila representa un slot de pantalla dentro de una cuenta padre.',
             action: { label: 'Ver Planificador', onClick: () => navigate('/admin/planificador', { state: { openEstatusPanel: true } }) },
           })}
         />
         <StatCard
-          icon={Tv} title="Dispositivos Activos" value={stats.totalDevices} color="bg-purple-500"
-          subtitle={`Inventario de equipos — ${stats.totalPantallas} pantallas, ${stats.pantallasLibres} libres en el Planificador`}
+          icon={Tv} title="Equipos en bodega" value={stats.equipos?.disponibles ?? stats.totalDevices} color="bg-purple-500"
+          subtitle={`Listos para vender — ${stats.equipos?.total ?? 0} en el inventario, ${stats.equipos?.vendidos ?? 0} vendidos`}
           onClick={() => setExplain({
-            title: 'Dispositivos Activos', value: stats.totalDevices, icon: Tv,
-            queEs: 'Cuántos equipos físicos (Fire TV, ONN…) están registrados como activos en el inventario.',
-            comoSeCalcula: 'Se cuentan los dispositivos del inventario marcados como **activos**. Si este número está en cero es porque el módulo de inventario no tiene registros propios — el control operativo real vive en el Planificador.',
-            origen: `Módulo **Inventario Equipos**. El Planificador, por su parte, registra ${stats.totalPantallas} pantallas con ${stats.pantallasLibres} libres.`,
+            title: 'Equipos en bodega', value: stats.equipos?.disponibles ?? stats.totalDevices, icon: Tv,
+            queEs: 'Cuántos equipos físicos (Fire TV, ONN…) del inventario siguen disponibles para la venta.',
+            comoSeCalcula: 'Se cuentan las unidades del **Inventario de Equipos** con número de serie que no tienen una venta asociada (serie ↔ serial de Venta Dispositivos) ni están marcadas como vendidas.',
+            origen: `Módulo **Inventario Equipos**: ${stats.equipos?.total ?? 0} unidades registradas, ${stats.equipos?.vendidos ?? 0} vendidas.`,
             action: { label: 'Ver Inventario', onClick: () => navigate('/admin/devices') },
           })}
         />
@@ -920,37 +908,37 @@ export default function DashboardHome() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 dash-a2 mt-4">
         <StatCard
           icon={Clock} title="Clientes con Deuda" value={stats.clientesConDeuda} color="bg-amber-500"
-          subtitle={`${formatCurrency(stats.montoDeudaTotal)} marcados como "debe" en el Planificador`}
+          subtitle={`${textoDeuda(stats.montoDeudaTotal, stats.montoDeudaUSD)} marcados como "debe" en el Planificador`}
           onClick={() => setExplain({
             title: 'Clientes con Deuda', value: stats.clientesConDeuda, icon: Clock,
             queEs: 'Cuentas del Planificador marcadas como "debe" — clientes que tienen un saldo pendiente por cobrar hoy.',
-            comoSeCalcula: 'Se cuentan las filas del Planificador con **debe = sí**, y se suma su campo **monto que debe**.',
+            comoSeCalcula: 'Se cuentan los **clientes distintos** con alguna pantalla marcada **debe = sí** (un cliente con varias pantallas cuenta una vez) y se suma el **monto que debe**, separado en pesos (COP) y dólares (USD).',
             origen: 'Módulo **Planificador** (campos debe / monto que debe de cada pantalla).',
             action: { label: 'Ver Planificador', onClick: () => navigate('/admin/planificador') },
           })}
         />
         <StatCard
-          icon={AlertCircle} title="Pagos Vencidos" value={cuentasVencidas.length} color="bg-red-500"
-          subtitle={cuentasVencidas.length > 0
-            ? 'Cuentas vencidas del Planificador — requieren contacto urgente'
-            : 'Sin cuentas vencidas en el Planificador — cartera sana por ahora'}
+          icon={AlertCircle} title="Pantallas vencidas" value={venc.pantallas} color="bg-red-500"
+          subtitle={venc.pantallas > 0
+            ? `${plural(venc.clientes, 'cliente', 'clientes')} sin renovar${venc.venceHoy ? ` · ${venc.venceHoy} vence${venc.venceHoy === 1 ? '' : 'n'} hoy` : ''} — requieren contacto`
+            : 'Sin pantallas vencidas en el Planificador'}
           onClick={() => setExplain({
-            title: 'Pagos Vencidos', value: cuentasVencidas.length, icon: AlertCircle,
+            title: 'Pantallas vencidas', value: venc.pantallas, icon: AlertCircle,
             queEs: 'Pantallas de clientes cuya fecha de vencimiento **ya pasó** y siguen sin renovar — cada día que pasa aumenta el riesgo de perder al cliente.',
-            comoSeCalcula: 'Para cada pantalla del Planificador se compara la **fecha de finalización** (o fin real) contra la fecha de hoy. Si ya pasó, la pantalla se clasifica como vencida. Es la misma clasificación que usa la tarjeta "Vencidas" del Planificador.',
+            comoSeCalcula: 'Para cada pantalla con cliente se compara la **fecha de fin** contra hoy. Si es hoy o ya pasó, la pantalla está vencida (las libres no cuentan). Un cliente con varias pantallas vencidas cuenta una vez en "clientes". Es la misma regla de la tarjeta "Vencidas" del Planificador.',
             origen: 'Módulo **Planificador** — campos de fecha de finalización y fin real de cada pantalla.',
             action: { label: 'Ver detalle de vencidas', onClick: () => setShowVencidasPanel(true) },
           })}
         />
         <StatCard
-          icon={TrendingUp} title="Próximas a vencer" value={proximasAVencer.length} color="bg-orange-500"
-          subtitle={proximasAVencer.length > 0
-            ? `Cuentas a ≤${planificador?.diasAlerta ?? 8} días de vencer — oportunidad de renovación`
-            : 'Sin cuentas próximas a vencer'}
+          icon={TrendingUp} title="Próximas a vencer" value={porV.pantallas} color="bg-orange-500"
+          subtitle={porV.pantallas > 0
+            ? `${plural(porV.clientes, 'cliente', 'clientes')} vencen en ≤ ${diasAlerta} días — oportunidad de renovación`
+            : 'Sin pantallas próximas a vencer'}
           onClick={() => setExplain({
-            title: 'Próximas a vencer', value: proximasAVencer.length, icon: TrendingUp,
+            title: 'Próximas a vencer', value: porV.pantallas, icon: TrendingUp,
             queEs: 'Pantallas que vencen dentro de los próximos días — la ventana ideal para contactar al cliente y asegurar la renovación **antes** del corte del servicio.',
-            comoSeCalcula: `Se calculan los días que faltan entre hoy y la fecha de vencimiento de cada pantalla. Si faltan **${planificador?.diasAlerta ?? 8} días o menos** (y aún no venció), entra en esta lista.`,
+            comoSeCalcula: `Se calculan los días que faltan entre hoy y la fecha de vencimiento de cada pantalla. Si faltan **${diasAlerta} días o menos** (y aún no venció), entra en esta lista. Las cortesías no entran, y un cliente que ya tiene otra pantalla vencida se cuenta como vencido.`,
             origen: 'Módulo **Planificador** — el umbral de alerta es configurable en el servidor.',
             action: { label: 'Ver detalle', onClick: () => setShowProximasPanel(true) },
           })}
@@ -1527,19 +1515,22 @@ export default function DashboardHome() {
                     <div className="flex items-center justify-between">
                       <CardTitle>Clientes en riesgo de churn</CardTitle>
                       <div className="flex gap-1.5">
-                        {bi.clientesEnRiesgo.filter(c => c.alerta === 'VENCIDO').length > 0 && (
+                        {(bi.clientesEnRiesgoResumen?.vencidos ?? 0) > 0 && (
                           <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
-                            {bi.clientesEnRiesgo.filter(c => c.alerta === 'VENCIDO').length} vencidos
+                            {bi.clientesEnRiesgoResumen.vencidos} vencidos
                           </span>
                         )}
-                        {bi.clientesEnRiesgo.filter(c => c.alerta === 'PROXIMO A VENCER').length > 0 && (
+                        {(bi.clientesEnRiesgoResumen?.porVencer ?? 0) > 0 && (
                           <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
-                            {bi.clientesEnRiesgo.filter(c => c.alerta === 'PROXIMO A VENCER').length} por vencer
+                            {bi.clientesEnRiesgoResumen.porVencer} por vencer
                           </span>
                         )}
                       </div>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">Pantallas con fin real vencido o a ≤ 8 días según el Planificador — ordenados por LTV histórico</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Clientes con pantallas vencidas o a ≤ {diasAlerta} días de vencer
+                      {bi.clientesEnRiesgoResumen?.total > bi.clientesEnRiesgo.length ? ` — se muestran los ${bi.clientesEnRiesgo.length} de mayor LTV histórico` : ' — ordenados por LTV histórico'}
+                    </p>
                   </CardHeader>
                   <CardBody className="p-0">
                     <div className="overflow-auto max-h-72">

@@ -5,6 +5,8 @@ const { verifyToken, requireRole } = require('../../middleware/authMiddleware');
 // Todas las rutas de administración requieren rol admin
 router.use(verifyToken);
 router.use(requireRole('admin'));
+// Cualquier escritura exitosa invalida la caché de indicadores del Dashboard
+router.use(require('../../utils/cacheDashboard').invalidarTrasEscritura);
 
 router.use(require('./dashboard'));
 router.use(require('./clients'));
