@@ -24,9 +24,9 @@ export function ingresosDelMes(porMes = [], hoy = new Date()) {
 function Cifra({ etiqueta, valor, detalle, tono, onClick }) {
   return (
     <button type="button" onClick={onClick}
-      className="text-left px-5 py-4 hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none transition-colors min-w-0">
+      className="text-left px-3.5 sm:px-5 py-4 hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none transition-colors min-w-0">
       <span className="dash-txt block text-[13px] font-medium text-slate-500">{etiqueta}</span>
-      <span className={cn('dash-num block text-[34px] sm:text-[38px] font-bold leading-tight truncate', tono || 'text-slate-900')}>{valor}</span>
+      <span className={cn('dash-num block text-[27px] sm:text-[38px] font-bold leading-tight break-words', tono || 'text-slate-900')}>{valor}</span>
       <span className="dash-txt block text-[13px] text-slate-500 leading-snug">{detalle}</span>
     </button>
   )
