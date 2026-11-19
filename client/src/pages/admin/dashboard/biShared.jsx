@@ -1,6 +1,7 @@
 // Piezas compartidas de las vistas BI (DashboardHome, AnalisisFinancieroPage,
 // BajasPage, ClientsPage): tarjetas KPI, tooltips, etiquetas de valor, tags
 // inteligentes y narrativas generadas desde los datos.
+import { useState } from 'react'
 import { TrendingUp, TrendingDown, Minus, Sparkles, Lightbulb } from 'lucide-react'
 import { formatCurrency } from '../../../utils/excelUtils'
 import { cn } from '../../../utils/cn'
@@ -96,7 +97,7 @@ export function BiCard({ icon: Icon, label, value, growth, growthLabel, sub, var
   return (
     <div
       className={cn(
-        styles[variant], 'rounded-xl p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5',
+        styles[variant], 'rounded-xl p-3.5 sm:p-5 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 min-w-0',
         interactive && 'cursor-pointer'
       )}
       {...(interactive ? {
@@ -106,10 +107,10 @@ export function BiCard({ icon: Icon, label, value, growth, growthLabel, sub, var
         onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } },
       } : {})}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-medium ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className={`text-[13px] sm:text-sm font-medium leading-snug ${variant === 'solid' ? 'opacity-90' : ''}`}>{label}</p>
+          <p className="text-lg sm:text-2xl font-bold mt-1 break-words leading-tight">{value}</p>
           {tag && <div className="mt-1.5"><SmartTag tone={tag.tone}>{tag.text}</SmartTag></div>}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {growth != null && <GrowthBadge pct={growth} />}
@@ -118,12 +119,12 @@ export function BiCard({ icon: Icon, label, value, growth, growthLabel, sub, var
             )}
           </div>
           {interactive && (
-            <p className={`text-xs font-semibold mt-2 ${variant === 'solid' ? 'text-white/90' : 'text-brand-primary'}`}>
+            <p className={`hidden sm:block text-xs font-semibold mt-2 ${variant === 'solid' ? 'text-white/90' : 'text-brand-primary'}`}>
               {clickHint}
             </p>
           )}
         </div>
-        <div className={`${iconBg[variant]} rounded-lg p-3`}>
+        <div className={`${iconBg[variant]} rounded-lg p-3 hidden sm:block flex-shrink-0`}>
           <Icon size={22} />
         </div>
       </div>
@@ -188,14 +189,28 @@ export function ChartTooltip({ active, payload, label }) {
 }
 
 // Recuadro de lectura al pie de cada gráfica (storytelling desde los datos)
+// Lectura del gráfico. En el celular los textos largos se pliegan a tres
+// líneas con "Ver análisis"; en pantallas grandes se ven completos.
+const LARGO_PLEGABLE = 180
+
 export function ChartInsight({ text }) {
+  const [abierto, setAbierto] = useState(false)
   if (!text) return null
+  const plegable = text.length > LARGO_PLEGABLE
   return (
     <div className="mt-3 flex gap-2.5 bg-orange-50/70 border border-orange-100 rounded-lg px-3.5 py-2.5">
       <Lightbulb size={16} className="text-orange-500 flex-shrink-0 mt-0.5" />
-      <p className="text-sm text-gray-600 leading-relaxed">
-        {text.split('**').map((chunk, j) => (j % 2 === 1 ? <strong key={j} className="text-gray-800">{chunk}</strong> : chunk))}
-      </p>
+      <div className="min-w-0">
+        <p className={cn('text-sm text-gray-600 leading-relaxed', plegable && !abierto && 'line-clamp-3 sm:line-clamp-none')}>
+          {text.split('**').map((chunk, j) => (j % 2 === 1 ? <strong key={j} className="text-gray-800">{chunk}</strong> : chunk))}
+        </p>
+        {plegable && (
+          <button type="button" onClick={() => setAbierto(a => !a)} aria-expanded={abierto}
+            className="sm:hidden mt-1 min-h-[32px] text-sm font-semibold text-orange-600">
+            {abierto ? 'Ver menos' : 'Ver análisis'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
