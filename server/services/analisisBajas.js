@@ -39,7 +39,10 @@ const TRAMOS_VIDA = [
   { tramo: 'Más de 2 años', hasta: Infinity },
 ];
 
-function calcularAnalisisBajas(bajas, ventas, { hoy = hoyISO() } = {}) {
+// Una fila por baja con su categoría de motivo, la última venta antes de la
+// baja, la permanencia y si el cliente volvió. Base del análisis y del plan
+// de retención (services/retencionBajas.js).
+function filasDeBajas(bajas, ventas) {
   // Ventas por cliente, ordenadas
   const porCliente = new Map();
   for (const v of ventas) {
@@ -50,7 +53,7 @@ function calcularAnalisisBajas(bajas, ventas, { hoy = hoyISO() } = {}) {
   }
   for (const l of porCliente.values()) l.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
 
-  const filas = bajas.filter(b => b.fechaBaja).map(b => {
+  return bajas.filter(b => b.fechaBaja).map(b => {
     const cat = categoriaMotivo(b.motivo);
     const id = String(b.customerId || '').trim();
     const vs = porCliente.get(id) || [];
@@ -69,8 +72,13 @@ function calcularAnalisisBajas(bajas, ventas, { hoy = hoyISO() } = {}) {
       vidaMeses: vida == null ? null : Math.round(vida * 10) / 10,
       recuperado: !!vuelve,
       fechaRegreso: vuelve ? String(vuelve.fecha).slice(0, 10) : null,
+      ultimaVenta: ultima ? { tipoPlan: ultima.tipoPlan || null, precioVenta: Number(ultima.precioVenta) || 0, fecha: String(ultima.fecha).slice(0, 10) } : null,
     };
   });
+}
+
+function calcularAnalisisBajas(bajas, ventas, { hoy = hoyISO() } = {}) {
+  const filas = filasDeBajas(bajas, ventas);
 
   const reales = filas.filter(f => f.categoria !== 'cambio_cuenta');
   const desde12 = sumarMeses(ym(hoy), -12); // últimos 12 meses (incluye el mes en curso)
@@ -167,4 +175,4 @@ async function analisisBajas(opciones) {
   return calcularAnalisisBajas(bajas, ventas, opciones);
 }
 
-module.exports = { analisisBajas, calcularAnalisisBajas };
+module.exports = { analisisBajas, calcularAnalisisBajas, filasDeBajas };

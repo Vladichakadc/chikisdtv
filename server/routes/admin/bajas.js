@@ -7,6 +7,7 @@ const { importFromExcel } = require('../../services/planificadorImportService');
 const { Op } = require('sequelize');
 const { siguienteIdBaja } = require('../../services/bajaPlanificador');
 const { analisisBajas } = require('../../services/analisisBajas');
+const { retencionBajas } = require('../../services/retencionBajas');
 const { enCache } = require('../../utils/cacheDashboard');
 const { MOTIVOS_BAJA } = require('../../utils/motivosBaja');
 const nombresMotivos = MOTIVOS_BAJA.map(m => m.nombre);
@@ -22,6 +23,12 @@ router.get('/bajas/next-id', asyncHandler(async (_req, res) => {
 // vida antes de la baja, recuperados y bajas sin motivo para clasificar
 router.get('/bajas/analisis', asyncHandler(async (_req, res) => {
   res.json(await enCache('bajas-analisis', () => analisisBajas()));
+}));
+
+// Plan de retención: clientes dados de baja que no han vuelto, con su último
+// plan, teléfono y el catálogo activo para armar la oferta de regreso
+router.get('/bajas/retencion', asyncHandler(async (_req, res) => {
+  res.json(await retencionBajas());
 }));
 
 // Clasificar el motivo de una baja ya registrada

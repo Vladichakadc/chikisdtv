@@ -11,6 +11,7 @@ import { titular, variacion, acciones, conMotivoReal, fmtPesosCorto, COLORES_MOT
 import {
   MotivosRanking, IngresoPorMotivo, BajasPorMes, VidaAntesDeLaBaja, MotivoSegunPlan, RecuperacionPorMotivo,
 } from './bajas/GraficasBajas'
+import { RetencionPanel } from './bajas/RetencionPanel'
 
 // Análisis de Bajas: "¿por qué se van los clientes, cuándo, cuánto nos
 // cuesta y cuántos vuelven?". Datos y reglas: GET /admin/bajas/analisis
@@ -235,6 +236,8 @@ export default function AnalisisBajasPage() {
           </ul>
         </section>
       )}
+
+      <RetencionPanel />
 
       <ClasificarSinMotivo lista={data.sinMotivo} onClasificada={cargar} />
 
