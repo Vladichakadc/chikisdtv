@@ -233,3 +233,21 @@ describe('datos del pago sugeridos (renovación)', () => {
     expect(tipoFireDeSku('', {})).toBe('')
   })
 })
+
+describe('pagos en dólares', () => {
+  it('reconoce los medios de pago en USD', async () => {
+    const { esMedioUSD } = await import('./renovacion')
+    for (const m of ['USD', 'Paypal', 'PayPal', 'Wester Union', 'Western Union', 'Dólares']) expect(esMedioUSD(m)).toBe(true)
+    for (const m of ['Nequi', 'NU', 'BBVA', 'Efectivo', '', null]) expect(esMedioUSD(m)).toBe(false)
+  })
+  it('convierte USD a pesos con la TRM y sugiere el valor en USD', async () => {
+    const { usdAPesos, pesosAUsd } = await import('./renovacion')
+    expect(usdAPesos('20', 3912.45)).toBe(78249)
+    expect(usdAPesos('19,5', 4000)).toBe(78000)
+    expect(usdAPesos('', 4000)).toBeNull()
+    expect(usdAPesos('20', null)).toBeNull()
+    expect(pesosAUsd(80000, 4000)).toBe('20')
+    expect(pesosAUsd(80000, 3912.45)).toBe('20.45')
+    expect(pesosAUsd('', 4000)).toBe('')
+  })
+})

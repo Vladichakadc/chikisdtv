@@ -253,3 +253,25 @@ export function datosPagoSugeridos(row, ultimoPago = null, tipoCliente = null) {
     cuentaDedicada: pantallas >= 3 ? 'SI' : 'NO',
   }
 }
+
+// ── Pagos en dólares ─────────────────────────────────────────────────────────
+// Medios de pago que llegan en USD (PayPal, Western Union o "USD"). En la venta
+// el precio siempre se guarda en pesos: el valor en dólares se convierte con
+// la TRM del día.
+export const esMedioUSD = (medio) => /(^|[^a-z])(usd|d[oó]lar|paypal|western?\s*union)/i.test(String(medio || ''))
+
+// USD × TRM → pesos (enteros). null si falta algún dato.
+export function usdAPesos(usd, trm) {
+  const u = Number(String(usd ?? '').replace(',', '.'))
+  const t = Number(trm)
+  if (!(u > 0) || !(t > 0)) return null
+  return Math.round(u * t)
+}
+
+// Pesos → USD con dos decimales (para sugerir el valor en dólares)
+export function pesosAUsd(pesos, trm) {
+  const p = Number(pesos)
+  const t = Number(trm)
+  if (!(p > 0) || !(t > 0)) return ''
+  return String(Math.round((p / t) * 100) / 100)
+}

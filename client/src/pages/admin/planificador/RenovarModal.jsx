@@ -8,9 +8,9 @@ import api from '../../../config/api'
 import { cn } from '../../../utils/cn'
 import { useUi } from '../../../context/UiContext'
 import { todayStr } from '../../../utils/dateUtils'
-import { formatDate, formatCurrency } from '../../../utils/excelUtils'
+import { formatDate, formatCurrency, formatUSD } from '../../../utils/excelUtils'
 import { CurrencyInput } from '../../../components/ui/CurrencyInput'
-import { mesesPorPlan, precioPorPlan, sumarMeses, inicioSugerido, diasRestantesDe, datosPagoSugeridos } from './renovacion'
+import { mesesPorPlan, precioPorPlan, sumarMeses, inicioSugerido, diasRestantesDe, datosPagoSugeridos, esMedioUSD, usdAPesos, pesosAUsd } from './renovacion'
 import { TIPOS_FIRE, MESES, tipoFireDeSku } from '../../../config/equipos'
 import { diasLabel } from './rowHelpers'
 
@@ -41,6 +41,10 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
   })
   const [verPago, setVerPago] = useState(true)
   const [tipoCliente, setTipoCliente] = useState(null)
+  // Pago en dólares: el precio se escribe en USD y se guarda en pesos con la TRM
+  const [precioUSD, setPrecioUSD] = useState('')
+  const [trm, setTrm] = useState({ valor: '', fuente: null, vigencia: null, cargando: false, error: false })
+  const enUSD = esMedioUSD(form.medioPago)
 
   useEffect(() => {
     let vivo = true
@@ -73,6 +77,21 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
     return () => { vivo = false }
   }, [row.idPantalla, row.nickname, row.customerId, pantallas])
 
+  // TRM del día (oficial; si no hay conexión, la última registrada) al elegir
+  // un medio de pago en dólares
+  useEffect(() => {
+    if (!enUSD || trm.valor || trm.cargando) return
+    setTrm(t => ({ ...t, cargando: true, error: false }))
+    api.get('/admin/inventario-equipos/trm')
+      .then(r => setTrm({ valor: r.data?.trm ? String(Math.round(Number(r.data.trm) * 100) / 100) : '', fuente: r.data?.fuente || null, vigencia: r.data?.vigencia || null, cargando: false, error: !r.data?.trm }))
+      .catch(() => setTrm(t => ({ ...t, cargando: false, error: true })))
+  }, [enUSD]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Con la TRM lista, se sugiere el valor en dólares del precio del plan
+  useEffect(() => {
+    if (enUSD && !precioUSD && trm.valor && form.precioVenta) setPrecioUSD(pesosAUsd(form.precioVenta, trm.valor))
+  }, [enUSD, trm.valor]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !guardando) onClose() }
     window.addEventListener('keydown', onKey)
@@ -97,7 +116,8 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
   const dias = diasRestantesDe(row)
   const inicio = form.inicioManual && form.inicioReal ? form.inicioReal : inicioSugerido(finActual, form.fecha)
   const finNuevo = form.meses ? sumarMeses(inicio, form.meses) : ''
-  const valido = form.tipoPlan && Number(form.meses) >= 1 && form.precioVenta !== '' && Number(form.precioVenta) >= 0 && form.fecha
+  const precioPesos = enUSD ? usdAPesos(precioUSD, trm.valor) : (form.precioVenta === '' ? null : Number(form.precioVenta))
+  const valido = form.tipoPlan && Number(form.meses) >= 1 && precioPesos != null && precioPesos >= 0 && form.fecha
 
   const guardar = async () => {
     if (!valido || guardando) return
@@ -107,7 +127,7 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
         fecha: form.fecha,
         tipoPlan: form.tipoPlan,
         meses: Number(form.meses),
-        precioVenta: Number(form.precioVenta),
+        precioVenta: precioPesos,
         medioPago: form.medioPago || null,
         ...(form.inicioManual && form.inicioReal ? { inicioReal: form.inicioReal } : {}),
         sku: form.sku || null,
@@ -120,7 +140,8 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
         cuentaDedicada: form.cuentaDedicada || null,
         mes: form.mes || null,
       })
-      showToast(`Renovación registrada: venta ${r.data.venta.idVM} · ${row.nickname} vigente hasta ${formatDate(r.data.duracionReal)}.`, 'success')
+      const enDolares = enUSD ? ` (US${formatUSD(Number(String(precioUSD).replace(',', '.')))} a TRM ${Number(trm.valor).toLocaleString('es-CO', { maximumFractionDigits: 2 })} = ${formatCurrency(precioPesos)})` : ''
+      showToast(`Renovación registrada: venta ${r.data.venta.idVM}${enDolares} · ${row.nickname} vigente hasta ${formatDate(r.data.duracionReal)}.`, 'success')
       onRenovado?.(r.data)
     } catch (e) {
       setError(e.response?.data?.error || e.message)
@@ -167,15 +188,41 @@ export function RenovarModal({ row, onClose, onRenovado, onAbrirPagos }) {
                 <input className={inputCls} type="number" min="1" max="36" step="1" value={form.meses}
                   onChange={e => setForm(f => ({ ...f, meses: e.target.value }))} />
               </Campo>
-              <Campo label="Precio">
-                <CurrencyInput value={form.precioVenta} onChange={e => setForm(f => ({ ...f, precioVenta: e.target.value }))} />
-              </Campo>
+              {enUSD ? (
+                <Campo label="Precio en dólares (USD)" hint={precioPesos != null ? `Se registra como ${formatCurrency(precioPesos)} COP` : 'Escribe el valor recibido en USD'}>
+                  <CurrencyInput prefix="US$" decimals={2} value={precioUSD} onChange={e => setPrecioUSD(e.target.value)} />
+                </Campo>
+              ) : (
+                <Campo label="Precio">
+                  <CurrencyInput value={form.precioVenta} onChange={e => setForm(f => ({ ...f, precioVenta: e.target.value }))} />
+                </Campo>
+              )}
               <Campo label="Medio de pago">
                 <select className={inputCls} value={form.medioPago} onChange={e => setForm(f => ({ ...f, medioPago: e.target.value }))}>
                   <option value="">—</option>
                   {(opciones?.mediosPago || []).map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </Campo>
+              {enUSD && (
+                <div className="col-span-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="block w-40">
+                      <span className="block text-xs font-semibold text-sky-900 mb-1">TRM (pesos por dólar)</span>
+                      <CurrencyInput decimals={2} value={trm.valor} onChange={e => setTrm(t => ({ ...t, valor: e.target.value, fuente: 'escrita a mano', vigencia: null }))} />
+                    </label>
+                    <div className="flex-1 min-w-[180px] text-xs text-sky-900 pb-2">
+                      {trm.cargando ? 'Consultando la TRM del día…'
+                        : trm.error && !trm.valor ? 'No se pudo consultar la TRM: escríbela.'
+                        : <>TRM {trm.fuente ? `· ${trm.fuente}` : ''}{trm.vigencia ? ` · vigente ${trm.vigencia}` : ''}</>}
+                      {precioPesos != null && (
+                        <p className="mt-0.5 text-sm font-bold text-sky-950">
+                          US{formatUSD(Number(String(precioUSD).replace(',', '.')))} × {Number(trm.valor).toLocaleString('es-CO', { maximumFractionDigits: 2 })} = {formatCurrency(precioPesos)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <Campo label="Fecha del pago">
                 <input className={inputCls} type="date" value={form.fecha} onChange={e => elegirFecha(e.target.value)} />
               </Campo>
