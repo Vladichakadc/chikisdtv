@@ -140,7 +140,7 @@ export function RetencionPanel() {
           ) : (
             <>
             <p className="text-xs text-slate-500 mb-2">{lista.length} baja{lista.length === 1 ? '' : 's'} · de la más reciente a la más antigua</p>
-            <ul className="grid gap-2 md:grid-cols-2 max-h-[70vh] overflow-y-auto pr-1 -mr-1 content-start">
+            <ul className="grid gap-2 md:grid-cols-2 max-h-[70dvh] overflow-y-auto pr-1 -mr-1 content-start">
               {lista.map(c => {
                 const enviada = enviadas[c.idBaja]
                 return (

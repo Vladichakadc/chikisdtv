@@ -193,7 +193,7 @@ export function RecordatorioLote({ titulo, screens, recordatorios, onClose, onRe
             </div>
 
             <div className="rounded-xl p-3 shadow-sm" style={{ background: '#ECE5DD' }}>
-              <div className="rounded-xl rounded-tl-sm px-3.5 py-3 shadow-sm text-[12.5px] leading-relaxed text-slate-800 whitespace-pre-wrap max-h-[38vh] overflow-y-auto" style={{ background: '#DCF8C6' }}>
+              <div className="rounded-xl rounded-tl-sm px-3.5 py-3 shadow-sm text-[12.5px] leading-relaxed text-slate-800 whitespace-pre-wrap max-h-[38dvh] overflow-y-auto" style={{ background: '#DCF8C6' }}>
                 {!d
                   ? <span className="flex items-center gap-2 text-slate-500"><Loader2 size={14} className="animate-spin" /> Preparando el mensaje…</span>
                   : d.error ? <span className="text-red-600">No se pudo consultar este cliente. Sáltalo y sigue.</span>

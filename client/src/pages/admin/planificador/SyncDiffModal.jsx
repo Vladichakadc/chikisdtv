@@ -46,7 +46,7 @@ export function SyncDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
 
   return (
     <div className="pl-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-2 sm:p-4" onClick={onClose}>
-      <div className="pl-confirm bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="pl-confirm bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90dvh] flex flex-col" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-2xl px-4 sm:px-6 py-4 flex items-start justify-between gap-3 flex-shrink-0">

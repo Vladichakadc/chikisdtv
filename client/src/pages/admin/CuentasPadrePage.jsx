@@ -318,7 +318,7 @@ function ImportDiffModal({ diff, canUndo, onUndo, onClose, undoing }) {
 
   return (
     <div className="cp-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90dvh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-t-2xl px-6 py-5 flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">

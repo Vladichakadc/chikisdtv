@@ -91,7 +91,7 @@ export function KpiExplainModal({ info, onClose }) {
       onClick={onClose}
     >
       <div
-        className={`bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full ${detalle ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[88vh] sm:max-h-[90vh] flex flex-col animate-sheet-up`}
+        className={`bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full ${detalle ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[88dvh] sm:max-h-[90dvh] flex flex-col animate-sheet-up`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Asa de arrastre — affordance de bottom-sheet, solo móvil */}

@@ -365,7 +365,7 @@ export function OfertaRapidaModal({ plan, planes = [], trmInicial, onClose }) {
         {formato === 'imagen' ? (
           <>
             {/* ── Tarjeta gráfica (área que se captura como imagen) ── */}
-            <div className="max-h-[48vh] overflow-y-auto rounded-xl">
+            <div className="max-h-[48dvh] overflow-y-auto rounded-xl">
               <div ref={cardRef} className="rounded-xl overflow-hidden shadow-sm" style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", background: '#ffffff' }}>
                 {/* Cabecera de marca: ícono fijo y ampliado */}
                 <div className="relative px-5 pt-5 pb-4 text-white overflow-hidden" style={{ background: 'linear-gradient(135deg,#f97316,#ea580c)' }}>
@@ -484,7 +484,7 @@ export function OfertaRapidaModal({ plan, planes = [], trmInicial, onClose }) {
             {/* Vista previa estilo WhatsApp */}
             <div className="rounded-xl p-3 shadow-sm" style={{ background: '#ECE5DD' }}>
               <div
-                className="rounded-xl rounded-tl-sm px-3.5 py-3 shadow-sm text-[12.5px] leading-relaxed text-slate-800 whitespace-pre-wrap max-h-[44vh] overflow-y-auto"
+                className="rounded-xl rounded-tl-sm px-3.5 py-3 shadow-sm text-[12.5px] leading-relaxed text-slate-800 whitespace-pre-wrap max-h-[44dvh] overflow-y-auto"
                 style={{ background: '#DCF8C6' }}
               >
                 {mensaje}

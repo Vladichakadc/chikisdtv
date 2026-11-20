@@ -119,7 +119,7 @@ export function AvisoCredencialesModal({ cuentaId, onClose }) {
   return (
     <div className="cp-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-[3px] sm:p-4" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="aviso-cred-titulo"
-        className="cp-confirm bg-white w-full sm:max-w-5xl max-h-[94vh] sm:max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+        className="cp-confirm bg-white w-full sm:max-w-5xl max-h-[94dvh] sm:max-h-[92dvh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}>
 
         {/* Encabezado */}

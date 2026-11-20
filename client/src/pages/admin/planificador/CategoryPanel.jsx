@@ -249,7 +249,7 @@ export function CategoryPanel({ catKey, screens, onClose, onGenerate, onEdit, on
             <p className="text-sm">{config.emptyMsg}</p>
           </div>
         ) : (
-          <div className="max-h-[62vh] sm:max-h-[50vh] overflow-y-auto">
+          <div className="max-h-[62dvh] sm:max-h-[50dvh] overflow-y-auto">
             {/* Escritorio / tablet: tabla */}
             <table className="w-full text-sm hidden sm:table">
               <thead className="bg-gray-50 sticky top-0 z-10">

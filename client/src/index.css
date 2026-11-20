@@ -40,3 +40,23 @@ body {
 .animate-sheet-up {
   animation: sheet-up 0.22s ease-out;
 }
+
+/* ── Ventanas en el celular ───────────────────────────────────────────────
+   Botón de cerrar (X) siempre visible: en pantallas pequeñas las X grises
+   claras sobre blanco casi no se veían. Se les da contraste, fondo y un área
+   de toque de 40 px; las X sobre encabezados de color (texto blanco) solo
+   ganan tamaño. Las que una ventana oculta a propósito (.hidden) no se tocan. */
+@media (max-width: 767px) {
+  .fixed button:not(.hidden):has(> svg.lucide-x) {
+    min-width: 40px;
+    min-height: 40px;
+    display: inline-grid;
+    place-items: center;
+    opacity: 1;
+  }
+  .fixed button:not(.hidden):has(> svg.lucide-x):is(.text-slate-400, .text-gray-400, .text-slate-500, .text-gray-500) {
+    color: #334155;
+    background-color: #f1f5f9;
+    border-radius: 9999px;
+  }
+}
