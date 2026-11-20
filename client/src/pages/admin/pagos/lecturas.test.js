@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { titular, tarjetas, recomendaciones, fmtPesosCorto, nombreMes, sumarMesesYm, tonoVar } from './lecturas'
+import { titular, tarjetas, recomendaciones, fmtPesosCorto, fmtCompacto, nombreMes, sumarMesesYm, tonoVar } from './lecturas'
 
 const datos = () => ({
   resumen: {
@@ -44,6 +44,8 @@ describe('lecturas del análisis de pagos', () => {
   })
   it('utilidades', () => {
     expect(fmtPesosCorto(37385733)).toBe('$37,4 M')
+    expect(fmtCompacto(2609200)).toBe('2,6M')
+    expect(fmtCompacto(431000)).toBe('431k')
     expect(nombreMes('2026-05')).toBe('mayo 2026')
     expect(sumarMesesYm('2026-01', -1)).toBe('2025-12')
     expect(tonoVar(-10)).toBe('mal')

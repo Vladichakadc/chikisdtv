@@ -14,6 +14,13 @@ export function fmtPesosCorto(v) {
   if (Math.abs(n) >= 1e3) return `$${Math.round(n / 1e3).toLocaleString('es-CO')} mil`
   return `$${Math.round(n).toLocaleString('es-CO')}`
 }
+// Cifra compacta sin signo de pesos para celdas y rótulos estrechos: 2,6M · 431k
+export function fmtCompacto(v) {
+  const n = Number(v) || 0
+  if (Math.abs(n) >= 1e6) return `${(n / 1e6).toLocaleString('es-CO', { maximumFractionDigits: 1 })}M`
+  if (Math.abs(n) >= 1e3) return `${Math.round(n / 1e3).toLocaleString('es-CO')}k`
+  return Math.round(n).toLocaleString('es-CO')
+}
 export const fmtPct = (v, d = 0) => (v == null ? '—' : `${Number(v).toLocaleString('es-CO', { maximumFractionDigits: d })}%`)
 export const fmtVar = (v) => (v == null ? null : `${v > 0 ? '+' : ''}${Number(v).toLocaleString('es-CO', { maximumFractionDigits: 1 })}%`)
 export const tonoVar = (v, umbral = 3) => (v == null ? 'neutro' : v > umbral ? 'bien' : v < -umbral ? 'mal' : 'neutro')

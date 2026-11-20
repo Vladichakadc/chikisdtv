@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, ComposedChart, BarChart, LineChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList,
 } from 'recharts'
 import { HALO } from '../retencion/etiquetas'
-import { COLORES_TIPO, NOMBRE_TIPO, colorMedio, fmtPesos, fmtPesosCorto, fmtPct, nombreMes } from './lecturas'
+import { COLORES_TIPO, NOMBRE_TIPO, colorMedio, fmtPesos, fmtPesosCorto, fmtCompacto, fmtPct, nombreMes } from './lecturas'
 import { cn } from '../../../utils/cn'
 
 const EJE = { fontSize: 11, fill: '#64748b' }
@@ -116,7 +116,7 @@ export function AnioContraAnio({ comparativo, movil }) {
             return (
               <Line key={a.anio} dataKey={a.anio} stroke={colores[a.anio]} strokeWidth={a === anios.at(-1) ? 3 : 2} dot={false} connectNulls={false} isAnimationActive={false}>
                 <LabelList dataKey={a.anio} content={({ x, y, index, value }) => (index === fin && value != null ? (
-                  <text x={x + 6} y={y + 4} fontSize={11} fontWeight={700} fill={colores[a.anio] === '#cbd5e1' ? '#94a3b8' : colores[a.anio]} {...HALO}>{a.anio} · {movil ? fmtPesosCorto(value).replace('$', '') : fmtPesosCorto(value)}</text>
+                  <text x={x + 6} y={y + 4} fontSize={11} fontWeight={700} fill={colores[a.anio] === '#cbd5e1' ? '#94a3b8' : colores[a.anio]} {...HALO}>{a.anio} · {movil ? fmtCompacto(value) : fmtPesosCorto(value)}</text>
                 ) : null)} />
               </Line>
             )
@@ -225,7 +225,7 @@ export function MapaEstacionalidad({ estacionalidad }) {
                 <td key={i} title={m ? `${nombreMes(m.mes)}: ${fmtPesos(m.ingresos)}${m.parcial ? ' (en curso)' : ''}` : ''}
                   className={cn('h-9 rounded-md text-center font-semibold tabular-nums', !m && 'bg-slate-50')}
                   style={m ? { background: m.parcial ? 'repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 4px,#e2e8f0 4px,#e2e8f0 8px)' : fondo(m.ingresos), color: !m.parcial && m.ingresos / max > 0.55 ? '#fff' : '#0f172a' } : undefined}>
-                  {m && m.ingresos ? fmtPesosCorto(m.ingresos).replace('$', '').replace(' mil', 'k').replace(' M', 'M') : ''}
+                  {m && m.ingresos ? fmtCompacto(m.ingresos) : ''}
                 </td>
               ))}
               <td className="text-right font-bold text-slate-800 tabular-nums px-1 whitespace-nowrap">{fmtPesosCorto(a.total)}</td>
