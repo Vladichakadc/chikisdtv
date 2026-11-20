@@ -40,23 +40,29 @@ function ejeY(max) {
   const tope = Math.max(paso, Math.ceil((max * 1.12) / paso) * paso)
   return { domain: [0, tope], ticks: Array.from({ length: Math.round(tope / paso) + 1 }, (_, i) => i * paso) }
 }
-function TickMes({ x, y, payload, index }) {
+// Eje de meses: el año aparece en el primer mes y cada vez que cambia
+function TickMes({ x, y, payload, index, meses = [] }) {
   const [a, m] = String(payload.value).split('-').map(Number)
+  const i = meses.indexOf(payload.value)
+  const previo = i > 0 ? Number(String(meses[i - 1]).slice(0, 4)) : null
+  const conAnio = index === 0 || m === 1 || (previo != null && previo !== a)
   return (
     <g transform={`translate(${x},${y + 10})`}>
       <text textAnchor="middle" fontSize={10.5} fill="#64748b">{MESES_CORTOS[m - 1]}</text>
-      {(m === 1 || index === 0) && <text y={13} textAnchor="middle" fontSize={10} fontWeight={700} fill="#334155">{a}</text>}
+      {conAnio && <text y={13} textAnchor="middle" fontSize={10} fontWeight={700} fill="#334155">{a}</text>}
     </g>
   )
 }
 
 // ── 1. Recaudo mes a mes por tipo de pago ───────────────────────────────────
-export function EvolucionMensual({ serie, movil }) {
+export function EvolucionMensual({ serie, movil, compacto = movil, onMes, tiposActivos = [], onTipo }) {
   const meses = movil ? serie.slice(-12) : serie
-  // En el celular, rótulo en meses alternos (y siempre en el último) para que no se monten
+  // Rótulos espaciados según el ancho disponible (siempre el último mes) para que no se monten
+  const maxRotulos = compacto ? 6 : 24
+  const paso = Math.max(1, Math.ceil(meses.length / maxRotulos))
   const filas = meses.map((m, i) => ({
     ...m,
-    rotulo: m.ingresos && (!movil || i % 2 === (meses.length - 1) % 2) ? `${fmtPesosCorto(m.ingresos)}${m.parcial ? '*' : ''}` : '',
+    rotulo: m.ingresos && (i % paso === (meses.length - 1) % paso) ? `${fmtPesosCorto(m.ingresos)}${m.parcial ? '*' : ''}` : '',
   }))
   if (!filas.some(f => f.ingresos)) return <Vacio texto="Aún no hay pagos registrados en este período." />
   const tipos = ['renovacion', 'activacion', 'otros'].filter(t => filas.some(f => f[t]))
@@ -65,15 +71,16 @@ export function EvolucionMensual({ serie, movil }) {
       <ResponsiveContainer width="100%" height={movil ? 260 : 320}>
         <ComposedChart data={filas} margin={{ top: 24, right: 8, left: movil ? -6 : 4, bottom: 8 }}>
           {GRID}
-          <XAxis dataKey="mes" tick={<TickMes />} axisLine={false} tickLine={false} interval={movil ? 1 : 0} height={34} />
-          <YAxis tick={EJE} axisLine={false} tickLine={false} tickFormatter={fmtPesosCorto} width={movil ? 58 : 64} {...ejeY(Math.max(...filas.map(f => f.ingresos)))} />
+          <XAxis dataKey="mes" tick={<TickMes meses={filas.map(f => f.mes)} />} axisLine={false} tickLine={false} interval={Math.max(0, Math.ceil(meses.length / (compacto ? 6 : 24)) - 1)} height={34} />
+          <YAxis tick={EJE} axisLine={false} tickLine={false} tickFormatter={fmtPesosCorto} width={movil ? 62 : 72} {...ejeY(Math.max(...filas.map(f => f.ingresos)))} />
           <Tooltip cursor={{ fill: '#f8fafc' }} content={<Caja render={(d) => (<>
             <p className="font-bold text-slate-900">{nombreMes(d.mes)}{d.parcial ? ' · en curso' : ''}</p>
             <p>{fmtPesos(d.ingresos)} · {d.ventas} pagos · ticket {fmtPesos(d.ticket)}</p>
             {tipos.filter(t => d[t]).map(t => <p key={t} className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: COLORES_TIPO[t] }} />{NOMBRE_TIPO[t]}: {fmtPesos(d[t])}</p>)}
           </>)} />} />
           {tipos.map(t => (
-            <Bar key={t} dataKey={t} stackId="t" fill={COLORES_TIPO[t]} maxBarSize={36}>
+            <Bar key={t} dataKey={t} stackId="t" fill={COLORES_TIPO[t]} maxBarSize={36}
+              cursor={onMes ? 'pointer' : undefined} onClick={onMes ? (e) => { const m = e?.payload?.mes ?? e?.mes; if (m) onMes(m) } : undefined}>
               {filas.map(f => <Cell key={f.mes} fillOpacity={f.parcial ? 0.45 : 1} />)}
             </Bar>
           ))}
@@ -82,7 +89,18 @@ export function EvolucionMensual({ serie, movil }) {
           </Line>
         </ComposedChart>
       </ResponsiveContainer>
-      <Leyenda items={tipos.map(t => ({ nombre: NOMBRE_TIPO[t], color: COLORES_TIPO[t] }))} />
+      {onTipo ? (
+        <ul className="flex flex-wrap gap-1.5 mt-2" aria-label="Filtrar por tipo de pago">
+          {[...new Set([...tipos, ...tiposActivos])].map(t => (
+            <li key={t}>
+              <button type="button" onClick={() => onTipo(t)} aria-pressed={tiposActivos.includes(t)}
+                className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ring-1', tiposActivos.includes(t) ? 'ring-emerald-500 bg-emerald-50 font-semibold text-emerald-800' : 'ring-slate-200 text-slate-600 hover:ring-slate-300')}>
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: COLORES_TIPO[t] }} />{NOMBRE_TIPO[t]}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : <Leyenda items={tipos.map(t => ({ nombre: NOMBRE_TIPO[t], color: COLORES_TIPO[t] }))} />}
       <p className="text-[11px] text-slate-400 mt-1">* Mes en curso (incompleto), en tono claro.</p>
     </>
   )
@@ -98,13 +116,15 @@ export function AnioContraAnio({ comparativo, movil }) {
   const max = Math.max(...anios.flatMap(a => a.puntos.filter(p => p != null)))
   // Rótulo al final de cada línea: año + total acumulado
   const finDe = (a) => a.puntos.reduce((u, p, i) => (p != null ? i : u), -1)
+  // Con pocos meses (filtro de meses) se dibujan los puntos para que se vean
+  const pocos = Math.max(...anios.map(a => a.puntos.filter(p => p != null).length)) <= 3
   return (
     <>
       <ResponsiveContainer width="100%" height={movil ? 250 : 290}>
         <LineChart data={filas} margin={{ top: 12, right: movil ? 78 : 96, left: movil ? -6 : 4, bottom: 0 }}>
           {GRID}
           <XAxis dataKey="mes" tick={EJE} axisLine={false} tickLine={false} interval={movil ? 1 : 0} />
-          <YAxis tick={EJE} axisLine={false} tickLine={false} tickFormatter={fmtPesosCorto} width={movil ? 58 : 64} {...ejeY(max)} />
+          <YAxis tick={EJE} axisLine={false} tickLine={false} tickFormatter={fmtPesosCorto} width={movil ? 62 : 72} {...ejeY(max)} />
           <Tooltip content={({ active, payload, label }) => (active && payload?.length ? (
             <div className="rounded-lg bg-white shadow-lg ring-1 ring-slate-200 px-3 py-2 text-xs text-slate-700">
               <p className="font-bold text-slate-900">Acumulado a {label}</p>
@@ -114,7 +134,8 @@ export function AnioContraAnio({ comparativo, movil }) {
           {anios.map(a => {
             const fin = finDe(a)
             return (
-              <Line key={a.anio} dataKey={a.anio} stroke={colores[a.anio]} strokeWidth={a === anios.at(-1) ? 3 : 2} dot={false} connectNulls={false} isAnimationActive={false}>
+              <Line key={a.anio} dataKey={a.anio} stroke={colores[a.anio]} strokeWidth={a === anios.at(-1) ? 3 : 2} isAnimationActive={false}
+                connectNulls dot={pocos ? { r: 4, fill: colores[a.anio], strokeWidth: 0 } : false}>
                 <LabelList dataKey={a.anio} content={({ x, y, index, value }) => (index === fin && value != null ? (
                   <text x={x + 6} y={y + 4} fontSize={11} fontWeight={700} fill={colores[a.anio] === '#cbd5e1' ? '#94a3b8' : colores[a.anio]} {...HALO}>{a.anio} · {movil ? fmtCompacto(value) : fmtPesosCorto(value)}</text>
                 ) : null)} />
@@ -129,7 +150,7 @@ export function AnioContraAnio({ comparativo, movil }) {
 }
 
 // ── 3. Medios de pago ───────────────────────────────────────────────────────
-export function MediosDePago({ medios, movil }) {
+export function MediosDePago({ medios, movil, activos = [], onElegir }) {
   const filas = medios.map((m, i) => ({ ...m, color: colorMedio(i, m.nombre), rotulo: `${fmtPesosCorto(m.ingresos)} · ${fmtPct(m.pct, m.pct < 1 ? 1 : 0)}` }))
   if (!filas.length) return <Vacio texto="Sin pagos en el período." />
   return (
@@ -143,8 +164,9 @@ export function MediosDePago({ medios, movil }) {
           <p>{fmtPesos(d.ingresos)} · {fmtPct(d.pct, 1)} del recaudo</p>
           <p>{d.ventas} pagos · ticket {fmtPesos(d.ticket)}</p>
         </>)} />} />
-        <Bar dataKey="ingresos" radius={[0, 6, 6, 0]} maxBarSize={24} minPointSize={3}>
-          {filas.map(f => <Cell key={f.nombre} fill={f.color} />)}
+        <Bar dataKey="ingresos" radius={[0, 6, 6, 0]} maxBarSize={24} minPointSize={3}
+          cursor={onElegir ? 'pointer' : undefined} onClick={onElegir ? (e) => { const n = e?.payload?.nombre ?? e?.nombre; if (n) onElegir(n) } : undefined}>
+          {filas.map(f => <Cell key={f.nombre} fill={f.color} stroke={activos.includes(f.nombre) ? '#0f172a' : undefined} strokeWidth={activos.includes(f.nombre) ? 1.5 : 0} />)}
           <LabelList dataKey="rotulo" content={RotuloDerecha} />
         </Bar>
       </BarChart>
@@ -154,7 +176,7 @@ export function MediosDePago({ medios, movil }) {
 
 // ── 4. Planes ───────────────────────────────────────────────────────────────
 const COLORES_PLAN = { Mensual: '#0891b2', Semestral: '#059669', Anual: '#7c3aed', Promociones: '#f97316', 'Sin plan': '#cbd5e1' }
-export function MixDePlanes({ planes, movil }) {
+export function MixDePlanes({ planes, movil, activos = [], onElegir }) {
   const filas = planes.map(p => ({ ...p, rotulo: `${fmtPesosCorto(p.ingresos)} · ${fmtPct(p.pct)} · ticket ${fmtPesosCorto(p.ticket)}` }))
   if (!filas.length) return <Vacio texto="Sin pagos en el período." />
   return (
@@ -168,8 +190,9 @@ export function MixDePlanes({ planes, movil }) {
           <p>{fmtPesos(d.ingresos)} · {fmtPct(d.pct, 1)} del recaudo</p>
           <p>{d.ventas} pagos · ticket {fmtPesos(d.ticket)}</p>
         </>)} />} />
-        <Bar dataKey="ingresos" radius={[0, 6, 6, 0]} maxBarSize={28} minPointSize={3}>
-          {filas.map(f => <Cell key={f.nombre} fill={COLORES_PLAN[f.nombre] || '#94a3b8'} />)}
+        <Bar dataKey="ingresos" radius={[0, 6, 6, 0]} maxBarSize={28} minPointSize={3}
+          cursor={onElegir ? 'pointer' : undefined} onClick={onElegir ? (e) => { const n = e?.payload?.nombre ?? e?.nombre; if (n) onElegir(n) } : undefined}>
+          {filas.map(f => <Cell key={f.nombre} fill={COLORES_PLAN[f.nombre] || '#94a3b8'} stroke={activos.includes(f.nombre) ? '#0f172a' : undefined} strokeWidth={activos.includes(f.nombre) ? 1.5 : 0} />)}
           <LabelList dataKey="rotulo" content={RotuloDerecha} />
         </Bar>
       </BarChart>
@@ -187,7 +210,7 @@ export function DiasDePago({ dias, movil }) {
       <BarChart data={filas} margin={{ top: 22, right: 8, left: movil ? -6 : 4, bottom: 0 }}>
         {GRID}
         <XAxis dataKey="tramo" tick={EJE} axisLine={false} tickLine={false} interval={0} />
-        <YAxis tick={EJE} axisLine={false} tickLine={false} tickFormatter={fmtPesosCorto} width={movil ? 58 : 64} {...ejeY(max)} />
+        <YAxis tick={EJE} axisLine={false} tickLine={false} tickFormatter={fmtPesosCorto} width={movil ? 62 : 72} {...ejeY(max)} />
         <Tooltip cursor={{ fill: '#f8fafc' }} content={<Caja render={(d) => (<>
           <p className="font-bold text-slate-900">Días {d.tramo}</p>
           <p>{fmtPesos(d.ingresos)} · {fmtPct(d.pct, 1)} del recaudo · {d.ventas} pagos</p>
@@ -202,7 +225,7 @@ export function DiasDePago({ dias, movil }) {
 }
 
 // ── 6. Estacionalidad: mapa de calor año × mes ──────────────────────────────
-export function MapaEstacionalidad({ estacionalidad }) {
+export function MapaEstacionalidad({ estacionalidad, onMes }) {
   const valores = estacionalidad.flatMap(a => a.meses.filter(m => m && !m.parcial).map(m => m.ingresos))
   const max = Math.max(1, ...valores)
   if (!valores.some(Boolean)) return <Vacio texto="Sin datos." />
@@ -223,9 +246,11 @@ export function MapaEstacionalidad({ estacionalidad }) {
               <td className="font-bold text-slate-700 px-1">{a.anio}</td>
               {a.meses.map((m, i) => (
                 <td key={i} title={m ? `${nombreMes(m.mes)}: ${fmtPesos(m.ingresos)}${m.parcial ? ' (en curso)' : ''}` : ''}
-                  className={cn('h-9 rounded-md text-center font-semibold tabular-nums', !m && 'bg-slate-50')}
+                  className={cn('h-9 rounded-md text-center font-semibold tabular-nums p-0', !m && 'bg-slate-50')}
                   style={m ? { background: m.parcial ? 'repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 4px,#e2e8f0 4px,#e2e8f0 8px)' : fondo(m.ingresos), color: !m.parcial && m.ingresos / max > 0.55 ? '#fff' : '#0f172a' } : undefined}>
-                  {m && m.ingresos ? fmtCompacto(m.ingresos) : ''}
+                  {m && m.ingresos ? (onMes
+                    ? <button type="button" onClick={() => onMes(m.mes)} className="w-full h-9 rounded-md hover:ring-2 hover:ring-slate-900/40 focus-visible:ring-2 focus-visible:ring-slate-900 focus:outline-none" aria-label={`Ver ${nombreMes(m.mes)}`}>{fmtCompacto(m.ingresos)}</button>
+                    : fmtCompacto(m.ingresos)) : ''}
                 </td>
               ))}
               <td className="text-right font-bold text-slate-800 tabular-nums px-1 whitespace-nowrap">{fmtPesosCorto(a.total)}</td>

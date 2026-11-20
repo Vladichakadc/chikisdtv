@@ -55,8 +55,25 @@ function resumenDe(lista) {
   return { ingresos: Math.round(ingresos), ventas: lista.length, ticket: lista.length ? Math.round(ingresos / lista.length) : 0 };
 }
 
-function calcularAnalisisPagos(ventas, { hoy = hoyISO() } = {}) {
-  const pagos = ventas
+// Filtros (todos opcionales):
+//   · variables → medios, tipos (renovacion|activacion|otros), planes: se
+//     aplican a TODO (tarjetas, serie, comparativos y distribuciones);
+//   · período   → periodo '12m' (por defecto) | 'todo' | 'personalizado' con
+//     anios ['2025', …] y meses [1..12]: definen la "selección" que muestran
+//     las gráficas de distribución, la serie, el año contra año y el mapa.
+//     Las tarjetas siguen comparando meses cerrados.
+function normalizarFiltros(f = {}) {
+  const lista = (v) => (Array.isArray(v) ? v : String(v || '').split(',')).map(x => String(x).trim()).filter(Boolean);
+  const meses = lista(f.meses).map(Number).filter(n => n >= 1 && n <= 12);
+  const anios = lista(f.anios).filter(a => /^\d{4}$/.test(a));
+  let periodo = ['12m', 'todo', 'personalizado'].includes(f.periodo) ? f.periodo : '12m';
+  if ((anios.length || meses.length) && periodo !== 'personalizado') periodo = 'personalizado';
+  return { medios: lista(f.medios), tipos: lista(f.tipos), planes: lista(f.planes), periodo, anios, meses };
+}
+
+function calcularAnalisisPagos(ventas, { hoy = hoyISO(), filtros: filtrosEntrada } = {}) {
+  const filtros = normalizarFiltros(filtrosEntrada);
+  const todos = ventas
     .filter(v => v.fecha && esIngresoReal(v))
     .map(v => ({
       fecha: String(v.fecha).slice(0, 10), mes: ym(v.fecha), monto: Number(v.precioVenta) || 0,
@@ -64,6 +81,22 @@ function calcularAnalisisPagos(ventas, { hoy = hoyISO() } = {}) {
       usd: esUSD(v.medioPago), cliente: clienteDe(v), nombre: String([v.nombre, v.apellido].filter(Boolean).join(' ') || v.nickname || '').trim(),
     }))
     .filter(v => v.fecha <= hoy);
+
+  // Opciones de los filtros (sin filtrar), ordenadas por recaudo
+  const ordenarPor = (clave) => {
+    const m = new Map();
+    for (const p of todos) m.set(p[clave], (m.get(p[clave]) || 0) + p.monto);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  };
+  const opciones = {
+    anios: [...new Set(todos.map(p => p.fecha.slice(0, 4)))].sort().reverse(),
+    medios: ordenarPor('medio'),
+    planes: ordenarPor('plan'),
+    tipos: ['renovacion', 'activacion', 'otros'].filter(t => todos.some(p => p.tipo === t)),
+  };
+  const pagos = todos.filter(p => (!filtros.medios.length || filtros.medios.includes(p.medio))
+    && (!filtros.tipos.length || filtros.tipos.includes(p.tipo))
+    && (!filtros.planes.length || filtros.planes.includes(p.plan)));
 
   const mesHoy = ym(hoy);
   const corte = sumarMeses(mesHoy, -1); // último mes cerrado
@@ -76,14 +109,15 @@ function calcularAnalisisPagos(ventas, { hoy = hoyISO() } = {}) {
   // ── Serie mensual: 24 meses cerrados + mes en curso ──
   const meses = [];
   for (let m = desde24; m <= mesHoy; m = sumarMeses(m, 1)) meses.push(m);
-  const serie = meses.map(m => {
+  const filaSerie = (m) => {
     const g = enMes(m);
     const r = resumenDe(g);
     const fila = { mes: m, ...r, parcial: m === mesHoy };
     for (const t of ['renovacion', 'activacion', 'otros']) fila[t] = Math.round(g.filter(p => p.tipo === t).reduce((s, p) => s + p.monto, 0));
     return fila;
-  });
-  const sparkline = serie.filter(s => !s.parcial).slice(-12).map(s => ({ mes: s.mes, ingresos: s.ingresos }));
+  };
+  const serie24 = meses.map(filaSerie);
+  const sparkline = serie24.filter(s => !s.parcial).slice(-12).map(s => ({ mes: s.mes, ingresos: s.ingresos }));
 
   // ── Mes en curso y proyección ──
   const dia = Number(hoy.slice(8, 10));
@@ -160,20 +194,43 @@ function calcularAnalisisPagos(ventas, { hoy = hoyISO() } = {}) {
   }
 
   // ── Estacionalidad: año × mes ──
-  const anios = [...new Set(pagos.map(p => p.fecha.slice(0, 4)))].sort();
+  // ── Selección del período ──
+  const personalizado = filtros.periodo === 'personalizado';
+  const enAnios = (a) => !filtros.anios.length || filtros.anios.includes(a);
+  const enMesesSel = (m) => !filtros.meses.length || filtros.meses.includes(Number(m.slice(5, 7)));
+  const seleccion = filtros.periodo === 'todo' ? pagos
+    : personalizado ? pagos.filter(p => enAnios(p.fecha.slice(0, 4)) && enMesesSel(p.mes))
+      : ult12;
+  // Serie de la selección: todos los meses del rango (también los que no
+  // tuvieron pagos), respetando los años y meses elegidos
+  const mesesDesde = (desde, hasta, incluir = () => true) => {
+    const out = [];
+    for (let m = desde; m <= hasta; m = sumarMeses(m, 1)) if (incluir(m)) out.push(filaSerie(m));
+    return out;
+  };
+  let serie = serie24;
+  if (personalizado) {
+    const ms = pagos.map(p => p.mes).filter(m => enAnios(m.slice(0, 4)) && enMesesSel(m)).sort();
+    serie = ms.length ? mesesDesde(ms[0], ms[ms.length - 1], (m) => enAnios(m.slice(0, 4)) && enMesesSel(m)) : [];
+  } else if (filtros.periodo === 'todo') {
+    const ms = pagos.map(p => p.mes).sort();
+    serie = ms.length ? mesesDesde(ms[0], mesHoy) : [];
+  }
+
+  const anios = [...new Set(pagos.map(p => p.fecha.slice(0, 4)))].sort().filter(enAnios);
   const estacionalidad = anios.map(a => ({
     anio: a,
     meses: Array.from({ length: 12 }, (_, i) => {
       const m = `${a}-${String(i + 1).padStart(2, '0')}`;
-      if (m > mesHoy) return null;
+      if (m > mesHoy || !enMesesSel(m)) return null;
       return { mes: m, ingresos: Math.round(enMes(m).reduce((s, p) => s + p.monto, 0)), parcial: m === mesHoy };
     }),
-    total: Math.round(pagos.filter(p => p.fecha.startsWith(a)).reduce((s, p) => s + p.monto, 0)),
+    total: Math.round(pagos.filter(p => p.fecha.startsWith(a) && enMesesSel(p.mes)).reduce((s, p) => s + p.monto, 0)),
   }));
 
   // ── Comparativo año contra año (acumulado por mes) ──
   const anioHoy = hoy.slice(0, 4);
-  const comparativo = anios.slice(-3).map(a => {
+  const comparativo = (filtros.anios.length ? anios : anios.slice(-3)).map(a => {
     let acc = 0;
     return {
       anio: a,
@@ -181,6 +238,7 @@ function calcularAnalisisPagos(ventas, { hoy = hoyISO() } = {}) {
         const m = `${a}-${String(i + 1).padStart(2, '0')}`;
         if (m > corte && a === anioHoy) return null; // solo meses cerrados del año en curso
         if (m > mesHoy) return null;
+        if (!enMesesSel(m)) return null; // con filtro de meses, solo los meses elegidos
         acc += enMes(m).reduce((s, p) => s + p.monto, 0);
         return Math.round(acc);
       }),
@@ -199,20 +257,28 @@ function calcularAnalisisPagos(ventas, { hoy = hoyISO() } = {}) {
     },
     sparkline,
     serie,
-    distribucion: { ultimos12: distribuciones(ult12), historico: distribuciones(pagos) },
+    distribucion: { ultimos12: distribuciones(ult12), seleccion: distribuciones(seleccion) },
+    seleccion: (() => {
+      const r = resumenDe(seleccion);
+      const nMeses = new Set(seleccion.map(p => p.mes)).size;
+      return { ...r, clientes: new Set(seleccion.map(p => p.cliente).filter(Boolean)).size, meses: nMeses, promedioMensual: nMeses ? Math.round(r.ingresos / nMeses) : 0, porTipo: Object.fromEntries(['renovacion', 'activacion', 'otros'].map(t => [t, Math.round(seleccion.filter(p => p.tipo === t).reduce((s, p) => s + p.monto, 0))])) };
+    })(),
+    filtros,
+    opciones,
     estacionalidad,
     comparativo,
   };
 }
 
-async function analisisPagos({ hoy } = {}) {
-  return enCache(`pagos-analisis-${hoy || 'hoy'}`, async () => {
+async function analisisPagos({ hoy, filtros } = {}) {
+  const f = normalizarFiltros(filtros);
+  return enCache(`pagos-analisis-${hoy || 'hoy'}-${JSON.stringify(f)}`, async () => {
     const ventas = await Venta.findAll({
       attributes: ['fecha', 'precioVenta', 'tipoPago', 'tipoPlan', 'medioPago', 'customerId', 'nickname', 'nombre', 'apellido'],
       raw: true,
     });
-    return calcularAnalisisPagos(ventas, { hoy });
+    return calcularAnalisisPagos(ventas, { hoy, filtros: f });
   });
 }
 
-module.exports = { analisisPagos, calcularAnalisisPagos, medioNormal, familiaPlan };
+module.exports = { analisisPagos, calcularAnalisisPagos, normalizarFiltros, medioNormal, familiaPlan };
