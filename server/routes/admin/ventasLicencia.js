@@ -4,6 +4,7 @@ const path = require('path');
 const XLSX = require('xlsx');
 const { Venta, Client, Device } = require('../../models');
 const asyncHandler = require('../../middleware/asyncHandler');
+const { analisisPagos } = require('../../services/analisisPagos');
 const { leerExcelOrigen, autoImportarSiDisponible } = require('../../utils/excelOrigen');
 const { normalizeTipoPago, sanitizeVentaBody, siguienteIdVenta } = require('../../services/ventasService');
 
@@ -74,6 +75,13 @@ router.get('/payments/ventas-licencia/next-id', asyncHandler(async (_req, res) =
 router.post('/payments/ventas-licencia/import', asyncHandler(async (_req, res) => {
   const count = await importVentas();
   res.json({ imported: count });
+}));
+
+// Análisis de Pagos (services/analisisPagos.js). ?hoy=AAAA-MM-DD permite ver
+// el análisis a una fecha de corte (útil para revisar meses anteriores).
+router.get('/payments/analisis', asyncHandler(async (req, res) => {
+  const hoy = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.hoy || '')) ? String(req.query.hoy) : undefined;
+  res.json(await analisisPagos({ hoy }));
 }));
 
 router.get('/payments/ventas-licencia', asyncHandler(async (_req, res) => {
