@@ -374,7 +374,7 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <style>{CSS}</style>
       <div
-        className="bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
+        className="bg-white rounded-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header — mismo degradado del hero del Planificador */}

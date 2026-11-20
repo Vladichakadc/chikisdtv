@@ -174,7 +174,7 @@ export default function DashboardLayout() {
     ?? flatNav.find(i => i.to !== '/admin' && location.pathname.startsWith(i.to))
 
   return (
-    <div className="h-screen bg-ui-background flex overflow-hidden">
+    <div className="h-screen h-dvh bg-ui-background flex overflow-hidden">
       <style>{SHELL_CSS}</style>
 
       {/* Overlay detrás del drawer en mobile */}

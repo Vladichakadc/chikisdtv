@@ -7,7 +7,7 @@ export function CuentasPadreAlertPanel({ cuentas, titulo, variante, onClose, nav
   const headerGrad = isVencidas ? 'from-red-600 to-red-700' : 'from-amber-500 to-amber-600'
   return (
     <div className="pl-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4" onClick={onClose}>
-      <div className="pl-confirm bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="pl-confirm bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80dvh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className={`bg-gradient-to-r ${headerGrad} rounded-t-2xl px-6 py-4 flex items-center justify-between flex-shrink-0`}>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Building2 size={20} /> {titulo}

@@ -213,7 +213,7 @@ export function IngresoPorClientePanel({ onClose }) {
                 <p className="text-sm">No se encontraron clientes para esa búsqueda.</p>
               </div>
             ) : (
-              <div className="max-h-[50vh] overflow-y-auto">
+              <div className="max-h-[50dvh] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">

@@ -1013,7 +1013,7 @@ export default function PlansPage() {
           onClick={() => setChartZoom(false)}
         >
           <div
-            className="pl-confirm bg-white w-full h-full sm:h-auto sm:rounded-2xl sm:shadow-2xl sm:max-w-6xl sm:max-h-[92vh] flex flex-col overflow-hidden"
+            className="pl-confirm bg-white w-full h-full sm:h-auto sm:rounded-2xl sm:shadow-2xl sm:max-w-6xl sm:max-h-[92dvh] flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-slate-100 flex-shrink-0">

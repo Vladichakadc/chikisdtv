@@ -135,7 +135,7 @@ function ClasificarSinMotivo({ lista, onClasificada }) {
       pregunta="Cada motivo que registres afina todo el análisis."
       className="mb-5 ring-amber-200 bg-amber-50/40">
       <p className="text-xs text-slate-500 mb-1">De la más reciente a la más antigua.</p>
-      <ul className="divide-y divide-amber-100 max-h-[60vh] overflow-y-auto pr-1">
+      <ul className="divide-y divide-amber-100 max-h-[60dvh] overflow-y-auto pr-1">
         {lista.map(b => (
           <li key={b.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="min-w-0 flex-1">

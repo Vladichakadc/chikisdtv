@@ -115,7 +115,7 @@ export function HistorialPanel({ onClose, onCambio }) {
         ) : filas.length === 0 ? (
           <div className="py-16 text-center text-gray-400 text-sm">Aún no hay cambios registrados.</div>
         ) : (
-          <ul className="max-h-[65vh] overflow-y-auto divide-y divide-gray-100">
+          <ul className="max-h-[65dvh] overflow-y-auto divide-y divide-gray-100">
             {filas.map(c => {
               const a = ACCIONES[c.accion] || { label: c.accion, cls: 'bg-gray-100 text-gray-600' }
               return (
