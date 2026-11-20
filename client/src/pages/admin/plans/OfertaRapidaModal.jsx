@@ -205,8 +205,10 @@ export function OfertaRapidaModal({ plan, planes = [], trmInicial, onClose }) {
 
   const handleWhatsAppTexto = () => {
     // Computador → WhatsApp Web; celular → app (ver utils/telefono.js)
-    abrirWhatsApp('', mensaje)
-    showToast('WhatsApp abierto — elige el chat del cliente; la oferta va prellenada.', 'success')
+    const { copiado } = abrirWhatsApp('', mensaje)
+    showToast(copiado
+      ? 'Oferta copiada — abre el chat del cliente en WhatsApp Web y pégala con Ctrl+V.'
+      : 'WhatsApp abierto — elige el chat del cliente; la oferta va prellenada.', 'success')
   }
 
   return (

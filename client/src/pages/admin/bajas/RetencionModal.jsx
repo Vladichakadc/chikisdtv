@@ -69,7 +69,8 @@ export function RetencionModal({ candidato, planes, onClose, onEnviada }) {
 
   const enviar = () => {
     if (!oferta.opciones.length) return
-    abrirWhatsApp(tel.numero, oferta.mensaje)
+    const { copiado } = abrirWhatsApp(tel.numero, oferta.mensaje)
+    if (copiado) showToast('Sin teléfono: oferta copiada — abre el chat del cliente en WhatsApp Web y pégala con Ctrl+V.', 'info')
     onEnviada?.(candidato)
   }
   const copiar = async () => {

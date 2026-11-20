@@ -38,7 +38,10 @@ describe('urlWhatsAppTexto', () => {
   it('computador: abre WhatsApp Web con el chat y el texto', () => {
     expect(urlWhatsAppTexto('573001234567', 'Hola 📺', { movil: false })).toBe('https://web.whatsapp.com/send?phone=573001234567&text=Hola%20%F0%9F%93%BA')
     expect(urlWhatsAppTexto('573001234567', '', { movil: false })).toBe('https://web.whatsapp.com/send?phone=573001234567')
-    expect(urlWhatsAppTexto('', '', { movil: false })).toBe('https://web.whatsapp.com/send')
+  })
+  it('computador sin número: página principal de WhatsApp Web (/send sin número queda en blanco)', () => {
+    expect(urlWhatsAppTexto('', 'Hola', { movil: false })).toBe('https://web.whatsapp.com/')
+    expect(urlWhatsAppTexto('', '', { movil: false })).toBe('https://web.whatsapp.com/')
   })
 })
 
