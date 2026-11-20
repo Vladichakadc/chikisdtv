@@ -4,38 +4,37 @@
 // cliente (client/src/pages/admin/bajas/ofertaRetencion.js) con el catálogo
 // de planes activo que también devuelve este servicio.
 //
-// Quedan por fuera:
-//   · los que ya volvieron a comprar (recuperados);
-//   · movimientos internos ("Cambio de cuenta o de pantalla");
-//   · "Fallecimiento del titular" (no se le escribe a esa familia una oferta);
-//   · los que hoy siguen activos con otra pantalla en el Planificador.
+// Se listan TODAS las bajas, de la más reciente a la más antigua, cada una
+// con su estado para saber a quién vale la pena escribirle:
+//   · por_recuperar → se fue y no ha vuelto (la oferta tiene sentido);
+//   · volvio        → volvió a comprar después de la baja;
+//   · activo        → sigue activo con otra pantalla en el Planificador;
+//   · interno       → "Cambio de cuenta o de pantalla" (movimiento interno);
+//   · fallecimiento → no se le envía oferta.
 const { Op } = require('sequelize');
 const { Baja, Venta, Planificador, Plan, Client, TablaCliente } = require('../models');
-const { filasDeBajas } = require('./analisisBajas');
+const { filasDeBajas, ordenRecientes } = require('./analisisBajas');
 
-const EXCLUIDAS = new Set(['cambio_cuenta', 'fallecimiento']);
 const hoyISO = () => new Date().toLocaleDateString('en-CA');
 const diasEntre = (a, b) => Math.round((new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / 86400000);
 
+function estadoDe(f, activos) {
+  if (f.categoria === 'fallecimiento') return 'fallecimiento';
+  if (f.categoria === 'cambio_cuenta') return 'interno';
+  if (f.recuperado) return 'volvio';
+  if (f.customerId && activos.has(f.customerId)) return 'activo';
+  return 'por_recuperar';
+}
+
 function calcularCandidatos(filas, { activos = new Set(), hoy = hoyISO() } = {}) {
-  // Si un cliente tiene varias bajas, se toma la más reciente
-  const porCliente = new Map();
-  for (const f of filas) {
-    if (f.recuperado || EXCLUIDAS.has(f.categoria)) continue;
-    if (f.customerId && activos.has(f.customerId)) continue;
-    const clave = f.customerId || `nick:${String(f.nickname || f.idBaja).toLowerCase()}`;
-    const previa = porCliente.get(clave);
-    if (!previa || f.fechaBaja > previa.fechaBaja) porCliente.set(clave, f);
-  }
-  return [...porCliente.values()]
-    .map(f => ({
-      id: f.id, idBaja: f.idBaja, nickname: f.nickname, nombre: f.nombre, customerId: f.customerId,
-      fechaBaja: f.fechaBaja, diasDesdeBaja: Math.max(0, diasEntre(f.fechaBaja, hoy)),
-      categoria: f.categoria, categoriaNombre: f.categoriaNombre, observaciones: f.observaciones,
-      pantallas: f.pantallas, tipoPlan: f.tipoPlan, vidaMeses: f.vidaMeses, ingresoMensual: f.ingresoMensual,
-      ultimaVenta: f.ultimaVenta,
-    }))
-    .sort((a, b) => b.fechaBaja.localeCompare(a.fechaBaja));
+  return [...filas].sort(ordenRecientes).map(f => ({
+    id: f.id, idBaja: f.idBaja, nickname: f.nickname, nombre: f.nombre, customerId: f.customerId,
+    fechaBaja: f.fechaBaja, diasDesdeBaja: f.fechaBaja ? Math.max(0, diasEntre(f.fechaBaja, hoy)) : null,
+    categoria: f.categoria, categoriaNombre: f.categoriaNombre, observaciones: f.observaciones,
+    pantallas: f.pantallas, tipoPlan: f.tipoPlan, vidaMeses: f.vidaMeses, ingresoMensual: f.ingresoMensual,
+    ultimaVenta: f.ultimaVenta, fechaRegreso: f.fechaRegreso || null,
+    estado: estadoDe(f, activos),
+  }));
 }
 
 async function retencionBajas({ hoy } = {}) {

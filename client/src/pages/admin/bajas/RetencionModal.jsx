@@ -92,7 +92,7 @@ export function RetencionModal({ candidato, planes, onClose, onEnviada }) {
             <div className="min-w-0">
               <h2 className="text-lg font-bold leading-tight truncate">Oferta de regreso · {nombre}</h2>
               <p className="text-white/85 text-xs truncate">
-                Se fue el {formatDate(candidato.fechaBaja)} · {candidato.categoriaNombre}
+                {candidato.fechaBaja ? `Se fue el ${formatDate(candidato.fechaBaja)}` : "Sin fecha de baja"} · {candidato.categoriaNombre}
                 {candidato.ultimaVenta ? ` · último plan ${candidato.ultimaVenta.tipoPlan || ''} ${pesos(candidato.ultimaVenta.precioVenta)}` : ''}
               </p>
             </div>

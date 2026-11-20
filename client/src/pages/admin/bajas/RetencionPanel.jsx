@@ -16,7 +16,15 @@ const CLAVE_ENVIADAS = 'bajas.retencion.enviadas'
 const leerEnviadas = () => { try { return JSON.parse(localStorage.getItem(CLAVE_ENVIADAS) || '{}') } catch { return {} } }
 const guardarEnviadas = (m) => { try { localStorage.setItem(CLAVE_ENVIADAS, JSON.stringify(m)) } catch { /* sin almacenamiento */ } }
 const pesos = (v) => `$${Math.round(Number(v) || 0).toLocaleString('es-CO')}`
-const hace = (dias) => (dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : dias < 60 ? `hace ${dias} días` : `hace ${Math.round(dias / 30)} meses`)
+const hace = (dias) => (dias == null ? 'sin fecha registrada' : dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : dias < 60 ? `hace ${dias} días` : `hace ${Math.round(dias / 30)} meses`)
+
+export const ESTADOS = {
+  por_recuperar: { nombre: 'Por recuperar', cls: 'bg-amber-100 text-amber-800' },
+  volvio: { nombre: 'Ya volvió', cls: 'bg-emerald-100 text-emerald-800' },
+  activo: { nombre: 'Activo en otra pantalla', cls: 'bg-sky-100 text-sky-800' },
+  interno: { nombre: 'Movimiento interno', cls: 'bg-slate-100 text-slate-700' },
+  fallecimiento: { nombre: 'Fallecimiento', cls: 'bg-slate-200 text-slate-700' },
+}
 
 const VENTANAS = [
   { clave: 90, nombre: 'Últimos 90 días' },
@@ -27,10 +35,10 @@ const VENTANAS = [
 export function RetencionPanel() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-  const [ventana, setVentana] = useState(365)
+  const [ventana, setVentana] = useState(0)
+  const [estado, setEstado] = useState('todos')
   const [motivo, setMotivo] = useState('todos')
   const [buscar, setBuscar] = useState('')
-  const [ver, setVer] = useState(6)
   const [abierto, setAbierto] = useState(null)
   const [enviadas, setEnviadas] = useState(leerEnviadas)
 
@@ -41,7 +49,7 @@ export function RetencionPanel() {
   }, [])
 
   const enVentana = useMemo(
-    () => (data?.candidatos || []).filter(c => !ventana || c.diasDesdeBaja <= ventana),
+    () => (data?.candidatos || []).filter(c => !ventana || (c.diasDesdeBaja != null && c.diasDesdeBaja <= ventana)),
     [data, ventana],
   )
   const motivos = useMemo(() => {
@@ -52,9 +60,16 @@ export function RetencionPanel() {
   const lista = useMemo(() => {
     const q = buscar.trim().toLowerCase()
     return enVentana.filter(c => (motivo === 'todos' || c.categoria === motivo)
+      && (estado === 'todos' || c.estado === estado)
       && (!q || `${c.nombre || ''} ${c.nickname || ''} ${c.customerId || ''}`.toLowerCase().includes(q)))
-  }, [enVentana, motivo, buscar])
-  const enJuego = enVentana.reduce((s, c) => s + (c.ingresoMensual || 0), 0)
+  }, [enVentana, motivo, estado, buscar])
+  const porRecuperar = enVentana.filter(c => c.estado === 'por_recuperar')
+  const enJuego = porRecuperar.reduce((s, c) => s + (c.ingresoMensual || 0), 0)
+  const estados = useMemo(() => {
+    const n = {}
+    for (const c of enVentana) n[c.estado] = (n[c.estado] || 0) + 1
+    return Object.keys(ESTADOS).filter(k => n[k]).map(k => ({ clave: k, nombre: ESTADOS[k].nombre, n: n[k] }))
+  }, [enVentana])
 
   const marcarEnviada = (c) => {
     const m = { ...enviadas, [c.idBaja]: new Date().toISOString().slice(0, 10) }
@@ -67,13 +82,13 @@ export function RetencionPanel() {
         <div>
           <h2 className="dash-num text-lg font-bold text-slate-900 leading-tight flex items-center gap-2"><Gift size={18} className="text-emerald-600" /> Plan de retención</h2>
           <p className="dash-txt text-[13px] text-slate-600 mt-0.5 max-w-2xl">
-            Clientes que se fueron y no han vuelto. A todos se les envía la misma oferta agresiva sobre su último plan: <strong>{EST.descuento}% de descuento</strong>, plan anual destacado y solo {EST.vigenciaDias} días para decidir, con precio mensual, semestral y anual.
+            Todas las bajas, de la más reciente a la más antigua, con su estado. A quienes no han vuelto se les envía la misma oferta agresiva sobre su último plan: <strong>{EST.descuento}% de descuento</strong>, plan anual destacado y solo {EST.vigenciaDias} días para decidir, con precio mensual, semestral y anual.
           </p>
         </div>
         {data && (
           <div className="text-right">
-            <p className="dash-num text-[26px] font-bold leading-none text-emerald-700">{enVentana.length}</p>
-            <p className="text-xs text-slate-500">por recuperar · {fmtPesosCorto(enJuego)}/mes en juego</p>
+            <p className="dash-num text-[26px] font-bold leading-none text-emerald-700">{porRecuperar.length}</p>
+            <p className="text-xs text-slate-500">por recuperar de {enVentana.length} bajas · {fmtPesosCorto(enJuego)}/mes en juego</p>
           </div>
         )}
       </header>
@@ -86,7 +101,7 @@ export function RetencionPanel() {
           <div className="flex flex-col lg:flex-row gap-2 mb-3">
             <div role="radiogroup" aria-label="Desde cuándo" className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold self-start">
               {VENTANAS.map(v => (
-                <button key={v.clave} role="radio" aria-checked={ventana === v.clave} onClick={() => { setVentana(v.clave); setVer(6) }}
+                <button key={v.clave} role="radio" aria-checked={ventana === v.clave} onClick={() => setVentana(v.clave)}
                   className={cn('px-3 py-1.5 rounded-md transition-colors', ventana === v.clave ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
                   {v.nombre}
                 </button>
@@ -98,10 +113,19 @@ export function RetencionPanel() {
                 className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300" />
             </label>
           </div>
+          <div className="flex flex-wrap gap-1.5 mb-2" aria-label="Filtrar por estado">
+            {[{ clave: 'todos', nombre: 'Todas las bajas', n: enVentana.length }, ...estados].map(e => (
+              <button key={e.clave} onClick={() => setEstado(e.clave)} aria-pressed={estado === e.clave}
+                className={cn('px-2.5 py-1 rounded-full text-xs font-semibold ring-1 transition-colors',
+                  estado === e.clave ? 'bg-emerald-700 text-white ring-emerald-700' : 'bg-white text-slate-600 ring-slate-200 hover:ring-slate-300')}>
+                {e.nombre} · {e.n}
+              </button>
+            ))}
+          </div>
           {motivos.length > 1 && (
             <div className="flex flex-wrap gap-1.5 mb-3" aria-label="Filtrar por motivo">
-              {[{ clave: 'todos', nombre: 'Todos', n: enVentana.length }, ...motivos].map(m => (
-                <button key={m.clave} onClick={() => { setMotivo(m.clave); setVer(6) }} aria-pressed={motivo === m.clave}
+              {[{ clave: 'todos', nombre: 'Todos los motivos', n: enVentana.length }, ...motivos].map(m => (
+                <button key={m.clave} onClick={() => setMotivo(m.clave)} aria-pressed={motivo === m.clave}
                   className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ring-1 transition-colors',
                     motivo === m.clave ? 'bg-slate-800 text-white ring-slate-800' : 'bg-white text-slate-600 ring-slate-200 hover:ring-slate-300')}>
                   {m.clave !== 'todos' && <span className="w-2 h-2 rounded-full" style={{ background: COLORES_MOTIVO[m.clave] }} />}
@@ -114,8 +138,10 @@ export function RetencionPanel() {
           {!lista.length ? (
             <p className="py-6 text-center text-sm text-slate-500">No hay clientes por recuperar con estos filtros.</p>
           ) : (
-            <ul className="grid gap-2 md:grid-cols-2">
-              {lista.slice(0, ver).map(c => {
+            <>
+            <p className="text-xs text-slate-500 mb-2">{lista.length} baja{lista.length === 1 ? '' : 's'} · de la más reciente a la más antigua</p>
+            <ul className="grid gap-2 md:grid-cols-2 max-h-[70vh] overflow-y-auto pr-1 -mr-1 content-start">
+              {lista.map(c => {
                 const enviada = enviadas[c.idBaja]
                 return (
                   <li key={c.idBaja} className="min-w-0 rounded-xl bg-white ring-1 ring-slate-200 p-3 flex flex-col gap-2">
@@ -123,7 +149,7 @@ export function RetencionPanel() {
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800 truncate">{c.nombre || c.nickname}</p>
                         <p className="text-xs text-slate-500 truncate">
-                          Se fue {hace(c.diasDesdeBaja)} ({formatDate(c.fechaBaja)})
+                          {c.idBaja} · {c.fechaBaja ? `Se fue ${hace(c.diasDesdeBaja)} (${formatDate(c.fechaBaja)})` : 'Sin fecha de baja'}
                           {c.ultimaVenta ? ` · ${c.ultimaVenta.tipoPlan || c.tipoPlan} ${pesos(c.ultimaVenta.precioVenta)}` : ''}
                           {` · ${c.pantallas} pant.`}
                         </p>
@@ -136,21 +162,23 @@ export function RetencionPanel() {
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: COLORES_MOTIVO[c.categoria] }} />{c.categoriaNombre}
                       </span>
+                      <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full', ESTADOS[c.estado]?.cls)}>
+                        {ESTADOS[c.estado]?.nombre}{c.estado === 'volvio' && c.fechaRegreso ? ` el ${formatDate(c.fechaRegreso)}` : ''}
+                      </span>
                       {enviada && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">Oferta enviada {formatDate(enviada)}</span>}
                     </div>
-                    <button onClick={() => setAbierto(c)}
-                      className="self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm">
-                      <Send size={13} /> {enviada ? 'Volver a ofrecer' : 'Armar oferta y enviar'}
-                    </button>
+                    {c.estado !== 'fallecimiento' && (
+                      <button onClick={() => setAbierto(c)}
+                        className={cn('self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm',
+                          c.estado === 'por_recuperar' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-white ring-1 ring-slate-300 text-slate-700 hover:bg-slate-50')}>
+                        <Send size={13} /> {enviada ? 'Volver a ofrecer' : 'Armar oferta y enviar'}
+                      </button>
+                    )}
                   </li>
                 )
               })}
             </ul>
-          )}
-          {ver < lista.length && (
-            <button onClick={() => setVer(v => v + 10)} className="mt-3 text-sm font-semibold text-emerald-800 hover:underline">
-              Ver más ({lista.length - ver} restantes)
-            </button>
+            </>
           )}
         </>
       )}
