@@ -3,8 +3,9 @@ import { todayStr } from '../../utils/dateUtils'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search, Plus, Pencil, Trash2, X,
-  DollarSign, ShoppingCart, RotateCcw, Zap,
-  ChevronUp, ChevronDown, ChevronsUpDown, Sparkles, Calendar
+  DollarSign,
+  ChevronUp, ChevronDown, ChevronsUpDown, Sparkles, Calendar,
+  Wallet, Tag, Layers, SlidersHorizontal, CircleDot, BadgeDollarSign
 } from 'lucide-react'
 import api from '../../config/api'
 import { SKU_TIPO_FIRE, MESES } from '../../config/equipos'
@@ -12,9 +13,12 @@ import { useUi } from '../../context/UiContext'
 import { Card, CardBody, CardHeader, CardTitle } from '../../components/ui/Card'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
-import { KpiCard } from '../../components/ui/KpiCard'
 import { formatDate, formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
+import { DASH_TIPOS } from './dashboard/AlAire'
+import { TarjetasPagos } from './pagos/TarjetasPagos'
+import { FiltroMultiple } from './pagos/FiltroMultiple'
+import { resumenPagos, mesEnCurso, tipoDe, medioDe, mesBonito, etiquetaTipoPago, TIPOS } from './pagos/resumenPagos'
 
 
 // ─── Icono de orden ───────────────────────────────────────────────────────────
@@ -53,12 +57,6 @@ const CSS = `
   }
 `
 
-// PagoCard → KpiCard global (dark Huashu)
-const PagoCard = (props) => <KpiCard {...props}
-  gradFrom={props.variant === 'outline' ? '#10b981' : '#10b981'}
-  gradTo={props.variant === 'outline' ? '#34d399' : '#059669'}
-/>
-
 // ─── Columnas ─────────────────────────────────────────────────────────────────
 
 const COLS = [
@@ -74,9 +72,9 @@ const COLS = [
   { key: 'cuenta',         label: 'Cuenta' },
   { key: 'estado',         label: 'Estado' },
   { key: 'cortesia',       label: 'Cortesía' },
-  { key: 'pantallas',      label: '#' },
-  { key: 'fechaAlta',      label: 'Alta' },
-  { key: 'fecha',          label: 'Fecha' },
+  { key: 'pantallas',      label: 'Pantallas' },
+  { key: 'fechaAlta',      label: 'Fecha alta' },
+  { key: 'fecha',          label: 'Fecha pago' },
   { key: 'anio',           label: 'Año' },
   { key: 'mes',            label: 'Mes' },
   { key: 'precioVenta',    label: 'Precio' },
@@ -119,8 +117,20 @@ function renderCell(row, key, onEdit, onDelete) {
     case 'cuentaId':
     case 'sku':
       return <span className="font-mono text-xs">{v || '—'}</span>
+    case 'customerId':
+      return <span className="font-mono text-xs text-slate-700">{v || '—'}</span>
     case 'nombre':
       return <span className="font-medium">{v || '—'}</span>
+    case 'nickname':
+      return <span className="font-semibold text-slate-800">{v || '—'}</span>
+    case 'mes':
+      return <span>{mesBonito(v)}</span>
+    case 'medioPago': {
+      const m = medioDe(v)
+      return m === 'Sin registrar'
+        ? <span className="text-xs text-slate-400">—</span>
+        : <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{m}</span>
+    }
     case 'estado':
       return (
         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold
@@ -139,20 +149,21 @@ function renderCell(row, key, onEdit, onDelete) {
         </span>
       )
     case 'precioVenta':
-      return <span className="font-semibold text-orange-700 whitespace-nowrap">{fmtCOP(v)}</span>
+      return <span className={cn('block text-right font-semibold whitespace-nowrap tabular-nums', Number(v) ? 'text-orange-700' : 'text-slate-400')}>{fmtCOP(v)}</span>
     case 'tipoPago':
       return (
         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold
-          ${v === 'Renovacion' ? 'bg-blue-100 text-blue-700'
+          ${v === 'Renovacion' ? 'bg-emerald-100 text-emerald-700'
           : v?.startsWith('Activacion') ? 'bg-orange-100 text-orange-700'
+          : v === 'Cortesia' ? 'bg-purple-100 text-purple-700'
           : 'bg-gray-100 text-gray-500'}`}>
-          {v || '—'}
+          {etiquetaTipoPago(v)}
         </span>
       )
     case 'pantallas':
     case 'itemQuantity':
     case 'anio':
-      return <span className="block text-center">{v ?? '—'}</span>
+      return <span className="block text-center tabular-nums">{v ?? '—'}</span>
     case 'fechaAlta':
     case 'fecha':
       return <span className="text-xs text-gray-600 whitespace-nowrap">{v ? formatDate(v) : '—'}</span>
@@ -199,6 +210,15 @@ export default function PaymentsPage() {
   const yearMenuRef = useRef(null)
   // `null` = todos los meses (sin filtro). Array = subconjunto explícito seleccionado.
   const [selectedMonths, setSelectedMonths] = useState(null)
+  // Filtros que también se activan desde las tarjetas
+  const [tipoFiltro, setTipoFiltro] = useState(null) // renovacion | activacion | cortesia | otros
+  const [mediosFiltro, setMediosFiltro] = useState([])
+  const [planesFiltro, setPlanesFiltro] = useState([])
+  const [estadosFiltro, setEstadosFiltro] = useState([])
+  const [valorFiltro, setValorFiltro] = useState(null) // con | cero
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [masFiltros, setMasFiltros] = useState(false)
   const [monthMenuOpen, setMonthMenuOpen] = useState(false)
   const monthMenuRef = useRef(null)
   const [sortCol, setSortCol]   = useState('fecha')
@@ -366,6 +386,16 @@ export default function PaymentsPage() {
     const val = e.target.value
     setForm(prev => {
       const next = { ...prev, [field]: val }
+
+      // Al cambiar la fecha del pago, Año y Mes la siguen, salvo que se hayan
+      // cambiado a mano (el mes facturado puede ser otro)
+      if (field === 'fecha' && /^\d{4}-\d{2}/.test(val)) {
+        const deFecha = (f) => (/^\d{4}-\d{2}/.test(f || '') ? { anio: f.slice(0, 4), mes: MESES[Number(f.slice(5, 7)) - 1] } : null)
+        const antes = deFecha(prev.fecha)
+        const ahora = deFecha(val)
+        const sinTocar = !prev.anio || !prev.mes || (antes && String(prev.anio) === antes.anio && normMes(prev.mes) === normMes(antes.mes))
+        if (sinTocar) { next.anio = ahora.anio; next.mes = ahora.mes }
+      }
 
       if (field === 'nickname') {
         const found = nicknames.find(n => n.nickname === val)
@@ -541,6 +571,14 @@ export default function PaymentsPage() {
       const wanted = new Set(selectedMonths.map(normMes))
       result = result.filter(r => wanted.has(normMes(r.mes)))
     }
+    if (tipoFiltro) result = result.filter(r => tipoDe(r.tipoPago) === tipoFiltro)
+    if (mediosFiltro.length) result = result.filter(r => mediosFiltro.includes(medioDe(r.medioPago)))
+    if (planesFiltro.length) result = result.filter(r => planesFiltro.includes(String(r.tipoPlan || '').trim() || 'Sin plan'))
+    if (estadosFiltro.length) result = result.filter(r => estadosFiltro.includes(String(r.estado || '').trim() || 'Sin estado'))
+    if (valorFiltro === 'con') result = result.filter(r => Number(r.precioVenta) > 0)
+    if (valorFiltro === 'cero') result = result.filter(r => !(Number(r.precioVenta) > 0))
+    if (fechaDesde) result = result.filter(r => String(r.fecha || '').slice(0, 10) >= fechaDesde)
+    if (fechaHasta) result = result.filter(r => r.fecha && String(r.fecha).slice(0, 10) <= fechaHasta)
     if (search) {
       const s = search.toLowerCase()
       result = result.filter(r =>
@@ -554,16 +592,34 @@ export default function PaymentsPage() {
       )
     }
     return result
-  }, [rows, search, selectedYears, selectedMonths])
+  }, [rows, search, selectedYears, selectedMonths, tipoFiltro, mediosFiltro, planesFiltro, estadosFiltro, valorFiltro, fechaDesde, fechaHasta])
 
   // Las tarjetas inteligentes reflejan el resultado filtrado por la búsqueda y el año
-  const stats = useMemo(() => {
-    const total       = searched.length
-    const ingresos    = searched.reduce((s, r) => s + (Number(r.precioVenta) || 0), 0)
-    const renovaciones = searched.filter(r => r.tipoPago === 'Renovacion').length
-    const activaciones = searched.filter(r => r.tipoPago?.startsWith('Activacion')).length
-    return { total, ingresos, renovaciones, activaciones }
-  }, [searched])
+  const resumen = useMemo(() => resumenPagos(searched), [searched])
+  const mesActual = useMemo(() => mesEnCurso(rows), [rows])
+  const stats = { total: rows.length }
+  const hayFiltro = !!(search || selectedYears !== null || selectedMonths !== null || tipoFiltro || mediosFiltro.length
+    || planesFiltro.length || estadosFiltro.length || valorFiltro || fechaDesde || fechaHasta)
+  const limpiarFiltros = () => {
+    setSearch(''); setSelectedYears(null); setSelectedMonths(null); setTipoFiltro(null); setMediosFiltro([])
+    setPlanesFiltro([]); setEstadosFiltro([]); setValorFiltro(null); setFechaDesde(''); setFechaHasta('')
+  }
+  // Opciones de los filtros con su conteo (sobre todas las ventas), de la más usada a la menos
+  const conteo = (clave) => {
+    const m = new Map()
+    for (const r of rows) { const k = clave(r); m.set(k, (m.get(k) || 0) + 1) }
+    return m
+  }
+  const cuentaMedios = useMemo(() => conteo(r => medioDe(r.medioPago)), [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cuentaPlanes = useMemo(() => conteo(r => String(r.tipoPlan || '').trim() || 'Sin plan'), [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cuentaEstados = useMemo(() => conteo(r => String(r.estado || '').trim() || 'Sin estado'), [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cuentaTipos = useMemo(() => conteo(r => tipoDe(r.tipoPago)), [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const ordenar = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+  const filtrosSecundarios = estadosFiltro.length + (valorFiltro ? 1 : 0) + (fechaDesde ? 1 : 0) + (fechaHasta ? 1 : 0)
+  const irAMesEnCurso = () => {
+    const [y, m] = mesActual.mes.split('-').map(Number)
+    setSelectedYears([String(y)]); setSelectedMonths([MESES[m - 1]])
+  }
 
   const filtered = useMemo(() => {
     return [...searched].sort((a, b) => {
@@ -585,7 +641,7 @@ export default function PaymentsPage() {
   // Se muestran de a PAGE_SIZE filas y el resto se carga bajo demanda.
   const PAGE_SIZE = 150
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [search, selectedYears, selectedMonths, sortCol, sortDir])
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [search, selectedYears, selectedMonths, tipoFiltro, mediosFiltro, planesFiltro, estadosFiltro, valorFiltro, fechaDesde, fechaHasta, sortCol, sortDir])
   const visible = filtered.slice(0, visibleCount)
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -593,6 +649,7 @@ export default function PaymentsPage() {
   return (
     <div>
       <style>{CSS}</style>
+      <style>{DASH_TIPOS}</style>
 
       {/* ── HERO HEADER ── */}
       <div className="pg-a1 relative rounded-3xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg,#064e3b 0%,#022c22 100%)' }}>
@@ -610,7 +667,7 @@ export default function PaymentsPage() {
               Pagos
             </h1>
             <p className="text-emerald-100/70 text-sm mt-2">
-              Ventas de licencias IPTV · {stats.total.toLocaleString()} registros
+              Ventas de licencias IPTV · {stats.total.toLocaleString('es-CO')} registros
             </p>
           </div>
           <button onClick={() => openNew()} className="pg-cta px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex items-center gap-2">
@@ -621,37 +678,15 @@ export default function PaymentsPage() {
 
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <PagoCard icon={ShoppingCart} label="Total Registros"  value={stats.total.toLocaleString()}          variant="solid"   sub={(search || selectedYears !== null || selectedMonths !== null) ? 'Resultados filtrados' : 'Histórico completo'}
-          onClick={() => setExplain({
-            title: 'Total Registros', value: stats.total.toLocaleString(), icon: ShoppingCart,
-            queEs: 'Cuántas ventas de licencias hay en la vista actual. Si tienes un filtro de búsqueda, año o mes activo, el número refleja solo lo filtrado.',
-            comoSeCalcula: 'Conteo simple de las filas de la tabla de ventas que pasan el filtro activo. **Sin filtros, coincide con el histórico completo.**',
-            origen: 'Tabla de ventas de licencias de este módulo (importada del Excel original y alimentada con cada venta nueva).',
-          })} />
-        <PagoCard icon={DollarSign}   label="Ingresos Totales" value={fmtCOP(stats.ingresos)}                variant="light"   sub="Licencias vendidas"
-          onClick={() => setExplain({
-            title: 'Ingresos Totales', value: fmtCOP(stats.ingresos), icon: DollarSign,
-            queEs: 'La plata que ha entrado por ventas de licencias en la vista actual (filtros incluidos).',
-            comoSeCalcula: 'Se **suma el precio de venta** de cada registro visible. Sin filtros activos, este número es el mismo "Ingresos históricos" que muestran el Dashboard y Análisis Financiero — todos beben de la misma tabla.',
-            origen: 'Campo precio de venta de cada fila de este módulo.',
-          })} />
-        <PagoCard icon={RotateCcw}    label="Renovaciones"     value={stats.renovaciones.toLocaleString()}   variant="outline" sub="Clientes recurrentes"
-          onClick={() => setExplain({
-            title: 'Renovaciones', value: stats.renovaciones.toLocaleString(), icon: RotateCcw,
-            queEs: 'Ventas de clientes que ya estaban y volvieron a pagar — el ingreso recurrente y más barato de conseguir.',
-            comoSeCalcula: 'Se cuentan los registros visibles cuyo **tipo de pago es "Renovacion"**.',
-            origen: 'Campo tipo de pago de cada venta de este módulo.',
-          })} />
-        <PagoCard icon={Zap}          label="Activaciones"     value={stats.activaciones.toLocaleString()}   variant="light"   sub="Nuevas pantallas"
-          onClick={() => setExplain({
-            title: 'Activaciones', value: stats.activaciones.toLocaleString(), icon: Zap,
-            queEs: 'Ventas que representan pantallas o clientes nuevos — el motor de crecimiento de la base.',
-            comoSeCalcula: 'Se cuentan los registros visibles cuyo tipo de pago **empieza por "Activacion"** (incluye "Activacion" y "Activacion Pantalla").',
-            origen: 'Campo tipo de pago de cada venta de este módulo.',
-          })} />
-      </div>
+      {/* Tarjetas: reflejan el filtro de la tabla y filtran al tocarlas */}
+      {!loading && !error && (
+        <TarjetasPagos resumen={resumen} mes={mesActual} filtroActivo={hayFiltro}
+          tipoActivo={tipoFiltro} mediosActivos={mediosFiltro}
+          onTipo={(t) => setTipoFiltro(v => (v === t ? null : t))}
+          onMedio={(m) => setMediosFiltro(l => (l.includes(m) ? l.filter(x => x !== m) : [...l, m]))}
+          onMesEnCurso={irAMesEnCurso}
+          onExplicar={setExplain} />
+      )}
 
       {/* Búsqueda y filtros */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -751,7 +786,66 @@ export default function PaymentsPage() {
             </div>
           )}
         </div>
+
+        <FiltroMultiple etiqueta="Tipo" icono={Tag} unico opciones={ordenar(cuentaTipos)} seleccion={tipoFiltro ? [tipoFiltro] : []}
+          onCambio={(v) => setTipoFiltro(v[0] || null)} nombre={(t) => TIPOS[t]?.nombre || t} contar={(t) => cuentaTipos.get(t) || 0} />
+        <FiltroMultiple etiqueta="Medio" icono={Wallet} opciones={ordenar(cuentaMedios)} seleccion={mediosFiltro}
+          onCambio={setMediosFiltro} contar={(m) => cuentaMedios.get(m) || 0} />
+        <FiltroMultiple etiqueta="Plan" icono={Layers} opciones={ordenar(cuentaPlanes)} seleccion={planesFiltro}
+          onCambio={setPlanesFiltro} contar={(p) => cuentaPlanes.get(p) || 0} />
+        <button type="button" onClick={() => setMasFiltros(v => !v)} aria-expanded={masFiltros}
+          className={cn('flex items-center gap-2 px-3.5 py-2.5 border rounded-xl bg-white shadow-sm text-sm font-medium transition-colors',
+            filtrosSecundarios ? 'border-emerald-500 text-emerald-800 bg-emerald-50/60' : 'border-emerald-200 text-gray-700 hover:bg-emerald-50')}>
+          <SlidersHorizontal size={16} className="text-emerald-500" /> Más filtros{filtrosSecundarios ? ` (${filtrosSecundarios})` : ''}
+          <ChevronDown size={14} className={cn('text-gray-400 transition-transform', masFiltros && 'rotate-180')} />
+        </button>
+        {masFiltros && (
+          <div className="w-full flex flex-wrap items-end gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+            <label className="block">
+              <span className="block text-xs font-semibold text-gray-600 mb-1">Fecha de pago desde</span>
+              <input type="date" value={fechaDesde} max={fechaHasta || undefined} onChange={e => setFechaDesde(e.target.value)}
+                className="px-3 py-2 border border-emerald-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
+            </label>
+            <label className="block">
+              <span className="block text-xs font-semibold text-gray-600 mb-1">Hasta</span>
+              <input type="date" value={fechaHasta} min={fechaDesde || undefined} onChange={e => setFechaHasta(e.target.value)}
+                className="px-3 py-2 border border-emerald-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
+            </label>
+            <div className="flex flex-wrap gap-1.5" aria-label="Rangos rápidos">
+              {[['Hoy', 0], ['Últimos 7 días', 6], ['Últimos 30 días', 29]].map(([n, d]) => (
+                <button key={n} type="button" onClick={() => { const h = todayStr(); const x = new Date(`${h}T12:00:00`); x.setDate(x.getDate() - d); setFechaDesde(x.toLocaleDateString('en-CA')); setFechaHasta(h) }}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white ring-1 ring-emerald-200 text-emerald-800 hover:bg-emerald-50">{n}</button>
+              ))}
+            </div>
+            <FiltroMultiple etiqueta="Estado" icono={CircleDot} opciones={ordenar(cuentaEstados)} seleccion={estadosFiltro}
+              onCambio={setEstadosFiltro} contar={(e) => cuentaEstados.get(e) || 0} />
+            <FiltroMultiple etiqueta="Valor" icono={BadgeDollarSign} unico opciones={['con', 'cero']} seleccion={valorFiltro ? [valorFiltro] : []}
+              onCambio={(v) => setValorFiltro(v[0] || null)} nombre={(v) => (v === 'con' ? 'Con valor' : 'En $0')} />
+          </div>
+        )}
       </div>
+
+      {hayFiltro && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Filtros activos">
+          {[
+            search && { k: 's', t: `“${search}”`, quitar: () => setSearch('') },
+            ...(selectedYears || []).map(y => ({ k: `a${y}`, t: y, quitar: () => setSelectedYears(l => { const n = l.filter(x => x !== y); return n.length ? n : null }) })),
+            ...(selectedMonths || []).map(m => ({ k: `m${m}`, t: m, quitar: () => setSelectedMonths(l => { const n = l.filter(x => x !== m); return n.length ? n : null }) })),
+            tipoFiltro && { k: 't', t: TIPOS[tipoFiltro].nombre, quitar: () => setTipoFiltro(null) },
+            ...mediosFiltro.map(m => ({ k: `d${m}`, t: m, quitar: () => setMediosFiltro(l => l.filter(x => x !== m)) })),
+            ...planesFiltro.map(p => ({ k: `p${p}`, t: p, quitar: () => setPlanesFiltro(l => l.filter(x => x !== p)) })),
+            ...estadosFiltro.map(e => ({ k: `e${e}`, t: e, quitar: () => setEstadosFiltro(l => l.filter(x => x !== e)) })),
+            valorFiltro && { k: 'v', t: valorFiltro === 'con' ? 'Con valor' : 'En $0', quitar: () => setValorFiltro(null) },
+            fechaDesde && { k: 'fd', t: `Desde ${formatDate(fechaDesde)}`, quitar: () => setFechaDesde('') },
+            fechaHasta && { k: 'fh', t: `Hasta ${formatDate(fechaHasta)}`, quitar: () => setFechaHasta('') },
+          ].filter(Boolean).map(c => (
+            <button key={c.k} type="button" onClick={c.quitar} className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 text-xs font-semibold hover:bg-emerald-100">
+              {c.t} <X size={12} aria-label={`Quitar ${c.t}`} />
+            </button>
+          ))}
+          <button type="button" onClick={limpiarFiltros} className="text-xs font-semibold text-rose-600 hover:underline ml-1">Limpiar filtros</button>
+        </div>
+      )}
 
       {/* Tabla */}
       <Card className="shadow-lg border-emerald-100 overflow-hidden">
@@ -776,7 +870,7 @@ export default function PaymentsPage() {
                           className={`sticky top-0 z-10 bg-emerald-600 px-3 py-3 font-semibold whitespace-nowrap transition-colors select-none shadow-[0_1px_0_0_rgba(0,0,0,0.08)] ${col.key !== 'acciones' ? 'cursor-pointer hover:bg-emerald-700' : 'right-0 z-20'}`}
                         >
                           {col.key !== 'acciones' ? (
-                            <div className="flex items-center gap-1">
+                            <div className={cn('flex items-center gap-1', col.key === 'precioVenta' && 'justify-end')}>
                               {col.label}
                               <SortIcon colKey={col.key} sortCol={sortCol} sortDir={sortDir} />
                             </div>
@@ -808,8 +902,8 @@ export default function PaymentsPage() {
                           onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
                           className="px-4 py-2 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-100 text-sm font-semibold transition-colors"
                         >
-                          Mostrar {Math.min(PAGE_SIZE, filtered.length - visibleCount).toLocaleString()} más
-                          · quedan {(filtered.length - visibleCount).toLocaleString()}
+                          Mostrar {Math.min(PAGE_SIZE, filtered.length - visibleCount).toLocaleString('es-CO')} más
+                          · quedan {(filtered.length - visibleCount).toLocaleString('es-CO')}
                         </button>
                       </td>
                     </tr>
@@ -828,7 +922,7 @@ export default function PaymentsPage() {
         </CardBody>
         <div className="flex items-center justify-between border-t border-emerald-100 bg-emerald-50/40 px-4 py-2 text-xs text-gray-500">
           <span>
-            {Math.min(visibleCount, filtered.length).toLocaleString()} visibles · {filtered.length.toLocaleString()} filtrados · {rows.length.toLocaleString()} totales
+            {Math.min(visibleCount, filtered.length).toLocaleString('es-CO')} visibles · {filtered.length.toLocaleString('es-CO')} filtrados · {rows.length.toLocaleString('es-CO')} totales
           </span>
           <span>Ordenado por <strong className="text-brand-accent">{COLS.find(c => c.key === sortCol)?.label ?? sortCol}</strong> ({sortDir === 'asc' ? '↑ ascendente' : '↓ descendente'})</span>
         </div>
@@ -1029,7 +1123,8 @@ export default function PaymentsPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
-                      <input value={form.anio} onChange={f('anio')}
+                      <input value={form.anio} onChange={e => setForm(p => ({ ...p, anio: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                        inputMode="numeric" maxLength={4} placeholder="AAAA" aria-label="Año"
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all" />
                     </div>
                     <div>
@@ -1068,9 +1163,14 @@ export default function PaymentsPage() {
                       <select value={form.tipoPago} onChange={f('tipoPago')}
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all">
                         <option value="">—</option>
-                        <option>Renovacion</option>
-                        <option>Activacion</option>
-                        <option>Activacion Pantalla</option>
+                        {form.tipoPago && !['Renovacion', 'Activacion', 'Activacion Pantalla', 'Cortesia', 'Cambio de Plan'].includes(form.tipoPago) && (
+                          <option value={form.tipoPago}>{form.tipoPago} (actual)</option>
+                        )}
+                        <option value="Renovacion">Renovación</option>
+                        <option value="Activacion">Activación</option>
+                        <option value="Activacion Pantalla">Activación pantalla</option>
+                        <option value="Cortesia">Cortesía</option>
+                        <option value="Cambio de Plan">Cambio de plan</option>
                       </select>
                     </div>
                     <div>
