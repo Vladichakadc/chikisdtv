@@ -5,7 +5,7 @@ import {
 import api from '../../../config/api'
 import { useUi } from '../../../context/UiContext'
 import { cn } from '../../../utils/cn'
-import { normalizarTelefono, urlWhatsAppTexto } from '../../../utils/telefono'
+import { normalizarTelefono, abrirWhatsApp } from '../../../utils/telefono'
 import { APP_NOMBRE, mensajeAvisoCredenciales, segmentosWhatsApp } from './avisoCredenciales'
 
 // Aviso de mantenimiento: "las credenciales de acceso de FlujoTV cambiaron".
@@ -106,7 +106,7 @@ export function AvisoCredencialesModal({ cuentaId, onClose }) {
 
   const enviar = (c) => {
     const tel = normalizarTelefono(c.telefono, c.pais)
-    window.open(urlWhatsAppTexto(tel.numero, mensajePara(c)), '_blank', 'noopener')
+    abrirWhatsApp(tel.numero, mensajePara(c))
     setEnviados(s => new Set(s).add(c.clave))
     setSeleccion(c.clave)
     if (!tel.numero) showToast(`${c.nombre || c.pantallas[0]?.nickname} no tiene teléfono: elige el chat en WhatsApp.`, 'warning')

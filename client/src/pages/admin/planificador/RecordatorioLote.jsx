@@ -8,7 +8,7 @@ import { X, MessageCircle, SkipForward, Loader2, Copy, CheckCircle2, ListChecks 
 import api from '../../../config/api'
 import { cn } from '../../../utils/cn'
 import { useUi } from '../../../context/UiContext'
-import { normalizarTelefono, urlWhatsAppTexto } from '../../../utils/telefono'
+import { normalizarTelefono, abrirWhatsApp } from '../../../utils/telefono'
 import { prepararRenovacion, etapaPendiente, etapaSugerida, ETAPAS_COBRO } from './renovacion'
 import { diasLabel } from './rowHelpers'
 
@@ -85,7 +85,7 @@ export function RecordatorioLote({ titulo, screens, recordatorios, onClose, onRe
   const enviar = () => {
     if (!listo) return
     // Sin await antes de window.open: debe ocurrir dentro del clic
-    window.open(urlWhatsAppTexto(tel.numero, prep.mensaje), '_blank')
+    abrirWhatsApp(tel.numero, prep.mensaje)
     registrar(actual, 'whatsapp', etapa)
     avanzar('enviado')
   }

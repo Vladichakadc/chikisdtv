@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { construirOferta, preciosBase, urlWhatsApp, redondear500, estrategiaDe, DESCUENTO_MAXIMO } from './ofertaRetencion'
+import { construirOferta, preciosBase, redondear500, estrategiaDe, DESCUENTO_MAXIMO } from './ofertaRetencion'
 
 const planes = [
   { nombre: 'Plan Mensual 1 Pantalla', precio: 15000, numeroPantallas: 1 },
@@ -53,7 +53,5 @@ describe('oferta de retención', () => {
     expect(estrategiaDe().descuento).toBe(DESCUENTO_MAXIMO)
     expect(estrategiaDe().recomendado).toBe('anual')
     expect(redondear500(13740)).toBe(13500)
-    expect(urlWhatsApp('573001112233', 'Hola 👋')).toBe('https://web.whatsapp.com/send?phone=573001112233&text=Hola%20%F0%9F%91%8B')
-    expect(urlWhatsApp('573001112233', 'x', { movil: true })).toContain('api.whatsapp.com')
   })
 })

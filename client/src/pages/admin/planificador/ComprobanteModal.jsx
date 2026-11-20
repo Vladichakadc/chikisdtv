@@ -18,7 +18,7 @@ import { useCredenciales } from '../../../hooks/useCredenciales'
 import { formatDate, formatCurrency } from '../../../utils/excelUtils'
 import { diasLabel, haceTexto } from './rowHelpers'
 import { esRenovable, tipoPlanDe, diasRestantesDe, mesRestanteDe, prepararRenovacion, etapaSugerida, ETAPAS_COBRO } from './renovacion'
-import { normalizarTelefono, urlWhatsAppTexto } from '../../../utils/telefono'
+import { normalizarTelefono, abrirWhatsApp, reservarVentanaWhatsApp, cerrarVentanaVacia, esDispositivoMovil } from '../../../utils/telefono'
 
 const ESTADO_STYLE = {
   VIGENTE:  { bg: '#dcfce7', text: '#15803d' },
@@ -186,9 +186,12 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
     // File de prueba); si no existe, la pestaña de WhatsApp se abre YA, dentro
     // del gesto del usuario — abrirla después de los await la bloquearía el
     // bloqueador de popups del navegador.
+    // Solo en celular se usa "compartir" (abre la app de WhatsApp). En el
+    // computador la imagen va al portapapeles y se abre WhatsApp Web: en
+    // Windows "compartir" abría la hoja del sistema en vez de WhatsApp Web.
     const probe = new File([''], 'probe.png', { type: 'image/png' })
-    const puedeCompartir = typeof navigator.canShare === 'function' && navigator.canShare({ files: [probe] })
-    const ventana = puedeCompartir ? null : window.open('', '_blank')
+    const puedeCompartir = esDispositivoMovil() && typeof navigator.canShare === 'function' && navigator.canShare({ files: [probe] })
+    const ventana = puedeCompartir ? null : reservarVentanaWhatsApp()
     try {
       const blob = await capturar()
       const file = new File([blob], `comprobante-${row.nickname || row.idPantalla}.png`, { type: 'image/png' })
@@ -200,14 +203,11 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
       }
       // Escritorio sin share: imagen al portapapeles + chat del cliente para pegarla
       await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
-      const numero = numeroWhatsApp()
-      const url = numero ? `https://wa.me/${numero}` : 'https://web.whatsapp.com'
-      if (ventana && !ventana.closed) ventana.location.href = url
-      else window.open(url, '_blank')
+      abrirWhatsApp(numeroWhatsApp(), '', { ventana })
       showToast('Imagen copiada — pégala en el chat de WhatsApp con Ctrl+V.', 'success')
       registrar('comprobante', 'whatsapp')
     } catch (e) {
-      if (ventana && !ventana.closed) ventana.close()
+      cerrarVentanaVacia(ventana)
       if (e?.name !== 'AbortError') showToast(`No se pudo preparar el envío: ${e.message || e}`, 'error')
     } finally {
       setTrabajando(false)
@@ -229,10 +229,9 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
 
   const handleWhatsAppMensaje = () => {
     // Sin await antes de window.open: se mantiene dentro del gesto del usuario.
-    // Se usa api.whatsapp.com directo (el destino oficial de wa.me): el
-    // redirect de wa.me reemplaza los emojis del texto por U+FFFD (�).
+    // Computador → WhatsApp Web; celular → app (ver utils/telefono.js)
     const numero = numeroWhatsApp()
-    window.open(urlWhatsAppTexto(numero, mensaje), '_blank')
+    abrirWhatsApp(numero, mensaje)
     registrar('renovacion', 'whatsapp')
     showToast(numero
       ? 'WhatsApp abierto con el mensaje listo — solo dale enviar.'
