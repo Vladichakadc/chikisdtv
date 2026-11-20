@@ -313,12 +313,15 @@ export function EditModal({ row, allPantallas, onClose, onSaved, onCreated, onSw
     }))
   }
 
-  // Al asignar un nuevo titular se trae el nombre y el Customer ID del cliente seleccionado
+  // Al asignar un nuevo titular se traen el nombre, el apellido y el Customer ID
+  // del cliente seleccionado (sin cliente elegido, los tres quedan vacíos)
   const handleClienteChange = (customerId) => {
     const cliente = clienteOptions.find(c => c.customerId === customerId)
     setForm(f => ({
       ...f,
-      ...(cliente ? { nombre: cliente.nombre, customerId: cliente.customerId } : { customerId }),
+      ...(cliente
+        ? { nombre: cliente.nombre, apellido: cliente.apellido, customerId: cliente.customerId }
+        : { nombre: '', apellido: '', customerId: customerId || '' }),
     }))
   }
 
