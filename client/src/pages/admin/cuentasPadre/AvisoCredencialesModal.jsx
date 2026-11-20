@@ -106,10 +106,10 @@ export function AvisoCredencialesModal({ cuentaId, onClose }) {
 
   const enviar = (c) => {
     const tel = normalizarTelefono(c.telefono, c.pais)
-    abrirWhatsApp(tel.numero, mensajePara(c))
+    const { copiado } = abrirWhatsApp(tel.numero, mensajePara(c))
     setEnviados(s => new Set(s).add(c.clave))
     setSeleccion(c.clave)
-    if (!tel.numero) showToast(`${c.nombre || c.pantallas[0]?.nickname} no tiene teléfono: elige el chat en WhatsApp.`, 'warning')
+    if (!tel.numero) showToast(`${c.nombre || c.pantallas[0]?.nickname} no tiene teléfono: ${copiado ? 'el mensaje quedó copiado, pégalo en su chat con Ctrl+V' : 'elige el chat en WhatsApp'}.`, 'warning')
   }
 
   const copiarMensaje = async () => {

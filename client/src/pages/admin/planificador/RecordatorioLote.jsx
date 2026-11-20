@@ -85,7 +85,8 @@ export function RecordatorioLote({ titulo, screens, recordatorios, onClose, onRe
   const enviar = () => {
     if (!listo) return
     // Sin await antes de window.open: debe ocurrir dentro del clic
-    abrirWhatsApp(tel.numero, prep.mensaje)
+    const { copiado } = abrirWhatsApp(tel.numero, prep.mensaje)
+    if (copiado) showToast('Sin teléfono: mensaje copiado — abre su chat en WhatsApp Web y pégalo con Ctrl+V.', 'info')
     registrar(actual, 'whatsapp', etapa)
     avanzar('enviado')
   }

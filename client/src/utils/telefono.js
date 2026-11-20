@@ -56,39 +56,42 @@ export function esDispositivoMovil(nav = globalThis.navigator) {
   return /Macintosh/i.test(ua) && Number(nav.maxTouchPoints) > 1
 }
 
-// Enlace de WhatsApp con el texto prellenado.
-//  · Computador → web.whatsapp.com/send (abre el chat directo en WhatsApp Web).
-//  · Celular    → api.whatsapp.com/send (abre la app). Se usa api.whatsapp.com
-//    y no wa.me: el redirect de wa.me cambia los emojis por U+FFFD (�).
+// Enlace de WhatsApp.
+//  · Computador con número → web.whatsapp.com/send?phone=…&text=… (chat
+//    directo en WhatsApp Web). WhatsApp Web NO sabe abrir /send sin número
+//    (queda la página en blanco): sin número se abre su página principal.
+//  · Celular → api.whatsapp.com/send (abre la app, y sin número deja elegir
+//    el chat). Se usa api.whatsapp.com y no wa.me: el redirect de wa.me
+//    cambia los emojis por U+FFFD (�).
+export const WHATSAPP_WEB = 'https://web.whatsapp.com/'
 export function urlWhatsAppTexto(numero, texto, { movil = esDispositivoMovil() } = {}) {
   const params = [numero ? `phone=${numero}` : null, texto ? `text=${encodeURIComponent(texto)}` : null].filter(Boolean).join('&')
-  return movil
-    ? `https://api.whatsapp.com/send/${params ? `?${params}` : ''}`
-    : `https://web.whatsapp.com/send${params ? `?${params}` : ''}`
+  if (movil) return `https://api.whatsapp.com/send/${params ? `?${params}` : ''}`
+  if (!numero) return WHATSAPP_WEB
+  return `https://web.whatsapp.com/send?${params}`
 }
 
-// En el computador WhatsApp Web se abre siempre en la misma pestaña (con
-// nombre): no se acumulan pestañas ni aparece el aviso de "WhatsApp está
-// abierto en otra ventana".
-export const VENTANA_WHATSAPP = 'chikisdtv-whatsapp'
-const destino = () => (esDispositivoMovil() ? '_blank' : VENTANA_WHATSAPP)
-
-// Abre (o reserva, para usarla después de un await) la pestaña de WhatsApp.
-// Debe llamarse dentro del clic: si no, el bloqueador de ventanas la frena.
+// Reserva la pestaña de WhatsApp dentro del clic (para usarla después de un
+// await): si se abre más tarde, el bloqueador de ventanas la frena.
 export function reservarVentanaWhatsApp() {
-  return window.open('', destino())
+  return window.open('', '_blank')
 }
 
+// Abre WhatsApp. En el computador sin número, el mensaje se copia al
+// portapapeles para pegarlo en el chat que se elija en WhatsApp Web.
+// Devuelve { copiado } para que la pantalla lo avise.
 export function abrirWhatsApp(numero, texto, { ventana } = {}) {
-  const url = urlWhatsAppTexto(numero, texto)
+  const movil = esDispositivoMovil()
+  const url = urlWhatsAppTexto(numero, texto, { movil })
   if (ventana && !ventana.closed) {
     ventana.location.href = url
-    ventana.focus?.()
-    return ventana
+  } else {
+    window.open(url, '_blank')
   }
-  return window.open(url, destino())
+  const copiado = !movil && !numero && !!texto
+  if (copiado) navigator.clipboard?.writeText(texto).catch(() => {})
+  return { copiado }
 }
-
 // Si hubo un error después de reservar la pestaña, se cierra solo si quedó en
 // blanco (nunca la pestaña de WhatsApp Web que el usuario ya tenía abierta).
 export function cerrarVentanaVacia(ventana) {

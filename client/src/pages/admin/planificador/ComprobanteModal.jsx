@@ -231,11 +231,13 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
     // Sin await antes de window.open: se mantiene dentro del gesto del usuario.
     // Computador → WhatsApp Web; celular → app (ver utils/telefono.js)
     const numero = numeroWhatsApp()
-    abrirWhatsApp(numero, mensaje)
+    const { copiado } = abrirWhatsApp(numero, mensaje)
     registrar('renovacion', 'whatsapp')
-    showToast(numero
-      ? 'WhatsApp abierto con el mensaje listo — solo dale enviar.'
-      : 'WhatsApp abierto — elige el chat del cliente; el mensaje va prellenado.', 'success')
+    showToast(copiado
+      ? 'Mensaje copiado — abre el chat del cliente en WhatsApp Web y pégalo con Ctrl+V.'
+      : numero
+        ? 'WhatsApp abierto con el mensaje listo — solo dale enviar.'
+        : 'WhatsApp abierto — elige el chat del cliente; el mensaje va prellenado.', 'success')
   }
 
   const estado = row.estadoReal || '—'
@@ -389,7 +391,7 @@ export function ComprobanteModal({ row, onClose, onRegistrado, ultimoRecordatori
             </div>
             <p className="text-[11px] text-slate-400 text-center mt-2.5">
               Va como texto prellenado en WhatsApp; los *asteriscos* se ven en negrita.
-              {tel.numero ? ` Chat directo: +${tel.numero}.` : ' Sin teléfono registrado: WhatsApp abre para elegir el chat.'}
+              {tel.numero ? ` Chat directo: +${tel.numero}.` : ' Sin teléfono registrado: el mensaje se copia y se abre WhatsApp para que lo pegues en su chat.'}
             </p>
             {!cargando && tel.origen === 'sin_indicativo' && (
               <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2">
