@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, ChevronDown, Info, Lightbulb, ArrowUpRight, ArrowDownRight, Minus, AlertTriangle } from 'lucide-react'
 import api from '../../config/api'
 import { cn } from '../../utils/cn'
 import { useEsMovil } from '../../hooks/useEsMovil'
 import { DASH_TIPOS } from './dashboard/AlAire'
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
-import { titular, tarjetas, recomendaciones, fmtPesosCorto, fmtVar, tonoVar, nombreMes } from './pagos/lecturas'
+import { titular, tarjetas, recomendaciones, fmtPesos, fmtPesosCorto, fmtVar, tonoVar, nombreMes } from './pagos/lecturas'
 import {
   EvolucionMensual, AnioContraAnio, MediosDePago, MixDePlanes, DiasDePago, MapaEstacionalidad, ConcentracionClientes,
 } from './pagos/GraficasPagos'
+import { FiltrosPagos, FILTROS_VACIOS, aParametros, textoPeriodo, alternar, filtrosActivos } from './pagos/FiltrosPagos'
 
 // Análisis de Pagos: "¿cuánto entra, cuándo, por qué canal, de qué planes y de
 // quién?". Datos y reglas: GET /admin/payments/analisis
@@ -79,7 +80,7 @@ function Tarjeta({ t, sparkline, enCurso, onExplicar }) {
   )
 }
 
-function Titular({ data, periodo, onPeriodo }) {
+function Titular({ data, filtrado }) {
   const t = titular(data)
   const u = data.resumen.ultimoMes
   return (
@@ -87,15 +88,7 @@ function Titular({ data, periodo, onPeriodo }) {
       style={{ background: 'radial-gradient(120% 150% at 0% 0%, #065f46 0%, #053d31 50%, #032620 100%)' }}>
       <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="dash-txt text-sm text-emerald-100/70">Análisis de pagos · último mes cerrado</p>
-          <div role="radiogroup" aria-label="Período de las gráficas" className="inline-flex rounded-lg bg-white/10 p-0.5 text-xs font-semibold">
-            {[['ultimos12', 'Últimos 12 meses'], ['historico', 'Todo el historial']].map(([k, l]) => (
-              <button key={k} role="radio" aria-checked={periodo === k} onClick={() => onPeriodo(k)}
-                className={cn('px-3 py-1.5 rounded-md transition-colors', periodo === k ? 'bg-white text-emerald-800' : 'text-emerald-100/80 hover:text-white')}>
-                {l}
-              </button>
-            ))}
-          </div>
+          <p className="dash-txt text-sm text-emerald-100/70">Análisis de pagos · último mes cerrado{filtrado ? ' · con los filtros de medio, tipo o plan' : ''}</p>
         </div>
         <h1 className="dash-num text-[30px] sm:text-[46px] font-bold leading-[1.05] mt-1 max-w-4xl">{t.titulo}</h1>
         {t.detalle && <p className="dash-txt text-[15px] mt-3 max-w-3xl leading-relaxed text-emerald-100/85">{t.detalle}</p>}
@@ -148,30 +141,45 @@ export default function AnalisisPagosPage() {
   const movil = useEsMovil()
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-  const [periodo, setPeriodo] = useState('ultimos12')
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS)
+  const [cargando, setCargando] = useState(false)
+  const pedido = useRef(0)
   const [explicar, setExplicar] = useState(null)
 
   useEffect(() => {
     // ?hoy=AAAA-MM-DD en la URL muestra el análisis a esa fecha de corte
     const hoy = new URLSearchParams(window.location.search).get('hoy')
-    api.get('/admin/payments/analisis', { params: hoy ? { hoy } : {} })
-      .then(r => setData(r.data))
-      .catch(e => setError(e.response?.data?.error || 'No se pudo cargar el análisis de pagos.'))
-  }, [])
+    const n = ++pedido.current
+    setCargando(true)
+    const t = setTimeout(() => {
+      api.get('/admin/payments/analisis', { params: { ...(hoy ? { hoy } : {}), ...aParametros(filtros) } })
+        .then(r => { if (n === pedido.current) { setData(r.data); setError(null) } })
+        .catch(e => { if (n === pedido.current) setError(e.response?.data?.error || 'No se pudo cargar el análisis de pagos.') })
+        .finally(() => { if (n === pedido.current) setCargando(false) })
+    }, 150)
+    return () => clearTimeout(t)
+  }, [filtros])
 
   const cards = useMemo(() => (data ? tarjetas(data) : []), [data])
   const recos = useMemo(() => (data ? recomendaciones(data) : []), [data])
 
-  if (error) return <div className="p-6 text-sm text-red-600">{error}</div>
+  if (error && !data) return <div className="p-6 text-sm text-red-600">{error}</div>
   if (!data) return <div className="p-16 flex justify-center text-slate-400"><Loader2 className="animate-spin" /></div>
 
-  const d = data.distribucion[periodo]
-  const etiqueta = periodo === 'ultimos12' ? `últimos 12 meses (${nombreMes(data.resumen.doceMeses.desde, { corto: true })} – ${nombreMes(data.resumen.doceMeses.hasta, { corto: true })})` : 'todo el historial'
+  const d = data.distribucion.seleccion
+  const sel = data.seleccion
+  const etiqueta = textoPeriodo(filtros, `últimos 12 meses (${nombreMes(data.resumen.doceMeses.desde, { corto: true })} – ${nombreMes(data.resumen.doceMeses.hasta, { corto: true })})`)
+  const variables = filtros.medios.length || filtros.tipos.length || filtros.planes.length
+  // Filtrar tocando las gráficas
+  const porMedio = (m) => setFiltros(f => ({ ...f, medios: alternar(f.medios, m) }))
+  const porPlan = (p) => setFiltros(f => ({ ...f, planes: alternar(f.planes, p) }))
+  const porTipo = (t) => setFiltros(f => ({ ...f, tipos: alternar(f.tipos, t) }))
+  const porMes = (ym) => setFiltros(f => ({ ...f, periodo: 'personalizado', anios: [ym.slice(0, 4)], meses: [Number(ym.slice(5, 7))] }))
 
   return (
     <div className="dash-txt max-w-7xl mx-auto">
       <style>{DASH_TIPOS}</style>
-      <Titular data={data} periodo={periodo} onPeriodo={setPeriodo} />
+      <Titular data={data} filtrado={!!variables} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
         {cards.map(t => (
@@ -195,24 +203,43 @@ export default function AnalisisPagosPage() {
         </section>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Panel titulo="¿Cuánto entra cada mes?" pregunta={`Recaudo por mes y tipo de pago · últimos ${movil ? 12 : 24} meses`} className="lg:col-span-2">
-          <EvolucionMensual serie={data.serie} movil={movil} />
+      <FiltrosPagos filtros={filtros} opciones={data.opciones} onCambio={setFiltros} cargando={cargando} />
+
+      <section className={cn('mb-5 rounded-2xl bg-emerald-50/70 ring-1 ring-emerald-200 px-4 py-3 transition-opacity', cargando && 'opacity-60')} aria-live="polite">
+        <p className="text-xs font-semibold text-emerald-900">Selección: {etiqueta}{variables ? ' · con filtros' : ''}</p>
+        <dl className="mt-1.5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-2">
+          {[
+            ['Recaudo', fmtPesos(sel.ingresos)],
+            ['Pagos', sel.ventas.toLocaleString('es-CO')],
+            ['Ticket promedio', fmtPesos(sel.ticket)],
+            ['Clientes', sel.clientes.toLocaleString('es-CO')],
+            ['Promedio por mes', fmtPesosCorto(sel.promedioMensual)],
+            ['Renovación / activación', sel.ingresos ? `${Math.round((sel.porTipo.renovacion / sel.ingresos) * 100)}% / ${Math.round((sel.porTipo.activacion / sel.ingresos) * 100)}%` : '—'],
+          ].map(([k, v]) => (
+            <div key={k}><dt className="text-[11px] text-emerald-800/70">{k}</dt><dd className="dash-num text-lg font-bold text-slate-900 leading-tight">{v}</dd></div>
+          ))}
+        </dl>
+        {!sel.ventas && <p className="text-sm text-slate-600 mt-1">No hay pagos con estos filtros. {filtrosActivos(filtros) && <button className="font-semibold text-emerald-700 underline" onClick={() => setFiltros(FILTROS_VACIOS)}>Limpiar filtros</button>}</p>}
+      </section>
+
+      <div className={cn('grid gap-5 lg:grid-cols-2 transition-opacity', cargando && 'opacity-60')}>
+        <Panel titulo="¿Cuánto entra cada mes?" pregunta={`Recaudo por mes y tipo de pago · ${filtros.periodo === '12m' ? `últimos ${movil ? 12 : 24} meses` : etiqueta}. Toca un mes para filtrarlo.`} className="lg:col-span-2">
+          <EvolucionMensual serie={data.serie} movil={movil && filtros.periodo === '12m'} compacto={movil} onMes={porMes} tiposActivos={filtros.tipos} onTipo={porTipo} />
         </Panel>
-        <Panel titulo="¿Vamos mejor que el año pasado?" pregunta="Recaudo acumulado de enero a cada mes, por año">
+        <Panel titulo="¿Vamos mejor que el año pasado?" pregunta={`Recaudo acumulado de enero a cada mes, por año${filtros.meses.length ? ' (solo los meses elegidos)' : ''}`}>
           <AnioContraAnio comparativo={data.comparativo} movil={movil} />
         </Panel>
         <Panel titulo="¿Qué días del mes pagan?" pregunta={`Recaudo según el día del pago · ${etiqueta}`}>
           <DiasDePago dias={d.dias} movil={movil} />
         </Panel>
-        <Panel titulo="¿Por dónde entra la plata?" pregunta={`Recaudo por medio de pago · ${etiqueta}`}>
-          <MediosDePago medios={d.medios} movil={movil} />
+        <Panel titulo="¿Por dónde entra la plata?" pregunta={`Recaudo por medio de pago · ${etiqueta}. Toca un medio para filtrarlo.`}>
+          <MediosDePago medios={d.medios} movil={movil} activos={filtros.medios} onElegir={porMedio} />
         </Panel>
-        <Panel titulo="¿Qué planes pagan más?" pregunta={`Recaudo, participación y ticket por tipo de plan · ${etiqueta}`}>
-          <MixDePlanes planes={d.planes} movil={movil} />
+        <Panel titulo="¿Qué planes pagan más?" pregunta={`Recaudo, participación y ticket por tipo de plan · ${etiqueta}. Toca un plan para filtrarlo.`}>
+          <MixDePlanes planes={d.planes} movil={movil} activos={filtros.planes} onElegir={porPlan} />
         </Panel>
-        <Panel titulo="¿En qué meses entra más?" pregunta="Recaudo por año y mes (estacionalidad)" className="lg:col-span-2">
-          <MapaEstacionalidad estacionalidad={data.estacionalidad} />
+        <Panel titulo="¿En qué meses entra más?" pregunta="Recaudo por año y mes (estacionalidad). Toca una celda para ver ese mes." className="lg:col-span-2">
+          <MapaEstacionalidad estacionalidad={data.estacionalidad} onMes={porMes} />
         </Panel>
         <Panel titulo="¿De quién depende el recaudo?"
           pregunta={`Clientes que más pagaron · ${etiqueta}. El 80 % lo hacen ${d.clientes.n80} de ${d.clientes.total} clientes; los 10 primeros, el ${Math.round(d.clientes.pctTop10 || 0)} %.`}

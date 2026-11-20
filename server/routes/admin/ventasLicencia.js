@@ -78,10 +78,12 @@ router.post('/payments/ventas-licencia/import', asyncHandler(async (_req, res) =
 }));
 
 // Análisis de Pagos (services/analisisPagos.js). ?hoy=AAAA-MM-DD permite ver
-// el análisis a una fecha de corte (útil para revisar meses anteriores).
+// el análisis a una fecha de corte. Filtros: periodo (12m|todo|personalizado),
+// anios, meses (1-12), medios, tipos, planes — listas separadas por coma.
 router.get('/payments/analisis', asyncHandler(async (req, res) => {
   const hoy = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.hoy || '')) ? String(req.query.hoy) : undefined;
-  res.json(await analisisPagos({ hoy }));
+  const { periodo, anios, meses, medios, tipos, planes } = req.query;
+  res.json(await analisisPagos({ hoy, filtros: { periodo, anios, meses, medios, tipos, planes } }));
 }));
 
 router.get('/payments/ventas-licencia', asyncHandler(async (_req, res) => {
