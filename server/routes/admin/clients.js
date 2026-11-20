@@ -1,4 +1,6 @@
 const express = require('express');
+const { servicioClientes } = require('../../services/servicioClientes');
+const { enCache } = require('../../utils/cacheDashboard');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const path = require('path');
@@ -44,6 +46,11 @@ router.get('/clients/tabla-clientes', asyncHandler(async (_req, res) => {
   if (count === 0) await autoImportarSiDisponible(importTablaClientes);
   const rows = await TablaCliente.findAll({ order: [['customerId', 'DESC']] });
   res.json(rows);
+}));
+
+// Estado del servicio de cada cliente (pantallas, vencimiento, pagos y bajas)
+router.get('/clients/tabla-clientes/servicio', asyncHandler(async (_req, res) => {
+  res.json(await enCache('clientes-servicio', () => servicioClientes()));
 }));
 
 router.get('/clients/tabla-clientes/next-id', asyncHandler(async (_req, res) => {
