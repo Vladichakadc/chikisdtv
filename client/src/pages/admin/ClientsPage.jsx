@@ -15,13 +15,20 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import {
-  Search, Users, Globe, UserCheck, Repeat,
+  Search, Users, Globe, Repeat,
   ChevronUp, ChevronDown, ChevronsUpDown,
-  Plus, Pencil, Trash2, X, Upload, MapPin, Phone, AlertTriangle, User
+  Plus, Pencil, Trash2, X, Upload, MapPin, Phone, AlertTriangle, User,
+  Activity, SlidersHorizontal, ClipboardCheck, UserPlus, MessageCircle
 } from 'lucide-react'
 
 import { KpiExplainModal } from '../../components/ui/KpiExplainModal'
-import { KpiCard } from '../../components/ui/KpiCard'
+import { cn } from '../../utils/cn'
+import { formatDate } from '../../utils/excelUtils'
+import { normalizarTelefono, abrirWhatsApp } from '../../utils/telefono'
+import { DASH_TIPOS } from './dashboard/AlAire'
+import { FiltroMultiple } from './pagos/FiltroMultiple'
+import { TarjetasClientes } from './clientes/TarjetasClientes'
+import { unirConServicio, resumenClientes, faltantes, formatoTelefono, ESTADOS, CAMPOS_CLAVE } from './clientes/resumenClientes'
 import api from '../../config/api'
 import { useApiResource } from '../../hooks/useApiResource'
 import { useUi } from '../../context/UiContext'
@@ -93,7 +100,9 @@ const CSS = `
   .cl-th-sort:hover { background: rgba(255,255,255,.12) }
 
   .cl-action-btn { transition: all .18s ease; opacity: 0 }
-  tr:hover .cl-action-btn { opacity: 1 }
+  tr:hover .cl-action-btn, .cl-action-btn:focus-visible { opacity: 1 }
+  /* En pantallas táctiles no hay "hover": las acciones siempre visibles */
+  @media (hover: none) { .cl-action-btn { opacity: 1 } }
   .cl-action-btn:hover { transform: scale(1.15) }
 
   @media (prefers-reduced-motion: reduce) {
@@ -107,16 +116,22 @@ const CSS = `
    CONSTANTS & UTILS
 ══════════════════════════════════════════════════════════════ */
 const COLS = [
-  { key: 'customerId',   label: 'ID' },
-  { key: 'nombre',       label: 'Nombre' },
-  { key: 'apellido',     label: 'Apellido' },
-  { key: 'genero',       label: 'Género' },
-  { key: 'pais',         label: 'País' },
-  { key: 'ciudad',       label: 'Ciudad' },
-  { key: 'tipoCliente',  label: 'Tipo' },
-  { key: 'referido',     label: 'Referido' },
-  { key: 'movil',        label: 'Móvil' },
+  { key: 'customerId',     label: 'ID' },
+  { key: 'nombre',         label: 'Nombre' },
+  { key: 'apellido',       label: 'Apellido' },
+  { key: 'estadoServicio', label: 'Servicio' },
+  { key: 'pantallas',      label: 'Pantallas', num: true },
+  { key: 'ultimoPago',     label: 'Último pago' },
+  { key: 'recaudo12m',     label: 'Pagado 12 m', num: true },
+  { key: 'totalPagado',    label: 'Total pagado', num: true },
+  { key: 'tipoCliente',    label: 'Tipo' },
+  { key: 'pais',           label: 'País' },
+  { key: 'ciudad',         label: 'Ciudad' },
+  { key: 'movil',          label: 'Móvil' },
+  { key: 'genero',         label: 'Género' },
+  { key: 'referido',       label: 'Referido por' },
 ]
+const ORDEN_ESTADO = { vencido: 0, por_vencer: 1, activo: 2, sin_servicio: 3 }
 
 const EMPTY = {
   customerId: '', nombre: '', apellido: '', genero: '',
@@ -324,7 +339,11 @@ function ClientDrawer({ editing, form, f, rows, onSubmit, onClose }) {
               </div>
               <div>
                 <FieldLabel>Móvil</FieldLabel>
-                <input value={form.movil || ''} onChange={f('movil')} placeholder="Ej: +57 300 123 4567" className={inputCls} />
+                <input value={form.movil || ''} onChange={f('movil')} placeholder="Ej: +57 300 123 4567" inputMode="tel" className={inputCls}
+                  onBlur={() => { const t = formatoTelefono(form.movil, form.pais); if (t && t !== form.movil) f('movil')(t) }} />
+                {form.movil && String(form.movil).replace(/\D/g, '').length > 4 && !normalizarTelefono(form.movil, form.pais).conIndicativo && (
+                  <p className="text-[11px] text-amber-700 mt-1">Revisa el número: sin indicativo de país no se podrá abrir WhatsApp.</p>
+                )}
               </div>
             </div>
 
@@ -365,16 +384,44 @@ export default function ClientsPage() {
   const [explain, setExplain] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
 
-  /* ── Stats & Data ── */
-  const stats = useMemo(() => ({
-    total:        rows.length,
-    finales:      rows.filter(r => r.tipoCliente === 'Final').length,
-    revendedores: rows.filter(r => r.tipoCliente === 'Revendedor').length,
-    paises:       new Set(rows.map(r => r.pais).filter(Boolean)).size,
-  }), [rows])
+  // Estado del servicio de cada cliente (pantallas, vencimiento, pagos y bajas)
+  const [servicio, setServicio] = useState({})
+  const cargarServicio = () => api.get('/admin/clients/tabla-clientes/servicio')
+    .then(r => setServicio(r.data?.clientes || {}))
+    .catch(() => {})
+  useEffect(() => { cargarServicio() }, [])
 
-  const filtered = useMemo(() => {
-    let result = rows
+  // Filtros (también se activan tocando las tarjetas)
+  const VACIOS = { estados: [], tipos: [], paises: [], generos: [], faltan: [], referido: [] }
+  const [filtros, setFiltros] = useState(VACIOS)
+  const [masFiltros, setMasFiltros] = useState(false)
+  const setF = (k) => (v) => setFiltros(f => ({ ...f, [k]: v }))
+  const alternarF = (k) => (v) => setFiltros(f => ({ ...f, [k]: f[k].includes(v) ? f[k].filter(x => x !== v) : [...f[k], v] }))
+  const hayFiltro = !!(search || Object.values(filtros).some(l => l.length))
+  const limpiarFiltros = () => { setSearch(''); setFiltros(VACIOS) }
+
+  const datos = useMemo(() => unirConServicio(rows, servicio), [rows, servicio])
+  const nombrePorId = useMemo(() => new Map(rows.map(r => [String(r.customerId), [r.nombre, r.apellido].filter(Boolean).join(' ')])), [rows])
+  const conteo = (fn) => {
+    const m = new Map()
+    for (const r of datos) { const k = fn(r); m.set(k, (m.get(k) || 0) + 1) }
+    return m
+  }
+  const cTipos = useMemo(() => conteo(r => String(r.tipoCliente || '').trim() || 'Sin tipo'), [datos]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cPaises = useMemo(() => conteo(r => String(r.pais || '').trim() || 'Sin país'), [datos]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cEstados = useMemo(() => conteo(r => r.estadoServicio), [datos]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cGeneros = useMemo(() => conteo(r => r.genero === 'F' ? 'F' : r.genero === 'M' ? 'M' : 'Sin dato'), [datos]) // eslint-disable-line react-hooks/exhaustive-deps
+  const ordenar = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+
+  const seleccion = useMemo(() => {
+    let result = datos
+    const { estados, tipos, paises, generos, faltan, referido } = filtros
+    if (estados.length) result = result.filter(r => estados.includes(r.estadoServicio))
+    if (tipos.length) result = result.filter(r => tipos.includes(String(r.tipoCliente || '').trim() || 'Sin tipo'))
+    if (paises.length) result = result.filter(r => paises.includes(String(r.pais || '').trim() || 'Sin país'))
+    if (generos.length) result = result.filter(r => generos.includes(r.genero === 'F' ? 'F' : r.genero === 'M' ? 'M' : 'Sin dato'))
+    if (faltan.length) result = result.filter(r => { const f = faltantes(r); return faltan.some(k => f.includes(k)) })
+    if (referido.length) result = result.filter(r => (referido[0] === 'con') === !!String(r.referido || '').trim())
     if (search) {
       const s = search.toLowerCase()
       result = result.filter(r =>
@@ -383,18 +430,26 @@ export default function ClientsPage() {
         (r.apellido  || '').toLowerCase().includes(s) ||
         (r.pais      || '').toLowerCase().includes(s) ||
         (r.ciudad    || '').toLowerCase().includes(s) ||
-        (r.referido  || '').toLowerCase().includes(s)
+        (r.referido  || '').toLowerCase().includes(s) ||
+        (r.movil     || '').replace(/\D/g, '').includes(s.replace(/\D/g, '') || '§')
       )
     }
-    return [...result].sort((a, b) => {
-      let va = a[sortCol] ?? '', vb = b[sortCol] ?? ''
+    return result
+  }, [datos, search, filtros])
+
+  const resumen = useMemo(() => resumenClientes(seleccion), [seleccion])
+
+  const filtered = useMemo(() => {
+    const valor = (r, k) => (k === 'estadoServicio' ? ORDEN_ESTADO[r[k]] : k === 'customerId' && /^\d+$/.test(String(r[k])) ? Number(r[k]) : r[k])
+    return [...seleccion].sort((a, b) => {
+      let va = valor(a, sortCol) ?? '', vb = valor(b, sortCol) ?? ''
       if (typeof va === 'number' && typeof vb === 'number') return sortDir === 'asc' ? va - vb : vb - va
       va = String(va).toLowerCase(); vb = String(vb).toLowerCase()
       if (va < vb) return sortDir === 'asc' ? -1 : 1
       if (va > vb) return sortDir === 'asc' ? 1 : -1
       return 0
     })
-  }, [rows, search, sortCol, sortDir])
+  }, [seleccion, sortCol, sortDir])
 
   /* ── Handlers ── */
   const handleSort = (key) => {
@@ -427,9 +482,12 @@ export default function ClientsPage() {
       if (field === 'nombre' || field === 'apellido') {
         next.concatenar = `${next.nombre || ''}${next.apellido || ''}`
       }
+      // Al elegir el país se pone su indicativo solo si el móvil está vacío
+      // (antes se borraba el número ya escrito)
       if (field === 'pais') {
         const pais = PAISES.find(p => p.nombre === val)
-        if (pais) next.movil = pais.codigo + ' '
+        const soloPrefijo = !String(prev.movil || '').replace(/^\+?\d{1,4}\s*$/, '').trim()
+        if (pais && soloPrefijo) next.movil = pais.codigo + ' '
       }
       return next
     })
@@ -445,7 +503,7 @@ export default function ClientsPage() {
         await api.post('/admin/clients/tabla-clientes', form)
         showToast('Cliente creado correctamente.', 'success')
       }
-      setShowForm(false); load()
+      setShowForm(false); load(); cargarServicio()
     } catch (err) {
       showToast(err.response?.data?.error || err.message, 'error')
     }
@@ -486,8 +544,35 @@ export default function ClientsPage() {
         ) : <span className="text-slate-400">—</span>
       case 'pais':
         return <span className="text-slate-600 flex items-center gap-1.5"><Globe size={13} className="text-slate-400" />{v || '—'}</span>
-      case 'movil':
-        return <span className="text-slate-600 flex items-center gap-1.5"><Phone size={13} className="text-slate-400" />{v || '—'}</span>
+      case 'movil': {
+        const t = formatoTelefono(v, row.pais)
+        return t
+          ? <span className="text-slate-700 flex items-center gap-1.5 tabular-nums"><Phone size={13} className="text-slate-400" />{t}</span>
+          : <span className="text-slate-400">—</span>
+      }
+      case 'estadoServicio': {
+        const e = ESTADOS[v] || ESTADOS.sin_servicio
+        const detalle = v === 'vencido' ? `hace ${Math.abs(row.diasVence)} d` : v === 'por_vencer' ? (row.diasVence === 0 ? 'hoy' : `en ${row.diasVence} d`) : v === 'activo' && row.proximoVence ? `hasta ${formatDate(row.proximoVence)}` : row.bajas ? 'dado de baja' : ''
+        return (
+          <span className="flex items-center gap-1.5">
+            <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1', e.cls)}>{e.singular}</span>
+            {detalle && <span className="text-[11px] text-slate-400">{detalle}</span>}
+          </span>
+        )
+      }
+      case 'pantallas':
+        return <span className="block text-right tabular-nums text-slate-700">{v || '—'}</span>
+      case 'ultimoPago':
+        return v
+          ? <span className="text-slate-600 whitespace-nowrap">{formatDate(v)} <span className="text-[11px] text-slate-400">· hace {row.diasSinPagar} d</span></span>
+          : <span className="text-slate-400">—</span>
+      case 'recaudo12m':
+      case 'totalPagado':
+        return <span className={cn('block text-right tabular-nums font-semibold', v ? 'text-slate-800' : 'text-slate-300')}>{v ? `$${Number(v).toLocaleString('es-CO')}` : '$0'}</span>
+      case 'referido':
+        return v ? <span className="text-slate-600"><span className="font-mono text-xs text-teal-700">{v}</span>{nombrePorId.get(String(v)) ? ` · ${nombrePorId.get(String(v))}` : ''}</span> : <span className="text-slate-400">—</span>
+      case 'ciudad':
+        return <span className="text-slate-600">{v ? String(v).trim().replace(/(^|\s)\S/g, c => c.toUpperCase()) : '—'}</span>
       default:
         return <span className="text-slate-600">{v || '—'}</span>
     }
@@ -496,6 +581,7 @@ export default function ClientsPage() {
   return (
     <>
       <style>{CSS}</style>
+      <style>{DASH_TIPOS}</style>
       <KpiExplainModal info={explain} onClose={() => setExplain(null)} />
 
       <div className="space-y-6 pb-8">
@@ -522,7 +608,7 @@ export default function ClientsPage() {
               </h1>
               <p className="text-teal-100/70 text-sm mt-2">
                 Base de suscriptores y clientes históricos IPTV
-                {!loading && <span className="text-teal-400/50"> · {rows.length.toLocaleString()} registros</span>}
+                {!loading && <span className="text-teal-400/50"> · {rows.length.toLocaleString('es-CO')} registros</span>}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -539,51 +625,66 @@ export default function ClientsPage() {
           </div>
         </div>
 
-        {/* ── KPI CARDS ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard icon={Users}     label="Total Clientes"   value={stats.total.toLocaleString()}        loading={loading} gradFrom="#14b8a6" gradTo="#2dd4bf" delay={2} sub="Histórico completo"
-            onClick={() => setExplain({
-              title: 'Total Clientes', value: stats.total.toLocaleString(), icon: Users,
-              queEs: 'Cuántos clientes hay registrados en la tabla de clientes.',
-              comoSeCalcula: 'Conteo simple de las filas. Ojo: "Clientes Activos" en el Dashboard usa otra fuente.',
-              origen: 'Tabla de clientes.',
-            })} />
-          <KpiCard icon={UserCheck} label="Clientes Finales" value={stats.finales.toLocaleString()}      loading={loading} gradFrom="#10b981" gradTo="#34d399" delay={3} sub="Usuarios directos"
-            onClick={() => setExplain({
-              title: 'Clientes Finales', value: stats.finales.toLocaleString(), icon: UserCheck,
-              queEs: 'Clientes que consumen el servicio directamente (mayor margen).',
-              comoSeCalcula: 'Registros con Tipo Cliente = Final.',
-              origen: 'Tabla de clientes.',
-            })} />
-          <KpiCard icon={Repeat}    label="Revendedores"     value={stats.revendedores.toLocaleString()} loading={loading} gradFrom="#f59e0b" gradTo="#fbbf24" delay={4} sub="Canal de reventa"
-            onClick={() => setExplain({
-              title: 'Revendedores', value: stats.revendedores.toLocaleString(), icon: Repeat,
-              queEs: 'Clientes que compran para revender a terceros.',
-              comoSeCalcula: 'Registros con Tipo Cliente = Revendedor.',
-              origen: 'Tabla de clientes.',
-            })} />
-          <KpiCard icon={Globe}     label="Países"           value={stats.paises.toLocaleString()}       loading={loading} gradFrom="#0ea5e9" gradTo="#38bdf8" delay={5} sub="Cobertura global"
-            onClick={() => setExplain({
-              title: 'Países', value: stats.paises.toLocaleString(), icon: Globe,
-              queEs: 'En cuántos países distintos hay clientes registrados.',
-              comoSeCalcula: 'Valores únicos del campo País.',
-              origen: 'Tabla de clientes.',
-            })} />
-        </div>
-
-
+        {/* ── TARJETAS (reflejan los filtros y filtran al tocarlas) ── */}
+        {!loading && !error && (
+          <TarjetasClientes r={resumen} filtros={filtros} hayFiltro={hayFiltro}
+            onEstado={alternarF('estados')} onTipo={alternarF('tipos')} onPais={alternarF('paises')} onFalta={alternarF('faltan')}
+            onExplicar={setExplain} />
+        )}
 
         {/* ── SEARCH & TABLE ── */}
         <div className="cl-a5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <div className="relative flex-1 min-w-[240px] max-w-sm">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input type="search" placeholder="Buscar por ID, nombre, país, referido…"
+              <input type="search" placeholder="Buscar por ID, nombre, móvil, país, referido…"
                 value={search} onChange={e => setSearch(e.target.value)}
                 className="cl-search w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200
                            bg-white text-sm text-slate-700 placeholder:text-slate-400 transition-shadow" />
             </div>
+            <FiltroMultiple etiqueta="Servicio" icono={Activity} opciones={Object.keys(ESTADOS).filter(k => cEstados.get(k))} seleccion={filtros.estados}
+              onCambio={setF('estados')} nombre={(k) => ESTADOS[k].nombre} contar={(k) => cEstados.get(k) || 0} />
+            <FiltroMultiple etiqueta="Tipo" icono={Repeat} opciones={ordenar(cTipos)} seleccion={filtros.tipos}
+              onCambio={setF('tipos')} contar={(k) => cTipos.get(k) || 0} />
+            <FiltroMultiple etiqueta="País" icono={Globe} opciones={ordenar(cPaises)} seleccion={filtros.paises}
+              onCambio={setF('paises')} contar={(k) => cPaises.get(k) || 0} />
+            <button type="button" onClick={() => setMasFiltros(v => !v)} aria-expanded={masFiltros}
+              className={cn('flex items-center gap-2 px-3.5 py-2.5 border rounded-xl bg-white shadow-sm text-sm font-medium transition-colors',
+                filtros.generos.length + filtros.faltan.length + filtros.referido.length ? 'border-emerald-500 text-emerald-800 bg-emerald-50/60' : 'border-emerald-200 text-gray-700 hover:bg-emerald-50')}>
+              <SlidersHorizontal size={16} className="text-emerald-500" /> Más filtros
+              {filtros.generos.length + filtros.faltan.length + filtros.referido.length > 0 && ` (${filtros.generos.length + filtros.faltan.length + filtros.referido.length})`}
+              <ChevronDown size={14} className={cn('text-gray-400 transition-transform', masFiltros && 'rotate-180')} />
+            </button>
+            {masFiltros && (
+              <div className="w-full flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+                <FiltroMultiple etiqueta="Datos faltantes" icono={ClipboardCheck} opciones={Object.keys(CAMPOS_CLAVE)} seleccion={filtros.faltan}
+                  onCambio={setF('faltan')} nombre={(k) => CAMPOS_CLAVE[k]} contar={(k) => datos.filter(r => faltantes(r).includes(k)).length} />
+                <FiltroMultiple etiqueta="Género" icono={User} opciones={ordenar(cGeneros)} seleccion={filtros.generos}
+                  onCambio={setF('generos')} nombre={(g) => (g === 'F' ? 'Femenino' : g === 'M' ? 'Masculino' : 'Sin dato')} contar={(g) => cGeneros.get(g) || 0} />
+                <FiltroMultiple etiqueta="Referido" icono={UserPlus} unico opciones={['con', 'sin']} seleccion={filtros.referido}
+                  onCambio={setF('referido')} nombre={(v) => (v === 'con' ? 'Llegó referido' : 'Sin referido')} />
+              </div>
+            )}
           </div>
+
+          {hayFiltro && (
+            <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Filtros activos">
+              {[
+                search && { k: 's', t: `“${search}”`, quitar: () => setSearch('') },
+                ...filtros.estados.map(v => ({ k: `e${v}`, t: ESTADOS[v].nombre, quitar: () => alternarF('estados')(v) })),
+                ...filtros.tipos.map(v => ({ k: `t${v}`, t: v, quitar: () => alternarF('tipos')(v) })),
+                ...filtros.paises.map(v => ({ k: `p${v}`, t: v, quitar: () => alternarF('paises')(v) })),
+                ...filtros.faltan.map(v => ({ k: `f${v}`, t: CAMPOS_CLAVE[v], quitar: () => alternarF('faltan')(v) })),
+                ...filtros.generos.map(v => ({ k: `g${v}`, t: v === 'F' ? 'Femenino' : v === 'M' ? 'Masculino' : 'Género sin dato', quitar: () => alternarF('generos')(v) })),
+                ...filtros.referido.map(v => ({ k: `r${v}`, t: v === 'con' ? 'Llegó referido' : 'Sin referido', quitar: () => setF('referido')([]) })),
+              ].filter(Boolean).map(c => (
+                <button key={c.k} type="button" onClick={c.quitar} className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full bg-teal-50 text-teal-800 ring-1 ring-teal-200 text-xs font-semibold hover:bg-teal-100">
+                  {c.t} <X size={12} aria-label={`Quitar ${c.t}`} />
+                </button>
+              ))}
+              <button type="button" onClick={limpiarFiltros} className="text-xs font-semibold text-rose-600 hover:underline ml-1">Limpiar filtros</button>
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
             {loading
@@ -597,7 +698,7 @@ export default function ClientsPage() {
                   </div>
                 )
                 : filtered.length === 0
-                  ? <EmptyState onNew={openNew} hasSearch={search.trim().length > 0} />
+                  ? <EmptyState onNew={openNew} hasSearch={hayFiltro} />
                   : (
                     <>
                       <div className="overflow-x-auto max-h-[36rem] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300">
@@ -607,13 +708,13 @@ export default function ClientsPage() {
                               {COLS.map(col => (
                                 <th key={col.key} onClick={() => handleSort(col.key)}
                                   className="cl-th-sort px-4 py-3.5 cursor-pointer whitespace-nowrap">
-                                  <div className="flex items-center gap-1">
+                                  <div className={cn('flex items-center gap-1', col.num && 'justify-end')}>
                                     {col.label}
                                     <SortIcon colKey={col.key} sortCol={sortCol} sortDir={sortDir} />
                                   </div>
                                 </th>
                               ))}
-                              <th className="px-4 py-3.5 w-16 text-center sticky right-0 bg-slate-50 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]"></th>
+                              <th className="px-4 py-3.5 w-24 text-center sticky right-0 bg-slate-50 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -624,8 +725,14 @@ export default function ClientsPage() {
                                     {renderCell(row, col.key)}
                                   </td>
                                 ))}
-                                <td className="px-2 py-3 whitespace-nowrap text-center sticky right-0 bg-white shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)] z-10 group-hover:bg-slate-50/50 transition-colors">
+                                <td className="px-2 py-3 whitespace-nowrap text-center sticky right-0 bg-white shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)] z-10 group-hover:bg-slate-50 transition-colors">
                                   <div className="flex items-center justify-center gap-1">
+                                    {normalizarTelefono(row.movil, row.pais).conIndicativo && (
+                                      <button onClick={() => abrirWhatsApp(normalizarTelefono(row.movil, row.pais).numero, '')}
+                                        className="cl-action-btn w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50" title="Abrir chat de WhatsApp" aria-label={`WhatsApp de ${row.nombre || row.customerId}`}>
+                                        <MessageCircle size={13} />
+                                      </button>
+                                    )}
                                     <button onClick={() => openEdit(row)}
                                       className="cl-action-btn w-7 h-7 rounded-lg flex items-center justify-center text-teal-600 hover:bg-teal-50" title="Editar">
                                       <Pencil size={13} />
@@ -644,7 +751,7 @@ export default function ClientsPage() {
 
                       {/* Footer tabla */}
                       <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/60">
-                        <span className="text-xs text-slate-400">{filtered.length.toLocaleString()} de {rows.length.toLocaleString()} registros</span>
+                        <span className="text-xs text-slate-400">{filtered.length.toLocaleString('es-CO')} de {rows.length.toLocaleString('es-CO')} clientes</span>
                         <span className="text-xs text-slate-400">Ordenado por <strong className="text-teal-600">{COLS.find(c => c.key === sortCol)?.label ?? sortCol}</strong> ({sortDir === 'asc' ? '↑ asc' : '↓ desc'})</span>
                       </div>
                     </>
