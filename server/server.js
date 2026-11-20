@@ -17,6 +17,7 @@ const { ensureVentasEquiposSchema } = require('./utils/ensureVentasEquiposSchema
 const { ensureModelColumns, dropStaleBackupTables } = require('./utils/ensureModelColumns');
 const { ensureIndexes } = require('./utils/ensureIndexes');
 const { migrarCredenciales } = require('./services/migrarCredenciales');
+const { unificarMediosPago } = require('./utils/medioPago');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -177,6 +178,9 @@ async function seedDevicesFromVentas() {
     // Cuentas Padre es la única fuente de la contraseña: se cifran las que estén
     // en texto plano y se borran las copias que tenía cada pantalla.
     await migrarCredenciales();
+    // El banco Nu se registra siempre como "NU" (llegaba también como "Nu" o "UN")
+    const mediosUnificados = await unificarMediosPago(sequelize);
+    if (mediosUnificados > 0) console.log(`[MIGRACION] ${mediosUnificados} pagos con medio "Nu"/"UN" quedaron como "NU".`);
     // recordatorios ganó `etapa` (secuencia de cobro antes / día / +3 días)
     await ensureModelColumns(Recordatorio);
     // ventas_equipos también ganó columnas tarde (costo, serial, garantia):

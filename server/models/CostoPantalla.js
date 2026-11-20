@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const { normalizarMedioPago } = require('../utils/medioPago');
 
 const CostoPantalla = sequelize.define('CostoPantalla', {
   id:                      { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -20,5 +21,8 @@ const CostoPantalla = sequelize.define('CostoPantalla', {
   costoPantallaCOP:        DataTypes.FLOAT,
   medioPago:               DataTypes.STRING,
 }, { tableName: 'costo_pantalla', timestamps: true });
+
+// "Nu", "UN" o "Nu Bank" se guardan siempre como "NU" (utils/medioPago.js)
+CostoPantalla.addHook('beforeSave', (r) => { if (r.changed('medioPago')) r.medioPago = normalizarMedioPago(r.medioPago); });
 
 module.exports = CostoPantalla;
