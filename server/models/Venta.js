@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const { normalizarMedioPago } = require('../utils/medioPago');
 
 const Venta = sequelize.define('Venta', {
   idVM:           { type: DataTypes.STRING, primaryKey: true },
@@ -35,5 +36,8 @@ const Venta = sequelize.define('Venta', {
     { fields: ['tipoPago'] },
   ]
 });
+
+// "Nu", "UN" o "Nu Bank" se guardan siempre como "NU" (utils/medioPago.js)
+Venta.addHook('beforeSave', (r) => { if (r.changed('medioPago')) r.medioPago = normalizarMedioPago(r.medioPago); });
 
 module.exports = Venta;

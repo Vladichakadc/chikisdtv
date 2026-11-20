@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const { normalizarMedioPago } = require('../utils/medioPago');
 
 const VentaEquipo = sequelize.define('VentaEquipo', {
   idVM:           { type: DataTypes.STRING, primaryKey: true },
@@ -32,5 +33,8 @@ const VentaEquipo = sequelize.define('VentaEquipo', {
   debe:           DataTypes.STRING,   // "SI" / "NO" — la venta quedó con saldo pendiente
   saldoDebe:      DataTypes.FLOAT,    // monto COP que el cliente aún debe (solo si debe = SI)
 }, { tableName: 'ventas_equipos', timestamps: true });
+
+// "Nu", "UN" o "Nu Bank" se guardan siempre como "NU" (utils/medioPago.js)
+VentaEquipo.addHook('beforeSave', (r) => { if (r.changed('medioPago')) r.medioPago = normalizarMedioPago(r.medioPago); });
 
 module.exports = VentaEquipo;

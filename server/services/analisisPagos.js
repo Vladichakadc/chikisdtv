@@ -37,7 +37,7 @@ const familiaPlan = (p) => {
 const medioNormal = (m) => {
   const t = String(m || '').trim();
   if (!t) return 'Sin registrar';
-  if (/^nu$/i.test(t)) return 'Nu';
+  if (/^(nu|un|nu\s*bank|nubank)$/i.test(t)) return 'Nu'; // "UN" era un error de escritura de Nu (Nu Bank)
   if (/^paypal$/i.test(t)) return 'PayPal';
   if (/wester/i.test(t)) return 'Western Union';
   return t;
