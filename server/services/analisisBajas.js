@@ -53,18 +53,21 @@ function filasDeBajas(bajas, ventas) {
   }
   for (const l of porCliente.values()) l.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
 
-  return bajas.filter(b => b.fechaBaja).map(b => {
+  // Incluye también las bajas sin fecha (fechaBaja null): el análisis las
+  // descarta, pero las listas (retención y clasificación) las muestran todas.
+  return bajas.map(b => {
     const cat = categoriaMotivo(b.motivo);
     const id = String(b.customerId || '').trim();
+    const fb = b.fechaBaja ? String(b.fechaBaja).slice(0, 10) : null;
     const vs = porCliente.get(id) || [];
-    const antes = vs.filter(v => v.fecha <= b.fechaBaja && v.tipoPago !== 'Cortesia');
+    const antes = vs.filter(v => (!fb || v.fecha <= fb) && v.tipoPago !== 'Cortesia');
     const ultima = antes[antes.length - 1];
     const activacion = vs.find(v => v.tipoPago === 'Activacion Pantalla');
-    const vuelve = vs.find(v => v.fecha > b.fechaBaja && v.tipoPago !== 'Cortesia');
-    const vida = activacion && activacion.fecha <= b.fechaBaja ? Math.max(0, mesesEntre(activacion.fecha, b.fechaBaja)) : null;
+    const vuelve = fb ? vs.find(v => v.fecha > fb && v.tipoPago !== 'Cortesia') : null;
+    const vida = fb && activacion && activacion.fecha <= fb ? Math.max(0, mesesEntre(activacion.fecha, fb)) : null;
     return {
       id: b.id, idBaja: b.idBaja, nickname: b.nickname, nombre: [b.nombre, b.apellido].filter(Boolean).join(' ').trim() || null,
-      customerId: id || null, fechaBaja: String(b.fechaBaja).slice(0, 10), mes: ym(b.fechaBaja),
+      customerId: id || null, fechaBaja: fb, mes: fb ? ym(fb) : null,
       pantallas: Number(b.pantallas) || 1, tipoPlan: b.tipoPlan || 'Sin plan', motivoTexto: b.motivo || null,
       observaciones: b.observaciones || null, devolucion: String(b.devolucion || '').trim().toUpperCase() === 'SI',
       categoria: cat.clave, categoriaNombre: cat.nombre,
@@ -77,8 +80,21 @@ function filasDeBajas(bajas, ventas) {
   });
 }
 
+// Orden de las listas: la baja más reciente primero; a igual fecha, el código
+// de baja más alto (BAJA161 antes que BAJA160); las que no tienen fecha, al final.
+const numBaja = (f) => Number(String(f.idBaja || '').replace(/\D/g, '')) || 0;
+function ordenRecientes(a, b) {
+  if (a.fechaBaja !== b.fechaBaja) {
+    if (!a.fechaBaja) return 1;
+    if (!b.fechaBaja) return -1;
+    return b.fechaBaja.localeCompare(a.fechaBaja);
+  }
+  return numBaja(b) - numBaja(a) || (b.id || 0) - (a.id || 0);
+}
+
 function calcularAnalisisBajas(bajas, ventas, { hoy = hoyISO() } = {}) {
-  const filas = filasDeBajas(bajas, ventas);
+  const todas = filasDeBajas(bajas, ventas);
+  const filas = todas.filter(f => f.fechaBaja);
 
   const reales = filas.filter(f => f.categoria !== 'cambio_cuenta');
   const desde12 = sumarMeses(ym(hoy), -12); // últimos 12 meses (incluye el mes en curso)
@@ -162,7 +178,7 @@ function calcularAnalisisBajas(bajas, ventas, { hoy = hoyISO() } = {}) {
     vida,
     porPlan,
     // Para clasificar: las más recientes primero
-    sinMotivo: filas.filter(f => f.categoria === 'sin_motivo').sort((a, b) => b.fechaBaja.localeCompare(a.fechaBaja))
+    sinMotivo: todas.filter(f => f.categoria === 'sin_motivo').sort(ordenRecientes)
       .map(({ id, idBaja, nickname, nombre, fechaBaja, tipoPlan, observaciones, recuperado }) => ({ id, idBaja, nickname, nombre, fechaBaja, tipoPlan, observaciones, recuperado })),
   };
 }
@@ -175,4 +191,4 @@ async function analisisBajas(opciones) {
   return calcularAnalisisBajas(bajas, ventas, opciones);
 }
 
-module.exports = { analisisBajas, calcularAnalisisBajas, filasDeBajas };
+module.exports = { analisisBajas, calcularAnalisisBajas, filasDeBajas, ordenRecientes };

@@ -110,7 +110,6 @@ function Indicadores({ r }) {
 // ─── Clasificar bajas sin motivo ────────────────────────────────────────────
 function ClasificarSinMotivo({ lista, onClasificada }) {
   const { showToast } = useUi()
-  const [ver, setVer] = useState(5)
   const [elegidos, setElegidos] = useState({})
   const [guardando, setGuardando] = useState(null)
   const [hechos, setHechos] = useState({})
@@ -133,16 +132,17 @@ function ClasificarSinMotivo({ lista, onClasificada }) {
 
   return (
     <Panel titulo={`Clasifica las bajas sin motivo (${lista.length})`}
-      pregunta="Cada motivo que registres afina todo el análisis. Empieza por las más recientes."
+      pregunta="Cada motivo que registres afina todo el análisis."
       className="mb-5 ring-amber-200 bg-amber-50/40">
-      <ul className="divide-y divide-amber-100">
-        {lista.slice(0, ver).map(b => (
+      <p className="text-xs text-slate-500 mb-1">De la más reciente a la más antigua.</p>
+      <ul className="divide-y divide-amber-100 max-h-[60vh] overflow-y-auto pr-1">
+        {lista.map(b => (
           <li key={b.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-800 truncate">{b.nickname || b.nombre || b.idBaja}
                 {b.recuperado && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Volvió</span>}
               </p>
-              <p className="text-xs text-slate-500">{b.idBaja} · {formatDate(b.fechaBaja)}{b.tipoPlan ? ` · ${b.tipoPlan}` : ''}{b.observaciones && b.observaciones !== 'Migrado desde Excel' ? ` · ${b.observaciones}` : ''}</p>
+              <p className="text-xs text-slate-500">{b.idBaja} · {b.fechaBaja ? formatDate(b.fechaBaja) : 'Sin fecha'}{b.tipoPlan ? ` · ${b.tipoPlan}` : ''}{b.observaciones && b.observaciones !== 'Migrado desde Excel' ? ` · ${b.observaciones}` : ''}</p>
             </div>
             {hechos[b.id] ? (
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><Check size={14} /> {hechos[b.id]}</span>
@@ -163,11 +163,6 @@ function ClasificarSinMotivo({ lista, onClasificada }) {
           </li>
         ))}
       </ul>
-      {ver < lista.length && (
-        <button onClick={() => setVer(v => v + 10)} className="mt-2 text-sm font-semibold text-amber-800 hover:underline">
-          Ver más ({lista.length - ver} restantes)
-        </button>
-      )}
     </Panel>
   )
 }
