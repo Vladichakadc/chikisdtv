@@ -18,6 +18,7 @@ import { cn } from '../../../utils/cn'
 import { useUi } from '../../../context/UiContext'
 import { formatCurrency, formatUSD } from '../../../utils/excelUtils'
 import { MARCA_CLIENTE, PAGO_NEQUI, PAGO_LLAVE } from '../../../config/negocio'
+import { abrirWhatsApp, reservarVentanaWhatsApp, cerrarVentanaVacia, esDispositivoMovil } from '../../../utils/telefono'
 
 const TRM_POR_DEFECTO = 3700
 
@@ -170,8 +171,8 @@ export function OfertaRapidaModal({ plan, planes = [], trmInicial, onClose }) {
     // Detección síncrona de Web Share; si no hay, la pestaña se abre YA
     // (dentro del gesto del usuario) para esquivar el bloqueador de popups
     const probe = new File([''], 'probe.png', { type: 'image/png' })
-    const puedeCompartir = typeof navigator.canShare === 'function' && navigator.canShare({ files: [probe] })
-    const ventana = puedeCompartir ? null : window.open('', '_blank')
+    const puedeCompartir = esDispositivoMovil() && typeof navigator.canShare === 'function' && navigator.canShare({ files: [probe] })
+    const ventana = puedeCompartir ? null : reservarVentanaWhatsApp()
     try {
       const blob = await capturar()
       const file = new File([blob], `oferta-${MARCA_CLIENTE.toLowerCase()}.png`, { type: 'image/png' })
@@ -180,12 +181,10 @@ export function OfertaRapidaModal({ plan, planes = [], trmInicial, onClose }) {
         return
       }
       await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
-      const url = 'https://web.whatsapp.com'
-      if (ventana && !ventana.closed) ventana.location.href = url
-      else window.open(url, '_blank')
+      abrirWhatsApp('', '', { ventana })
       showToast('Imagen copiada — pégala en el chat de WhatsApp con Ctrl+V.', 'success')
     } catch (e) {
-      if (ventana && !ventana.closed) ventana.close()
+      cerrarVentanaVacia(ventana)
       if (e?.name !== 'AbortError') showToast(`No se pudo preparar el envío: ${e.message || e}`, 'error')
     } finally {
       setTrabajando(false)
@@ -205,8 +204,8 @@ export function OfertaRapidaModal({ plan, planes = [], trmInicial, onClose }) {
   }
 
   const handleWhatsAppTexto = () => {
-    // api.whatsapp.com directo (el redirect de wa.me daña los emojis)
-    window.open(`https://api.whatsapp.com/send/?text=${encodeURIComponent(mensaje)}`, '_blank')
+    // Computador → WhatsApp Web; celular → app (ver utils/telefono.js)
+    abrirWhatsApp('', mensaje)
     showToast('WhatsApp abierto — elige el chat del cliente; la oferta va prellenada.', 'success')
   }
 

@@ -128,10 +128,3 @@ export function mensajeOferta({ candidato, opciones, descuento, validoHasta, pan
     'Respóndeme *VUELVO* con el plan que prefieres y envíame el comprobante: te reactivo hoy mismo. 😉',
   ].filter(Boolean).join('\n\n')
 }
-
-// WhatsApp Web en computador; en el celular, el enlace que abre la app
-export function urlWhatsApp(numero, texto, { movil = false } = {}) {
-  const t = encodeURIComponent(texto || '')
-  if (movil) return numero ? `https://api.whatsapp.com/send/?phone=${numero}&text=${t}` : `https://api.whatsapp.com/send/?text=${t}`
-  return numero ? `https://web.whatsapp.com/send?phone=${numero}&text=${t}` : `https://web.whatsapp.com/send?text=${t}`
-}

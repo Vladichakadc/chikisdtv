@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizarTelefono, urlWhatsAppTexto } from './telefono'
+import { normalizarTelefono, urlWhatsAppTexto, esDispositivoMovil } from './telefono'
 
 describe('normalizarTelefono', () => {
   it('celular colombiano sin indicativo → 57', () => {
@@ -31,8 +31,23 @@ describe('normalizarTelefono', () => {
 })
 
 describe('urlWhatsAppTexto', () => {
-  it('con y sin número', () => {
-    expect(urlWhatsAppTexto('573001234567', 'Hola 📺')).toBe('https://api.whatsapp.com/send/?phone=573001234567&text=Hola%20%F0%9F%93%BA')
-    expect(urlWhatsAppTexto('', 'Hola')).toBe('https://api.whatsapp.com/send/?text=Hola')
+  it('celular: abre la app (api.whatsapp.com)', () => {
+    expect(urlWhatsAppTexto('573001234567', 'Hola 📺', { movil: true })).toBe('https://api.whatsapp.com/send/?phone=573001234567&text=Hola%20%F0%9F%93%BA')
+    expect(urlWhatsAppTexto('', 'Hola', { movil: true })).toBe('https://api.whatsapp.com/send/?text=Hola')
+  })
+  it('computador: abre WhatsApp Web con el chat y el texto', () => {
+    expect(urlWhatsAppTexto('573001234567', 'Hola 📺', { movil: false })).toBe('https://web.whatsapp.com/send?phone=573001234567&text=Hola%20%F0%9F%93%BA')
+    expect(urlWhatsAppTexto('573001234567', '', { movil: false })).toBe('https://web.whatsapp.com/send?phone=573001234567')
+    expect(urlWhatsAppTexto('', '', { movil: false })).toBe('https://web.whatsapp.com/send')
+  })
+})
+
+describe('esDispositivoMovil', () => {
+  it('distingue celular, iPad y computador', () => {
+    expect(esDispositivoMovil({ userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-A546E) Mobile Safari' })).toBe(true)
+    expect(esDispositivoMovil({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)' })).toBe(true)
+    expect(esDispositivoMovil({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', maxTouchPoints: 5 })).toBe(true)
+    expect(esDispositivoMovil({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131' })).toBe(false)
+    expect(esDispositivoMovil({ userAgentData: { mobile: false }, userAgent: 'x' })).toBe(false)
   })
 })

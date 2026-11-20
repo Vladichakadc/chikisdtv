@@ -5,11 +5,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { X, MessageCircle, Copy, Check, Gift, Star, ChevronDown, AlertTriangle, Sparkles } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 import { useUi } from '../../../context/UiContext'
-import { useEsMovil } from '../../../hooks/useEsMovil'
 import { CurrencyInput } from '../../../components/ui/CurrencyInput'
-import { normalizarTelefono } from '../../../utils/telefono'
+import { normalizarTelefono, abrirWhatsApp, esDispositivoMovil } from '../../../utils/telefono'
 import { formatDate } from '../../../utils/excelUtils'
-import { construirOferta, preciosBase, estrategiaDe, urlWhatsApp, MODALIDADES } from './ofertaRetencion'
+import { construirOferta, preciosBase, estrategiaDe, MODALIDADES } from './ofertaRetencion'
 import { COLORES_MOTIVO } from './lecturas'
 
 const pesos = (v) => `$${Math.round(Number(v) || 0).toLocaleString('es-CO')}`
@@ -42,7 +41,7 @@ function TextoWhatsApp({ texto }) {
 
 export function RetencionModal({ candidato, planes, onClose, onEnviada }) {
   const { showToast } = useUi()
-  const movil = useEsMovil()
+  const movil = esDispositivoMovil()
   const est = estrategiaDe()
   const { base: baseCatalogo, modUltima } = useMemo(() => preciosBase(candidato, planes), [candidato, planes])
 
@@ -70,7 +69,7 @@ export function RetencionModal({ candidato, planes, onClose, onEnviada }) {
 
   const enviar = () => {
     if (!oferta.opciones.length) return
-    window.open(urlWhatsApp(tel.numero, oferta.mensaje, { movil }), '_blank', 'noopener')
+    abrirWhatsApp(tel.numero, oferta.mensaje)
     onEnviada?.(candidato)
   }
   const copiar = async () => {

@@ -43,11 +43,57 @@ export function normalizarTelefono(raw, pais) {
   return { numero: digitos, conIndicativo: false, origen: 'sin_indicativo' }
 }
 
-// Enlace de WhatsApp con el texto prellenado. Se usa api.whatsapp.com directo
-// (el destino oficial de wa.me): el redirect de wa.me cambia emojis por U+FFFD.
-export function urlWhatsAppTexto(numero, texto) {
-  const t = encodeURIComponent(texto || '')
-  return numero
-    ? `https://api.whatsapp.com/send/?phone=${numero}&text=${t}`
-    : `https://api.whatsapp.com/send/?text=${t}`
+// ¿Celular o tablet? En esos equipos WhatsApp se abre en la app; en el
+// computador, en WhatsApp Web. (En Windows, Chrome y Edge también permiten
+// "compartir" archivos, pero eso abre la hoja de Windows y no WhatsApp Web,
+// así que la decisión se toma por el tipo de equipo y no por navigator.share.)
+export function esDispositivoMovil(nav = globalThis.navigator) {
+  if (!nav) return false
+  if (nav.userAgentData && typeof nav.userAgentData.mobile === 'boolean') return nav.userAgentData.mobile
+  const ua = String(nav.userAgent || '')
+  if (/Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(ua)) return true
+  // iPadOS se presenta como Mac de escritorio, pero tiene pantalla táctil
+  return /Macintosh/i.test(ua) && Number(nav.maxTouchPoints) > 1
+}
+
+// Enlace de WhatsApp con el texto prellenado.
+//  · Computador → web.whatsapp.com/send (abre el chat directo en WhatsApp Web).
+//  · Celular    → api.whatsapp.com/send (abre la app). Se usa api.whatsapp.com
+//    y no wa.me: el redirect de wa.me cambia los emojis por U+FFFD (�).
+export function urlWhatsAppTexto(numero, texto, { movil = esDispositivoMovil() } = {}) {
+  const params = [numero ? `phone=${numero}` : null, texto ? `text=${encodeURIComponent(texto)}` : null].filter(Boolean).join('&')
+  return movil
+    ? `https://api.whatsapp.com/send/${params ? `?${params}` : ''}`
+    : `https://web.whatsapp.com/send${params ? `?${params}` : ''}`
+}
+
+// En el computador WhatsApp Web se abre siempre en la misma pestaña (con
+// nombre): no se acumulan pestañas ni aparece el aviso de "WhatsApp está
+// abierto en otra ventana".
+export const VENTANA_WHATSAPP = 'chikisdtv-whatsapp'
+const destino = () => (esDispositivoMovil() ? '_blank' : VENTANA_WHATSAPP)
+
+// Abre (o reserva, para usarla después de un await) la pestaña de WhatsApp.
+// Debe llamarse dentro del clic: si no, el bloqueador de ventanas la frena.
+export function reservarVentanaWhatsApp() {
+  return window.open('', destino())
+}
+
+export function abrirWhatsApp(numero, texto, { ventana } = {}) {
+  const url = urlWhatsAppTexto(numero, texto)
+  if (ventana && !ventana.closed) {
+    ventana.location.href = url
+    ventana.focus?.()
+    return ventana
+  }
+  return window.open(url, destino())
+}
+
+// Si hubo un error después de reservar la pestaña, se cierra solo si quedó en
+// blanco (nunca la pestaña de WhatsApp Web que el usuario ya tenía abierta).
+export function cerrarVentanaVacia(ventana) {
+  if (!ventana || ventana.closed) return
+  try {
+    if (ventana.location.href === 'about:blank') ventana.close()
+  } catch { /* otra página (p. ej. WhatsApp Web): se deja abierta */ }
 }
