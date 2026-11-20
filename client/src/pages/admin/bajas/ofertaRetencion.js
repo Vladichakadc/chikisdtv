@@ -6,11 +6,10 @@
 //     siempre (6+1 y 12+2), así que el valor por mes baja de verdad.
 //   · Si el cliente pagaba menos que el catálogo actual en esa misma
 //     modalidad, se le respeta su precio de siempre.
-//   · Descuento de regreso moderado y por motivo (nunca más de 30 %: los
-//     descuentos grandes enseñan a cancelar para conseguir rebaja) y con
-//     fecha límite.
-//   · El gancho del mensaje responde al motivo por el que se fue y solo
-//     promete lo que el servicio ya incluye.
+//   · Una sola estrategia agresiva para todos (ESTRATEGIA): descuento máximo
+//     (30 %, el tope para no enseñar a cancelar por rebaja), plan anual
+//     destacado y fecha límite corta. El mensaje solo promete lo que el
+//     servicio ya incluye.
 import { MARCA_CLIENTE, PAGO_NEQUI, PAGO_LLAVE } from '../../../config/negocio'
 
 export const MODALIDADES = [
@@ -18,22 +17,19 @@ export const MODALIDADES = [
   { clave: 'semestral', nombre: 'Semestral', patron: /semestral/i, pagas: 6, regalo: 1 },
   { clave: 'anual', nombre: 'Anual', patron: /anual/i, pagas: 12, regalo: 2 },
 ]
-export const DESCUENTO_MAXIMO = 30
+const DESCUENTO_MAXIMO_VALOR = 30
+export const DESCUENTO_MAXIMO = DESCUENTO_MAXIMO_VALOR
 
-// Descuento sugerido, plan que se destaca y gancho del mensaje, por motivo
+// Estrategia única y agresiva para todos los clientes, sin importar el motivo:
+// el descuento más alto permitido, el plan anual destacado (el de menor valor
+// por mes, con 2 meses de regalo) y una ventana corta de 3 días.
 export const ESTRATEGIA = {
-  economico: { descuento: 20, recomendado: 'anual', gancho: 'Sabemos que el bolsillo manda, así que te armamos una tarifa especial para que vuelvas pagando menos.' },
-  competencia: { descuento: 20, recomendado: 'anual', gancho: 'Compara: +800 canales HD, deportes en vivo y +9.000 películas y series de todas las plataformas en un solo servicio.' },
-  senal: { descuento: 15, recomendado: null, gancho: 'Queremos que lo disfrutes sin fallas: te dejamos todo configurado y probado por videollamada de WhatsApp, sin costo.' },
-  dispositivo: { descuento: 10, recomendado: null, gancho: 'Funciona en TV Android, Watch ONN, TV Box, Fire Stick, celulares y tablets, y te ayudamos a instalarlo por videollamada.' },
-  soporte: { descuento: 15, recomendado: null, gancho: 'Queremos atenderte mejor: tendrás soporte directo por WhatsApp para lo que necesites.' },
-  no_usa: { descuento: 10, recomendado: 'mensual', gancho: 'Seguimos sumando estrenos de todas las plataformas y deportes en vivo; vuelve con un mes para probarlo sin compromiso.' },
-  temporal: { descuento: 15, recomendado: 'mensual', gancho: '¡Bienvenido de regreso! Retoma tu servicio cuando quieras con tarifa especial.' },
-  moroso: { descuento: 0, recomendado: 'mensual', gancho: 'Queremos que vuelvas a disfrutar tu servicio sin complicaciones.' },
-  otro: { descuento: 15, recomendado: null, gancho: 'Te extrañamos y queremos que vuelvas a disfrutar todo tu contenido.' },
-  sin_motivo: { descuento: 15, recomendado: null, gancho: 'Te extrañamos y queremos que vuelvas a disfrutar todo tu contenido.' },
+  descuento: DESCUENTO_MAXIMO_VALOR,
+  recomendado: 'anual',
+  vigenciaDias: 3,
+  gancho: 'Te extrañamos 💔 y queremos que vuelvas YA: si regresas en estos días, te damos nuestro *descuento de regreso más alto*.',
 }
-export const estrategiaDe = (categoria) => ESTRATEGIA[categoria] || ESTRATEGIA.otro
+export const estrategiaDe = () => ESTRATEGIA
 
 const pesos = (v) => `$${Math.round(Number(v) || 0).toLocaleString('es-CO')}`
 export const redondear500 = (v) => Math.round((Number(v) || 0) / 500) * 500
@@ -104,7 +100,7 @@ export function construirOferta(candidato, planes, { descuento, vigenciaDias = 7
 const NUMEROS = ['1️⃣', '2️⃣', '3️⃣']
 export function mensajeOferta({ candidato, opciones, descuento, validoHasta, pantallas }) {
   const nombre = primerNombre(candidato)
-  const est = estrategiaDe(candidato.categoria)
+  const est = estrategiaDe()
   const pant = pantallas === 1 ? 'tu pantalla' : `tus ${pantallas} pantallas`
   const ultimo = candidato.ultimaVenta?.tipoPlan || (candidato.tipoPlan !== 'Sin plan' ? candidato.tipoPlan : null)
 
@@ -128,7 +124,7 @@ export function mensajeOferta({ candidato, opciones, descuento, validoHasta, pan
     mejorAhorro ? `💡 Con el plan ${mejorAhorro.nombre.toLowerCase()} ahorras ${pesos(mejorAhorro.ahorroVsMensual)} frente a pagar mes a mes.` : null,
     '✨ Incluye +800 canales HD, deportes en vivo y +9.000 películas y series.\n🛠️ Te dejamos todo funcionando con soporte por videollamada de WhatsApp.',
     `💳 *Para activar, consigna a:*\n📲 Nequi: ${PAGO_NEQUI}\n🔑 Llave BreB: ${PAGO_LLAVE}\n🌎 PayPal (pagos internacionales)`,
-    `⏳ Oferta válida hasta el ${fechaLarga(validoHasta)}.`,
+    `⏳ *Solo hasta el ${fechaLarga(validoHasta)}.* Después vuelve al precio normal.`,
     'Respóndeme *VUELVO* con el plan que prefieres y envíame el comprobante: te reactivo hoy mismo. 😉',
   ].filter(Boolean).join('\n\n')
 }

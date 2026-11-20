@@ -14,7 +14,7 @@ import { COLORES_MOTIVO } from './lecturas'
 
 const pesos = (v) => `$${Math.round(Number(v) || 0).toLocaleString('es-CO')}`
 const DESCUENTOS = [0, 10, 15, 20, 25, 30]
-const VIGENCIAS = [3, 7, 15]
+const VIGENCIAS = [2, 3, 7]
 
 function Segmentos({ opciones, valor, onCambio, etiqueta, formato = (v) => v }) {
   return (
@@ -43,11 +43,11 @@ function TextoWhatsApp({ texto }) {
 export function RetencionModal({ candidato, planes, onClose, onEnviada }) {
   const { showToast } = useUi()
   const movil = useEsMovil()
-  const est = estrategiaDe(candidato.categoria)
+  const est = estrategiaDe()
   const { base: baseCatalogo, modUltima } = useMemo(() => preciosBase(candidato, planes), [candidato, planes])
 
   const [descuento, setDescuento] = useState(est.descuento)
-  const [vigencia, setVigencia] = useState(7)
+  const [vigencia, setVigencia] = useState(est.vigenciaDias)
   const [recomendado, setRecomendado] = useState(est.recomendado || modUltima || 'mensual')
   const [base, setBase] = useState(baseCatalogo)
   const [verPrecios, setVerPrecios] = useState(false)
@@ -105,7 +105,7 @@ export function RetencionModal({ candidato, planes, onClose, onEnviada }) {
           <div className="space-y-4 min-w-0">
             <div className="rounded-xl bg-emerald-50 ring-1 ring-emerald-100 px-3.5 py-2.5 text-sm text-emerald-900 flex gap-2">
               <Sparkles size={16} className="shrink-0 mt-0.5 text-emerald-600" />
-              <p><strong>Estrategia por el motivo ({candidato.categoriaNombre.toLowerCase()}):</strong> {est.descuento ? `${est.descuento}% de descuento` : 'sin descuento'}{est.recomendado ? ` y destacar el plan ${est.recomendado}` : ''}. {est.gancho}</p>
+              <p><strong>Estrategia de regreso agresiva:</strong> {est.descuento}% de descuento en el primer pago, plan anual destacado (2 meses de regalo) y solo {est.vigenciaDias} días para decidir. Es la misma para todos los clientes.</p>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-3">

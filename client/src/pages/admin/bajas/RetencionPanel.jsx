@@ -8,6 +8,8 @@ import { cn } from '../../../utils/cn'
 import { formatDate } from '../../../utils/excelUtils'
 import { COLORES_MOTIVO, fmtPesosCorto } from './lecturas'
 import { estrategiaDe } from './ofertaRetencion'
+
+const EST = estrategiaDe()
 import { RetencionModal } from './RetencionModal'
 
 const CLAVE_ENVIADAS = 'bajas.retencion.enviadas'
@@ -65,7 +67,7 @@ export function RetencionPanel() {
         <div>
           <h2 className="dash-num text-lg font-bold text-slate-900 leading-tight flex items-center gap-2"><Gift size={18} className="text-emerald-600" /> Plan de retención</h2>
           <p className="dash-txt text-[13px] text-slate-600 mt-0.5 max-w-2xl">
-            Clientes que se fueron y no han vuelto. Cada uno tiene una oferta de regreso armada sobre su último plan, con precio mensual, semestral y anual, lista para enviar por WhatsApp.
+            Clientes que se fueron y no han vuelto. A todos se les envía la misma oferta agresiva sobre su último plan: <strong>{EST.descuento}% de descuento</strong>, plan anual destacado y solo {EST.vigenciaDias} días para decidir, con precio mensual, semestral y anual.
           </p>
         </div>
         {data && (
@@ -114,7 +116,6 @@ export function RetencionPanel() {
           ) : (
             <ul className="grid gap-2 md:grid-cols-2">
               {lista.slice(0, ver).map(c => {
-                const est = estrategiaDe(c.categoria)
                 const enviada = enviadas[c.idBaja]
                 return (
                   <li key={c.idBaja} className="min-w-0 rounded-xl bg-white ring-1 ring-slate-200 p-3 flex flex-col gap-2">
@@ -134,9 +135,6 @@ export function RetencionPanel() {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: COLORES_MOTIVO[c.categoria] }} />{c.categoriaNombre}
-                      </span>
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                        {est.descuento ? `${est.descuento}% de regreso` : 'Sin descuento'}{est.recomendado ? ` · ${est.recomendado}` : ''}
                       </span>
                       {enviada && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">Oferta enviada {formatDate(enviada)}</span>}
                     </div>
