@@ -4,7 +4,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search, Plus, Pencil, Trash2, X,
   DollarSign,
-  ChevronUp, ChevronDown, ChevronsUpDown, Sparkles, Calendar
+  ChevronUp, ChevronDown, ChevronsUpDown, Sparkles, Calendar,
+  Wallet, Tag, Layers, SlidersHorizontal, CircleDot, BadgeDollarSign
 } from 'lucide-react'
 import api from '../../config/api'
 import { SKU_TIPO_FIRE, MESES } from '../../config/equipos'
@@ -16,6 +17,7 @@ import { formatDate, formatCurrency } from '../../utils/excelUtils'
 import { cn } from '../../utils/cn'
 import { DASH_TIPOS } from './dashboard/AlAire'
 import { TarjetasPagos } from './pagos/TarjetasPagos'
+import { FiltroMultiple } from './pagos/FiltroMultiple'
 import { resumenPagos, mesEnCurso, tipoDe, medioDe, mesBonito, etiquetaTipoPago, TIPOS } from './pagos/resumenPagos'
 
 
@@ -211,6 +213,12 @@ export default function PaymentsPage() {
   // Filtros que también se activan desde las tarjetas
   const [tipoFiltro, setTipoFiltro] = useState(null) // renovacion | activacion | cortesia | otros
   const [mediosFiltro, setMediosFiltro] = useState([])
+  const [planesFiltro, setPlanesFiltro] = useState([])
+  const [estadosFiltro, setEstadosFiltro] = useState([])
+  const [valorFiltro, setValorFiltro] = useState(null) // con | cero
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [masFiltros, setMasFiltros] = useState(false)
   const [monthMenuOpen, setMonthMenuOpen] = useState(false)
   const monthMenuRef = useRef(null)
   const [sortCol, setSortCol]   = useState('fecha')
@@ -565,6 +573,12 @@ export default function PaymentsPage() {
     }
     if (tipoFiltro) result = result.filter(r => tipoDe(r.tipoPago) === tipoFiltro)
     if (mediosFiltro.length) result = result.filter(r => mediosFiltro.includes(medioDe(r.medioPago)))
+    if (planesFiltro.length) result = result.filter(r => planesFiltro.includes(String(r.tipoPlan || '').trim() || 'Sin plan'))
+    if (estadosFiltro.length) result = result.filter(r => estadosFiltro.includes(String(r.estado || '').trim() || 'Sin estado'))
+    if (valorFiltro === 'con') result = result.filter(r => Number(r.precioVenta) > 0)
+    if (valorFiltro === 'cero') result = result.filter(r => !(Number(r.precioVenta) > 0))
+    if (fechaDesde) result = result.filter(r => String(r.fecha || '').slice(0, 10) >= fechaDesde)
+    if (fechaHasta) result = result.filter(r => r.fecha && String(r.fecha).slice(0, 10) <= fechaHasta)
     if (search) {
       const s = search.toLowerCase()
       result = result.filter(r =>
@@ -578,14 +592,30 @@ export default function PaymentsPage() {
       )
     }
     return result
-  }, [rows, search, selectedYears, selectedMonths, tipoFiltro, mediosFiltro])
+  }, [rows, search, selectedYears, selectedMonths, tipoFiltro, mediosFiltro, planesFiltro, estadosFiltro, valorFiltro, fechaDesde, fechaHasta])
 
   // Las tarjetas inteligentes reflejan el resultado filtrado por la búsqueda y el año
   const resumen = useMemo(() => resumenPagos(searched), [searched])
   const mesActual = useMemo(() => mesEnCurso(rows), [rows])
   const stats = { total: rows.length }
-  const hayFiltro = !!(search || selectedYears !== null || selectedMonths !== null || tipoFiltro || mediosFiltro.length)
-  const limpiarFiltros = () => { setSearch(''); setSelectedYears(null); setSelectedMonths(null); setTipoFiltro(null); setMediosFiltro([]) }
+  const hayFiltro = !!(search || selectedYears !== null || selectedMonths !== null || tipoFiltro || mediosFiltro.length
+    || planesFiltro.length || estadosFiltro.length || valorFiltro || fechaDesde || fechaHasta)
+  const limpiarFiltros = () => {
+    setSearch(''); setSelectedYears(null); setSelectedMonths(null); setTipoFiltro(null); setMediosFiltro([])
+    setPlanesFiltro([]); setEstadosFiltro([]); setValorFiltro(null); setFechaDesde(''); setFechaHasta('')
+  }
+  // Opciones de los filtros con su conteo (sobre todas las ventas), de la más usada a la menos
+  const conteo = (clave) => {
+    const m = new Map()
+    for (const r of rows) { const k = clave(r); m.set(k, (m.get(k) || 0) + 1) }
+    return m
+  }
+  const cuentaMedios = useMemo(() => conteo(r => medioDe(r.medioPago)), [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cuentaPlanes = useMemo(() => conteo(r => String(r.tipoPlan || '').trim() || 'Sin plan'), [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cuentaEstados = useMemo(() => conteo(r => String(r.estado || '').trim() || 'Sin estado'), [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cuentaTipos = useMemo(() => conteo(r => tipoDe(r.tipoPago)), [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const ordenar = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+  const filtrosSecundarios = estadosFiltro.length + (valorFiltro ? 1 : 0) + (fechaDesde ? 1 : 0) + (fechaHasta ? 1 : 0)
   const irAMesEnCurso = () => {
     const [y, m] = mesActual.mes.split('-').map(Number)
     setSelectedYears([String(y)]); setSelectedMonths([MESES[m - 1]])
@@ -611,7 +641,7 @@ export default function PaymentsPage() {
   // Se muestran de a PAGE_SIZE filas y el resto se carga bajo demanda.
   const PAGE_SIZE = 150
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [search, selectedYears, selectedMonths, tipoFiltro, mediosFiltro, sortCol, sortDir])
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [search, selectedYears, selectedMonths, tipoFiltro, mediosFiltro, planesFiltro, estadosFiltro, valorFiltro, fechaDesde, fechaHasta, sortCol, sortDir])
   const visible = filtered.slice(0, visibleCount)
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -756,18 +786,61 @@ export default function PaymentsPage() {
             </div>
           )}
         </div>
+
+        <FiltroMultiple etiqueta="Tipo" icono={Tag} unico opciones={ordenar(cuentaTipos)} seleccion={tipoFiltro ? [tipoFiltro] : []}
+          onCambio={(v) => setTipoFiltro(v[0] || null)} nombre={(t) => TIPOS[t]?.nombre || t} contar={(t) => cuentaTipos.get(t) || 0} />
+        <FiltroMultiple etiqueta="Medio" icono={Wallet} opciones={ordenar(cuentaMedios)} seleccion={mediosFiltro}
+          onCambio={setMediosFiltro} contar={(m) => cuentaMedios.get(m) || 0} />
+        <FiltroMultiple etiqueta="Plan" icono={Layers} opciones={ordenar(cuentaPlanes)} seleccion={planesFiltro}
+          onCambio={setPlanesFiltro} contar={(p) => cuentaPlanes.get(p) || 0} />
+        <button type="button" onClick={() => setMasFiltros(v => !v)} aria-expanded={masFiltros}
+          className={cn('flex items-center gap-2 px-3.5 py-2.5 border rounded-xl bg-white shadow-sm text-sm font-medium transition-colors',
+            filtrosSecundarios ? 'border-emerald-500 text-emerald-800 bg-emerald-50/60' : 'border-emerald-200 text-gray-700 hover:bg-emerald-50')}>
+          <SlidersHorizontal size={16} className="text-emerald-500" /> Más filtros{filtrosSecundarios ? ` (${filtrosSecundarios})` : ''}
+          <ChevronDown size={14} className={cn('text-gray-400 transition-transform', masFiltros && 'rotate-180')} />
+        </button>
+        {masFiltros && (
+          <div className="w-full flex flex-wrap items-end gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+            <label className="block">
+              <span className="block text-xs font-semibold text-gray-600 mb-1">Fecha de pago desde</span>
+              <input type="date" value={fechaDesde} max={fechaHasta || undefined} onChange={e => setFechaDesde(e.target.value)}
+                className="px-3 py-2 border border-emerald-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
+            </label>
+            <label className="block">
+              <span className="block text-xs font-semibold text-gray-600 mb-1">Hasta</span>
+              <input type="date" value={fechaHasta} min={fechaDesde || undefined} onChange={e => setFechaHasta(e.target.value)}
+                className="px-3 py-2 border border-emerald-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
+            </label>
+            <div className="flex flex-wrap gap-1.5" aria-label="Rangos rápidos">
+              {[['Hoy', 0], ['Últimos 7 días', 6], ['Últimos 30 días', 29]].map(([n, d]) => (
+                <button key={n} type="button" onClick={() => { const h = todayStr(); const x = new Date(`${h}T12:00:00`); x.setDate(x.getDate() - d); setFechaDesde(x.toLocaleDateString('en-CA')); setFechaHasta(h) }}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white ring-1 ring-emerald-200 text-emerald-800 hover:bg-emerald-50">{n}</button>
+              ))}
+            </div>
+            <FiltroMultiple etiqueta="Estado" icono={CircleDot} opciones={ordenar(cuentaEstados)} seleccion={estadosFiltro}
+              onCambio={setEstadosFiltro} contar={(e) => cuentaEstados.get(e) || 0} />
+            <FiltroMultiple etiqueta="Valor" icono={BadgeDollarSign} unico opciones={['con', 'cero']} seleccion={valorFiltro ? [valorFiltro] : []}
+              onCambio={(v) => setValorFiltro(v[0] || null)} nombre={(v) => (v === 'con' ? 'Con valor' : 'En $0')} />
+          </div>
+        )}
       </div>
 
-      {(tipoFiltro || mediosFiltro.length > 0 || hayFiltro) && (
+      {hayFiltro && (
         <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Filtros activos">
-          {tipoFiltro && (
-            <button type="button" onClick={() => setTipoFiltro(null)} className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 text-xs font-semibold hover:bg-emerald-100">
-              {TIPOS[tipoFiltro].nombre} <X size={12} aria-label="Quitar" />
-            </button>
-          )}
-          {mediosFiltro.map(m => (
-            <button key={m} type="button" onClick={() => setMediosFiltro(l => l.filter(x => x !== m))} className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full bg-violet-50 text-violet-800 ring-1 ring-violet-200 text-xs font-semibold hover:bg-violet-100">
-              {m} <X size={12} aria-label="Quitar" />
+          {[
+            search && { k: 's', t: `“${search}”`, quitar: () => setSearch('') },
+            ...(selectedYears || []).map(y => ({ k: `a${y}`, t: y, quitar: () => setSelectedYears(l => { const n = l.filter(x => x !== y); return n.length ? n : null }) })),
+            ...(selectedMonths || []).map(m => ({ k: `m${m}`, t: m, quitar: () => setSelectedMonths(l => { const n = l.filter(x => x !== m); return n.length ? n : null }) })),
+            tipoFiltro && { k: 't', t: TIPOS[tipoFiltro].nombre, quitar: () => setTipoFiltro(null) },
+            ...mediosFiltro.map(m => ({ k: `d${m}`, t: m, quitar: () => setMediosFiltro(l => l.filter(x => x !== m)) })),
+            ...planesFiltro.map(p => ({ k: `p${p}`, t: p, quitar: () => setPlanesFiltro(l => l.filter(x => x !== p)) })),
+            ...estadosFiltro.map(e => ({ k: `e${e}`, t: e, quitar: () => setEstadosFiltro(l => l.filter(x => x !== e)) })),
+            valorFiltro && { k: 'v', t: valorFiltro === 'con' ? 'Con valor' : 'En $0', quitar: () => setValorFiltro(null) },
+            fechaDesde && { k: 'fd', t: `Desde ${formatDate(fechaDesde)}`, quitar: () => setFechaDesde('') },
+            fechaHasta && { k: 'fh', t: `Hasta ${formatDate(fechaHasta)}`, quitar: () => setFechaHasta('') },
+          ].filter(Boolean).map(c => (
+            <button key={c.k} type="button" onClick={c.quitar} className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 text-xs font-semibold hover:bg-emerald-100">
+              {c.t} <X size={12} aria-label={`Quitar ${c.t}`} />
             </button>
           ))}
           <button type="button" onClick={limpiarFiltros} className="text-xs font-semibold text-rose-600 hover:underline ml-1">Limpiar filtros</button>

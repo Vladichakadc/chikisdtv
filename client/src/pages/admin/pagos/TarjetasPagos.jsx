@@ -149,7 +149,7 @@ export function TarjetasPagos({ resumen: r, mes, filtroActivo, tipoActivo, medio
           {[['renovacion', 'Por renovación'], ['activacion', 'Por activación']].map(([k, n]) => (
             <div key={k} className="flex items-center justify-between gap-2">
               <dt className="flex items-center gap-1.5 text-slate-500"><span className="w-2 h-2 rounded-full" style={{ background: TIPOS[k].color }} />{n}</dt>
-              <dd className="font-semibold text-slate-800 tabular-nums">{pesos(r.ticketPorTipo[k])}</dd>
+              <dd className="font-semibold text-slate-800 tabular-nums">{r.ticketPorTipo[k] ? pesos(r.ticketPorTipo[k]) : "—"}</dd>
             </div>
           ))}
         </dl>
